@@ -56,7 +56,44 @@ fun GenjurStreamHome(activity: MainActivity) {
     var checking by remember { mutableStateOf(true) }
     var downloading by remember { mutableStateOf(false) }
     var updateError by remember { mutableStateOf<String?>(null) }
+    var feedMovies by remember { mutableStateOf(emptyList<FeedMovie>()) }
+    var feedLoading by remember { mutableStateOf(false) }
+    var feedMessage by remember { mutableStateOf("Tambahkan sumber feed JSON, lalu muat katalog.") }
     val scope = rememberCoroutineScope()
+
+    fun refreshCatalog() {
+        scope.launch {
+            feedLoading = true
+            val result = withContext(Dispatchers.IO) {
+                runCatching {
+                    val urls = savedFeedUrls(activity)
+                    require(urls.isNotEmpty()) { "Belum ada sumber. Tambahkan sumber terlebih dahulu." }
+                    val movies = mutableListOf<FeedMovie>()
+                    urls.forEach { sourceUrl ->
+                        val connection = URL(sourceUrl).openConnection()
+                        connection.connectTimeout = 12000
+                        connection.readTimeout = 20000
+                        val root = JSONObject(connection.getInputStream().bufferedReader().use { it.readText() })
+                        val items = root.optJSONArray("items") ?: error("Feed tidak memiliki array items.")
+                        for (i in 0 until items.length()) {
+                            val item = items.optJSONObject(i) ?: continue
+                            val title = item.optString("title").trim()
+                            if (title.isNotEmpty()) movies.add(FeedMovie(
+                                title, item.optString("description", "Sinopsis belum tersedia."),
+                                item.optString("category", "Film"), item.optString("videoUrl")
+                            ))
+                        }
+                    }
+                    movies
+                }
+            }
+            feedLoading = false
+            result.onSuccess {
+                feedMovies = it
+                feedMessage = if (it.isEmpty()) "Feed terbaca, tetapi belum ada item tontonan." else "${it.size} tontonan berhasil dimuat."
+            }.onFailure { feedMessage = it.message ?: "Gagal memuat katalog." }
+        }
+    }
     val categories = listOf("Semua", "Film", "Serial", "Animasi", "Dokumenter")
 
     LaunchedEffect(Unit) {
@@ -192,8 +229,11 @@ fun GenjurStreamHome(activity: MainActivity) {
                 Text(if (feedLoading) "Memuat katalog..." else "Muat katalog dari sumber")
             }
             Text(feedMessage, color = Muted, fontSize = 12.sp)
-            feedMovies.filter { (category == "Semua" || it.category.equals(category, true)) &&
-                (search.isBlank() || it.title.contains(search, true) || it.description.contains(search, true)) }.forEach { movie ->
+            feedMovies.filter { movie ->
+                (category == "Semua" || movie.category.equals(category, ignoreCase = true)) &&
+                    (search.isBlank() || movie.title.contains(search, ignoreCase = true) ||
+                        movie.description.contains(search, ignoreCase = true))
+            }.forEach { movie ->
                 Card(Modifier.fillMaxWidth().padding(top = 8.dp), shape = RoundedCornerShape(16.dp),
                     colors = CardDefaults.cardColors(containerColor = Panel)) {
                     Column(Modifier.padding(16.dp)) {
