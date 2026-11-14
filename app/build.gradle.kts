@@ -8,12 +8,27 @@ android {
     namespace = "com.genjur.stream"
     compileSdk = 35
 
+    signingConfigs {
+        create("stableRelease") {
+            storeFile = file(System.getenv("ANDROID_KEYSTORE_PATH") ?: "keystore.jks")
+            storePassword = System.getenv("ANDROID_KEYSTORE_PASSWORD")
+            keyAlias = System.getenv("ANDROID_KEY_ALIAS")
+            keyPassword = System.getenv("ANDROID_KEY_PASSWORD")
+        }
+    }
+
     defaultConfig {
         applicationId = "com.genjur.stream"
         minSdk = 23
         targetSdk = 35
         versionCode = 2
         versionName = "0.2.0"
+    }
+
+    buildTypes {
+        getByName("debug") {
+            signingConfig = signingConfigs.getByName("stableRelease")
+        }
     }
 
     buildFeatures {
