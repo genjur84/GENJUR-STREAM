@@ -12,6 +12,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -22,6 +23,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
+import org.json.JSONArray
 import java.io.File
 import java.net.URL
 
@@ -34,7 +36,7 @@ private val Muted = Color(0xFFACB7C5)
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContent { MaterialTheme { GenjurStreamHome(this) } }
+        setContent { MaterialTheme { GenjurStreamApp(this) } }
     }
 }
 
@@ -193,4 +195,83 @@ fun GenjurStreamHome(activity: MainActivity) {
                 fontSize = 11.sp, modifier = Modifier.padding(bottom = 10.dp))
         }
     }
+}
+
+
+private data class SavedSource(val name: String, val url: String)
+
+@Composable
+private fun GenjurStreamApp(activity: MainActivity) {
+    var showSources by remember { mutableStateOf(false) }
+    Box(Modifier.fillMaxSize()) {
+        GenjurStreamHome(activity)
+        Button(onClick = { showSources = true },
+            modifier = Modifier.align(Alignment.BottomEnd).padding(18.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = Green, contentColor = Bg)
+        ) { Text("Sumber") }
+        if (showSources) SourcesDialog(activity) { showSources = false }
+    }
+}
+
+@Composable
+private fun SourcesDialog(activity: MainActivity, onClose: () -> Unit) {
+    val prefs = activity.getSharedPreferences("genjur_stream_sources", 0)
+    fun readSources(): List<SavedSource> = runCatching {
+        val a = JSONArray(prefs.getString("items", "[]"))
+        (0 until a.length()).mapNotNull { i ->
+            val o = a.optJSONObject(i) ?: return@mapNotNull null
+            SavedSource(o.optString("name"), o.optString("url"))
+        }
+    }.getOrDefault(emptyList())
+    var sources by remember { mutableStateOf(readSources()) }
+    var name by remember { mutableStateOf("") }
+    var url by remember { mutableStateOf("") }
+    var error by remember { mutableStateOf<String?>(null) }
+    AlertDialog(
+        onDismissRequest = onClose,
+        title = { Text("Sumber tontonan") },
+        text = {
+            Column(Modifier.heightIn(max = 440.dp).verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Tambahkan katalog dari sumber yang menyediakan API, RSS, atau feed resmi. URL website biasa belum tentu bisa dibaca otomatis.", color = Muted, fontSize = 12.sp)
+                OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Nama sumber") }, singleLine = true)
+                OutlinedTextField(value = url, onValueChange = { url = it }, label = { Text("URL HTTPS") }, singleLine = true)
+                error?.let { Text(it, color = MaterialTheme.colorScheme.error, fontSize = 12.sp) }
+                Button(onClick = {
+                    val n = name.trim(); val u = url.trim()
+                    val valid = runCatching { Uri.parse(u).let { it.scheme == "https" && !it.host.isNullOrBlank() } }.getOrDefault(false)
+                    when {
+                        n.isBlank() -> error = "Masukkan nama sumber."
+                        !valid -> error = "Masukkan URL HTTPS yang benar."
+                        sources.any { it.url.equals(u, true) } -> error = "Sumber sudah ada."
+                        else -> {
+                            sources = sources + SavedSource(n, u)
+                            val a = JSONArray()
+                            sources.forEach { a.put(JSONObject().put("name", it.name).put("url", it.url)) }
+                            prefs.edit().putString("items", a.toString()).apply()
+                            name = ""; url = ""; error = null
+                        }
+                    }
+                }, colors = ButtonDefaults.buttonColors(containerColor = Green, contentColor = Bg)) { Text("Tambah sumber") }
+                if (sources.isEmpty()) Text("Belum ada sumber tersimpan.", color = Muted)
+                sources.forEachIndexed { index, item ->
+                    Card(colors = CardDefaults.cardColors(containerColor = Panel)) {
+                        Row(Modifier.fillMaxWidth().padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Column(Modifier.weight(1f)) {
+                                Text(item.name, color = Color.White, fontWeight = FontWeight.Bold)
+                                Text(item.url, color = Muted, fontSize = 10.sp)
+                            }
+                            TextButton(onClick = {
+                                sources = sources.filterIndexed { i, _ -> i != index }
+                                val a = JSONArray()
+                                sources.forEach { a.put(JSONObject().put("name", it.name).put("url", it.url)) }
+                                prefs.edit().putString("items", a.toString()).apply()
+                            }) { Text("Hapus") }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onClose) { Text("Selesai") } }
+    )
 }
