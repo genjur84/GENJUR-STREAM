@@ -33,6 +33,13 @@ private val Panel = Color(0xFF171F2B)
 private val Green = Color(0xFF42D6A4)
 private val Muted = Color(0xFFACB7C5)
 
+
+private data class FeedMovie(val title: String, val description: String, val category: String, val videoUrl: String)
+private fun savedFeedUrls(activity: MainActivity): List<String> = runCatching {
+    val a = JSONArray(activity.getSharedPreferences("genjur_stream_sources", 0).getString("items", "[]"))
+    (0 until a.length()).mapNotNull { a.optJSONObject(it)?.optString("url")?.takeIf { u -> u.isNotBlank() } }
+}.getOrDefault(emptyList())
+
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -180,14 +187,25 @@ fun GenjurStreamHome(activity: MainActivity) {
             Text(if (search.isBlank()) "Mulai dari sini" else "Hasil pencarian",
                 color = Color.White, fontSize = 19.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(10.dp))
-            Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(18.dp),
-                colors = CardDefaults.cardColors(containerColor = Panel)) {
-                Column(Modifier.padding(18.dp)) {
-                    Text(if (search.isBlank()) "Koleksi ${category.lowercase()}" else "Pencarian: $search",
-                        color = Green, fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                    Spacer(Modifier.height(6.dp))
-                    Text("Katalog tontonan akan ditampilkan di sini setelah sumber konten resmi ditambahkan.",
-                        color = Muted, fontSize = 13.sp, lineHeight = 19.sp)
+            Button(onClick = { refreshCatalog() }, enabled = !feedLoading,
+                colors = ButtonDefaults.buttonColors(containerColor = Green, contentColor = Bg)) {
+                Text(if (feedLoading) "Memuat katalog..." else "Muat katalog dari sumber")
+            }
+            Text(feedMessage, color = Muted, fontSize = 12.sp)
+            feedMovies.filter { (category == "Semua" || it.category.equals(category, true)) &&
+                (search.isBlank() || it.title.contains(search, true) || it.description.contains(search, true)) }.forEach { movie ->
+                Card(Modifier.fillMaxWidth().padding(top = 8.dp), shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = Panel)) {
+                    Column(Modifier.padding(16.dp)) {
+                        Text(movie.title, color = Color.White, fontWeight = FontWeight.Bold)
+                        Text(movie.category, color = Green, fontSize = 11.sp)
+                        Text(movie.description, color = Muted, fontSize = 13.sp)
+                        if (movie.videoUrl.startsWith("https://")) {
+                            TextButton(onClick = { activity.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(movie.videoUrl))) }) {
+                                Text("Putar video")
+                            }
+                        }
+                    }
                 }
             }
             Spacer(Modifier.height(26.dp))
