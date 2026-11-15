@@ -32,7 +32,7 @@ android {
 
     defaultConfig {
         applicationId = "com.genjur.stream"
-        minSdk = 23
+        minSdk = 24
         targetSdk = 35
         versionCode = System.getenv("GENJUR_VERSION_CODE")?.toIntOrNull() ?: 8
         versionName = System.getenv("GENJUR_VERSION_NAME") ?: "0.5.3"
@@ -77,6 +77,7 @@ dependencies {
 
     implementation("androidx.media3:media3-exoplayer:1.5.1")
     implementation("androidx.media3:media3-exoplayer-hls:1.5.1")
+    implementation("dev.ffmpegkit-maintained:ffmpeg-kit-full:8.1.7")
     implementation("androidx.media3:media3-ui:1.5.1")
 
     debugImplementation("androidx.compose.ui:ui-tooling")
