@@ -771,27 +771,6 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                                 Spacer(Modifier.height(16.dp))
                             }
                         }
-                        Spacer(Modifier.height(18.dp))
-                        Text("Kategori", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-                        Spacer(Modifier.height(10.dp))
-                        categories.drop(1).chunked(if (tvLayout) 4 else 2).forEach { items ->
-                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                                items.forEach { item ->
-                                    Card(onClick = {
-                                        category = item; selectedTab = "Kategori"
-                                    }, modifier = Modifier.weight(1f).padding(bottom = 8.dp),
-                                        shape = RoundedCornerShape(16.dp),
-                                        colors = CardDefaults.cardColors(containerColor = Color(0xFF24202E))) {
-                                        Column(Modifier.fillMaxWidth().padding(vertical = 18.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                                            Text(when(item) { "Film" -> "▣"; "Serial" -> "▤"; "Animasi" -> "✧"; else -> "◉" },
-                                                color = Color(0xFFC4A7FF), fontSize = 28.sp)
-                                            Text(item, color = Color.White, fontWeight = FontWeight.SemiBold)
-                                        }
-                                    }
-                                }
-                                if (items.size < (if (tvLayout) 4 else 2)) Spacer(Modifier.weight(1f))
-                            }
-                        }
                     } else {
                         Text(selectedTab, color = Color.White, fontSize = 27.sp, fontWeight = FontWeight.ExtraBold)
                         Spacer(Modifier.height(14.dp))
