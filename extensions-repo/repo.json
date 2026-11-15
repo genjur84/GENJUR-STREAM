@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "name": "GENJUR EXTENSIONS",
+  "description": "Repositori ekstensi resmi GENJUR STREAM.",
+  "extensions": [
+    {
+      "id": "genjur-public-domain-catalog",
+      "name": "Katalog Domain Publik",
+      "description": "Katalog uji untuk film dan video yang telah diverifikasi berstatus domain publik atau memiliki izin distribusi.",
+      "feedUrl": "https://raw.githubusercontent.com/genjur84/GENJUR-STREAM/main/extensions-repo/feeds/public-domain.json"
+    }
+  ]
+}
