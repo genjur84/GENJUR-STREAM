@@ -309,6 +309,7 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
     var category by remember { mutableStateOf("Semua") }
     var selectedTab by remember { mutableStateOf("Beranda") }
     var savedSourceMenu by remember { mutableStateOf(emptyList<SavedSourceLink>()) }
+    var selectedSearchSourceUrl by remember { mutableStateOf<String?>(null) }
     var sourceMenuExpanded by remember { mutableStateOf(false) }
     var selectedSourceName by remember { mutableStateOf("Sumber Link") }
     LaunchedEffect(selectedTab) {
@@ -716,6 +717,20 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                                     colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White,
                                         unfocusedTextColor = Color.White, focusedBorderColor = Green,
                                         unfocusedBorderColor = Color(0xFF393344), cursorColor = Green))
+                                Spacer(Modifier.height(8.dp))
+                                Text("Cari dari sumber:", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                                Row(Modifier.fillMaxWidth().clickable { selectedSearchSourceUrl = null }, verticalAlignment = Alignment.CenterVertically) {
+                                    Checkbox(checked = selectedSearchSourceUrl == null, onCheckedChange = { if (it) selectedSearchSourceUrl = null },
+                                        colors = CheckboxDefaults.colors(checkedColor = Green, uncheckedColor = Muted))
+                                    Text("Semua sumber", color = Color.White, fontSize = 13.sp)
+                                }
+                                savedSourceMenu.forEach { source ->
+                                    Row(Modifier.fillMaxWidth().clickable { selectedSearchSourceUrl = source.url }, verticalAlignment = Alignment.CenterVertically) {
+                                        Checkbox(checked = selectedSearchSourceUrl == source.url, onCheckedChange = { checked -> selectedSearchSourceUrl = if (checked) source.url else null },
+                                            colors = CheckboxDefaults.colors(checkedColor = Green, uncheckedColor = Muted))
+                                        Text(source.name, color = Color.White, fontSize = 13.sp, maxLines = 1)
+                                    }
+                                }
                             }
                             "Sumber Link" -> {
                                 SourceLinksScreen(activity = activity, onOpenLink = { link ->
@@ -869,7 +884,12 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                         if (selectedTab == "Cari" || selectedTab == "Kategori") {
                             Spacer(Modifier.height(14.dp))
                             feedMovies.filter { movie ->
-                                (category == "Semua" || selectedTab != "Kategori" || movie.category.equals(category, true)) &&
+                                val selectedHost = selectedSearchSourceUrl?.let { Uri.parse(it).host?.lowercase()?.removePrefix("www.") }
+                                val movieHost = listOf(movie.videoUrl, movie.termsUrl).mapNotNull { candidate ->
+                                    runCatching { Uri.parse(candidate).host?.lowercase()?.removePrefix("www.") }.getOrNull()
+                                }.firstOrNull()
+                                (selectedTab != "Cari" || selectedHost == null || movieHost == selectedHost || movieHost?.endsWith(".$selectedHost") == true) &&
+                                    (category == "Semua" || selectedTab != "Kategori" || movie.category.equals(category, true)) &&
                                     (search.isBlank() || movie.title.contains(search, true) || movie.description.contains(search, true) || movie.genres.any { it.contains(search, true) })
                             }.forEach { movie ->
                                 Card(Modifier.fillMaxWidth().padding(bottom = 9.dp), colors = CardDefaults.cardColors(containerColor = Panel)) {
