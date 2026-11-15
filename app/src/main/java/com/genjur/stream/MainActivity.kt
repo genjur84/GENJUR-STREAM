@@ -776,7 +776,7 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                                             browserInitialUrl = if (host == "youtube.com" || host.endsWith(".youtube.com") || host == "youtu.be") {
                                                 "https://www.youtube.com/results?search_query=$query"
                                             } else {
-                                                sourceUrl
+                                                "https://www.google.com/search?q=" + Uri.encode("site:$host ${search.trim()}")
                                             }
                                             selectedTab = "Browser Sumber"
                                         }
@@ -786,6 +786,14 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                                     colors = ButtonDefaults.outlinedButtonColors(contentColor = Green)
                                 ) {
                                     Text(if (selectedSource != null) "Cari di sumber ${selectedSource.name}" else "Pilih sumber untuk mencari")
+                                }
+                                selectedSource?.let { source ->
+                                    val sourceHost = Uri.parse(source.url).host?.removePrefix("www.") ?: source.url
+                                    Text(
+                                        "Hasil pencarian dibatasi ke alamat $sourceHost. Periksa alamat situs pada setiap hasil sebelum dibuka.",
+                                        color = Muted,
+                                        fontSize = 11.sp
+                                    )
                                 }
                             }
                             "Sumber Link" -> {
