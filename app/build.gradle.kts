@@ -21,8 +21,8 @@ android {
         applicationId = "com.genjur.stream"
         minSdk = 23
         targetSdk = 35
-        versionCode = 4
-        versionName = "0.4.0"
+        versionCode = 5
+        versionName = "0.5.0"
     }
 
     buildTypes {
@@ -57,6 +57,7 @@ dependencies {
     implementation("androidx.core:core-ktx:1.15.0")
 
     implementation("androidx.media3:media3-exoplayer:1.5.1")
+    implementation("androidx.media3:media3-exoplayer-hls:1.5.1")
     implementation("androidx.media3:media3-ui:1.5.1")
 
     debugImplementation("androidx.compose.ui:ui-tooling")
