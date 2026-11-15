@@ -20,6 +20,14 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Link
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.Icon
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -872,7 +880,15 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     // Pencarian tetap berada di ikon kaca pembesar bagian atas.
-                    listOf("Beranda" to "⌂", "Sumber Link" to "↗", "Unduhan" to "⇩", "Favorit" to "♡", "Riwayat" to "◷", "Pengaturan" to "⚙").forEach { (tab, glyph) ->
+                    listOf(
+                        "Beranda" to Icons.Filled.Home,
+                        "Sumber Link" to Icons.Filled.Link,
+                        "Unduhan" to Icons.Filled.Download,
+                        "Favorit" to Icons.Filled.Favorite,
+                        "Riwayat" to Icons.Filled.History,
+                        "Pengaturan" to Icons.Filled.Settings
+                    ).forEach { (tab, navIcon) ->
+                        val isSelected = selectedTab == tab
                         Column(
                             modifier = Modifier.width(if (tvLayout) 104.dp else 56.dp).clickable {
                                 selectedTab = tab
@@ -880,8 +896,12 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.Center
                         ) {
-                            Text(glyph, color = if (selectedTab == tab) Green else Muted,
-                                fontSize = if (tvLayout) 25.sp else 24.sp, maxLines = 1)
+                            Icon(
+                                imageVector = navIcon,
+                                contentDescription = tab,
+                                tint = if (isSelected) Green else Muted,
+                                modifier = Modifier.size(if (tvLayout) 27.dp else 25.dp)
+                            )
                         }
                     }
                 }
