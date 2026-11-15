@@ -739,6 +739,38 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                                 }
                             }
                         }
+                        if (feedMovies.isNotEmpty()) {
+                            Spacer(Modifier.height(22.dp))
+                            Text("Katalog dari Sumber", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                            Text("${feedMovies.size} judul berhasil dikenali dari sumber tersimpan", color = Muted, fontSize = 11.sp)
+                            Spacer(Modifier.height(12.dp))
+                            feedMovies.groupBy { it.category.ifBlank { "Sumber Web" } }.forEach { (groupName, items) ->
+                                Text(groupName, color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                                Spacer(Modifier.height(8.dp))
+                                Row(
+                                    Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                ) {
+                                    items.take(30).forEach { movie ->
+                                        Column(
+                                            Modifier.width(if (tvLayout) 150.dp else 116.dp)
+                                                .clickable {
+                                                    if (movie.licenseId == "Metadata halaman sumber") {
+                                                        browserInitialUrl = movie.videoUrl
+                                                        selectedTab = "Browser Sumber"
+                                                    } else selectedMovie = movie
+                                                }
+                                        ) {
+                                            MoviePoster(movie.posterUrl, movie.title, if (tvLayout) 190.dp else 148.dp)
+                                            Spacer(Modifier.height(6.dp))
+                                            Text(movie.title, color = Color.White, fontSize = 12.sp,
+                                                fontWeight = FontWeight.SemiBold, maxLines = 2)
+                                        }
+                                    }
+                                }
+                                Spacer(Modifier.height(16.dp))
+                            }
+                        }
                         Spacer(Modifier.height(18.dp))
                         Text("Kategori", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
                         Spacer(Modifier.height(10.dp))
