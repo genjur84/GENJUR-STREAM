@@ -908,7 +908,8 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                                 val movieHost = listOf(movie.videoUrl, movie.termsUrl).mapNotNull { candidate ->
                                     runCatching { Uri.parse(candidate).host?.lowercase()?.removePrefix("www.") }.getOrNull()
                                 }.firstOrNull()
-                                (selectedTab != "Cari" || selectedHost == null || movieHost == selectedHost || movieHost?.endsWith(".$selectedHost") == true) &&
+                                (selectedTab != "Cari" || !movie.title.equals("Drama", true)) &&
+                                    (selectedTab != "Cari" || selectedHost == null || movieHost == selectedHost || movieHost?.endsWith(".$selectedHost") == true) &&
                                     (category == "Semua" || selectedTab != "Kategori" || movie.category.equals(category, true)) &&
                                     (search.isBlank() || movie.title.contains(search, true) || movie.description.contains(search, true) || movie.genres.any { it.contains(search, true) })
                             }.forEach { movie ->
