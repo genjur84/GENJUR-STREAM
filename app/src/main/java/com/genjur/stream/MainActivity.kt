@@ -431,6 +431,7 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
     var watchHistory by remember { mutableStateOf(readSavedMovies(activity, "history")) }
     var downloads by remember { mutableStateOf(readDownloads(activity)) }
     var downloadMessage by remember { mutableStateOf<String?>(null) }
+    var confirmClearDownloads by remember { mutableStateOf(false) }
     var downloadStates by remember { mutableStateOf<Map<Long, Pair<Int, String>>>(emptyMap()) }
     val libraryPrefs = remember { activity.getSharedPreferences("genjur_stream_library", 0) }
     val downloadManager = remember { activity.getSystemService(DownloadManager::class.java) }
@@ -1135,6 +1136,11 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                             }
                             "Unduhan" -> {
                                 downloadMessage?.let { Text(it, color = if (it.startsWith("Gagal") || it.contains("belum")) MaterialTheme.colorScheme.error else Green, fontSize = 12.sp) }
+                                if (downloads.isNotEmpty()) {
+                                    TextButton(onClick = { confirmClearDownloads = true }) {
+                                        Text("Hapus semua riwayat unduhan", color = Color(0xFFFF8A8A))
+                                    }
+                                }
                                 if (downloads.isEmpty()) {
                                     Text("Belum ada video yang diunduh.", color = Muted)
                                 } else {
@@ -1348,6 +1354,34 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                 }
             }
         }
+    }
+
+    if (confirmClearDownloads) {
+        AlertDialog(
+            onDismissRequest = { confirmClearDownloads = false },
+            title = { Text("Hapus semua riwayat unduhan?") },
+            text = { Text("Daftar unduhan akan dikosongkan. File MP4 hasil konversi dan unduhan GENJUR yang tersimpan juga akan dihapus.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    downloads.forEach { entry ->
+                        if (entry.id < 0L) {
+                            adaptiveSessions[entry.id]?.let { FFmpegKit.cancel(it) }
+                            File(Uri.parse(entry.movie.videoUrl).path.orEmpty()).delete()
+                        } else {
+                            runCatching { downloadManager.remove(entry.id) }
+                        }
+                    }
+                    downloads = emptyList()
+                    downloadStates = emptyMap()
+                    persistDownloads(emptyList())
+                    downloadMessage = "Riwayat unduhan sudah dikosongkan. Silakan coba download lagi untuk menguji pesan terbaru."
+                    confirmClearDownloads = false
+                }) { Text("Hapus semua", color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmClearDownloads = false }) { Text("Batal") }
+            }
+        )
     }
 
     selectedMovie?.let { movie ->
