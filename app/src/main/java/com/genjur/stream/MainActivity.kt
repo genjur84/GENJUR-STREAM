@@ -474,10 +474,6 @@ private fun GenjurStreamApp(activity: MainActivity) {
     var showSources by remember { mutableStateOf(false) }
     Box(Modifier.fillMaxSize()) {
         GenjurStreamHome(activity) { showSources = true }
-        Button(onClick = { showSources = true },
-            modifier = Modifier.align(Alignment.BottomEnd).padding(18.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = Green, contentColor = Bg)
-        ) { Text("Sumber") }
         if (showSources) SourcesDialog(activity) { showSources = false }
     }
 }
