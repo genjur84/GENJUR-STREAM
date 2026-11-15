@@ -40,6 +40,7 @@ The feed URL must return JSON with an explicit distribution-rights declaration:
       "title": "Example film",
       "description": "Synopsis supplied by the authorized provider.",
       "category": "Drama",
+      "posterUrl": "https://catalog.example.org/posters/example-film.jpg",
       "videoUrl": "https://media.example.org/authorized-title.mp4"
     }
   ]
@@ -52,6 +53,7 @@ The current feed reader requires:
 - an HTTPS `rights.termsUrl`;
 - a non-empty `rights.attribution`;
 - an `items` array; each item must have a non-empty `title`;
+- `posterUrl` is optional; when present it must be a valid HTTPS image URL and is shown on the catalog card and detail page.
 - `videoUrl` may be empty for metadata-only catalog entries, otherwise it must be a valid HTTPS URL.
 
 Use only catalog metadata, artwork, and playback URLs that the provider has authorized you to redistribute or display. A repository index is not itself proof of rights; each feed provider remains responsible for its license and terms.
