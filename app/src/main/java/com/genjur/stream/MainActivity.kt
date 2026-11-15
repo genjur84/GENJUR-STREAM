@@ -1365,6 +1365,7 @@ private fun SourceBrowser(initialUrl: String, fullScreen: Boolean = false, onPla
     var address by remember(initialUrl) { mutableStateOf(initialUrl) }
     var currentUrl by remember(initialUrl) { mutableStateOf(initialUrl) }
     var pageTitle by remember { mutableStateOf("Masukkan alamat situs sumber video.") }
+    var isLoading by remember(initialUrl) { mutableStateOf(initialUrl.isNotBlank()) }
     var webView by remember { mutableStateOf<WebView?>(null) }
     Column(Modifier.fillMaxSize().padding(if (fullScreen) 0.dp else 8.dp), verticalArrangement = Arrangement.spacedBy(if (fullScreen) 4.dp else 8.dp)) {
         if (!fullScreen) Text("Buka situs sumber video di dalam GENJUR STREAM. Gunakan hanya situs dan video yang boleh kamu akses.", color = Muted, fontSize = 12.sp)
@@ -1390,6 +1391,10 @@ private fun SourceBrowser(initialUrl: String, fullScreen: Boolean = false, onPla
             }
             Text(pageTitle, color = Muted, fontSize = 11.sp, maxLines = 2)
         }
+        Box(
+            modifier = if (fullScreen) Modifier.fillMaxWidth().weight(1f) else Modifier.fillMaxWidth().height(420.dp),
+            contentAlignment = Alignment.Center
+        ) {
         AndroidView(
             factory = { context ->
                 WebView(context).apply {
@@ -1402,7 +1407,11 @@ private fun SourceBrowser(initialUrl: String, fullScreen: Boolean = false, onPla
                         post { onPlaybackStarted(title, pageUrl) }
                     }, "GenjurPlayback")
                     webViewClient = object : WebViewClient() {
+                        override fun onPageStarted(view: WebView, url: String, favicon: android.graphics.Bitmap?) {
+                            isLoading = true
+                        }
                         override fun onPageFinished(view: WebView, url: String) {
+                            isLoading = false
                             pageTitle = view.title?.takeIf { it.isNotBlank() } ?: url
                             address = url
                             view.evaluateJavascript(
@@ -1429,6 +1438,9 @@ private fun SourceBrowser(initialUrl: String, fullScreen: Boolean = false, onPla
                                 null
                             )
                         }
+                        override fun onReceivedError(view: WebView, request: WebResourceRequest, error: android.webkit.WebResourceError) {
+                            if (request.isForMainFrame) isLoading = false
+                        }
                         override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
                             val scheme = request.url.scheme
                             return scheme != "https" && scheme != "http"
@@ -1444,8 +1456,15 @@ private fun SourceBrowser(initialUrl: String, fullScreen: Boolean = false, onPla
                     view.loadUrl(currentUrl)
                 }
             },
-            modifier = if (fullScreen) Modifier.fillMaxWidth().weight(1f) else Modifier.fillMaxWidth().height(420.dp)
+            modifier = Modifier.fillMaxSize()
         )
+        if (isLoading) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                CircularProgressIndicator(color = Green)
+                Text("Memuat situs... Mohon tunggu", color = Color.White, fontSize = 13.sp)
+            }
+        }
+        }
         if (!fullScreen) Text("Situs dengan DRM, login khusus, atau pemutar tanpa tautan video langsung mungkin tidak dapat dialihkan ke GENJUR Player.", color = Muted, fontSize = 10.sp)
     }
 }
