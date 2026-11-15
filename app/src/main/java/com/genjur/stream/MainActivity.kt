@@ -566,7 +566,7 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
         }
     }
 
-    val categories = listOf("Semua") + (listOf("Film", "Serial", "Animasi", "Dokumenter") + feedMovies.map { it.category }).map { it.trim() }.filter { it.isNotBlank() }.distinct()
+    val categories = listOf("Semua") + (listOf("Film", "Serial", "Animasi", "Dokumenter") + feedMovies.map { it.category }).map { it.trim() }.filter { it.isNotBlank() && !it.equals("Drama", true) }.distinct()
 
     LaunchedEffect(Unit) {
         val result = withContext(Dispatchers.IO) {
