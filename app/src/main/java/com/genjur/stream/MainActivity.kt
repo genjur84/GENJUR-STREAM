@@ -231,12 +231,13 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
+fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}, onOpenWebsite: (String) -> Unit = {}) {
     var search by remember { mutableStateOf("") }
     var category by remember { mutableStateOf("Semua") }
     var selectedTab by remember { mutableStateOf("Beranda") }
     var browserVideoUrl by remember { mutableStateOf<String?>(null) }
     var browserInitialUrl by remember { mutableStateOf("") }
+    var browserAllowVideoDetection by remember { mutableStateOf(true) }
     var updateVersion by remember { mutableStateOf<String?>(null) }
     var updateUrl by remember { mutableStateOf<String?>(null) }
     var checking by remember { mutableStateOf(true) }
@@ -723,7 +724,8 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                                 })
                             }
                             "Browser Sumber" -> {
-                                SourceBrowser(initialUrl = browserInitialUrl, onVideoDetected = { detected -> browserVideoUrl = detected })
+                                SourceBrowser(initialUrl = browserInitialUrl, allowVideoDetection = browserAllowVideoDetection,
+                                    onVideoDetected = { detected -> browserVideoUrl = detected })
                                 browserVideoUrl?.let { videoUrl ->
                                     Spacer(Modifier.height(12.dp))
                                     Card(colors = CardDefaults.cardColors(containerColor = Panel)) {
@@ -1176,7 +1178,7 @@ private inline fun <T> List<T>.anyIndexed(predicate: (Int, T) -> Boolean): Boole
     return false
 }
 @Composable
-private fun SourceBrowser(initialUrl: String, onVideoDetected: (String) -> Unit) {
+private fun SourceBrowser(initialUrl: String, allowVideoDetection: Boolean = true, onVideoDetected: (String) -> Unit) {
     var address by remember(initialUrl) { mutableStateOf(initialUrl) }
     var currentUrl by remember(initialUrl) { mutableStateOf(initialUrl) }
     var pageTitle by remember { mutableStateOf("Masukkan alamat situs sumber video.") }
@@ -1221,12 +1223,14 @@ private fun SourceBrowser(initialUrl: String, onVideoDetected: (String) -> Unit)
                             return scheme != "https" && scheme != "http"
                         }
                         override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): android.webkit.WebResourceResponse? {
-                            val candidate = request.url.toString()
-                            val path = request.url.path.orEmpty().lowercase()
-                            val cleanPath = path.substringBefore("?")
-                            val looksLikeVideo = listOf(".mp4", ".m3u8", ".mpd", ".webm", ".m4v").any { cleanPath.endsWith(it) }
-                            if (looksLikeVideo && candidate.startsWith("https://")) {
-                                view.post { onVideoDetected(candidate) }
+                            if (allowVideoDetection) {
+                                val candidate = request.url.toString()
+                                val path = request.url.path.orEmpty().lowercase()
+                                val cleanPath = path.substringBefore("?")
+                                val looksLikeVideo = listOf(".mp4", ".m3u8", ".mpd", ".webm", ".m4v").any { cleanPath.endsWith(it) }
+                                if (looksLikeVideo && candidate.startsWith("https://")) {
+                                    view.post { onVideoDetected(candidate) }
+                                }
                             }
                             return super.shouldInterceptRequest(view, request)
                         }
@@ -1244,6 +1248,49 @@ private fun SourceBrowser(initialUrl: String, onVideoDetected: (String) -> Unit)
             modifier = Modifier.fillMaxWidth().height(420.dp)
         )
         Text("Situs dengan DRM, login khusus, atau pemutar tanpa tautan video langsung mungkin tidak dapat dialihkan ke GENJUR Player.", color = Muted, fontSize = 10.sp)
+    }
+}
+
+@Composable
+private fun ProviderWebDialog(url: String, onClose: () -> Unit) {
+    Dialog(onDismissRequest = onClose, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Surface(
+            Modifier.fillMaxWidth().fillMaxHeight(0.92f).padding(8.dp),
+            shape = RoundedCornerShape(18.dp),
+            color = Panel
+        ) {
+            Column(Modifier.fillMaxSize().padding(10.dp)) {
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text("Layanan streaming resmi", color = Color.White, fontWeight = FontWeight.Bold)
+                        Text("Pemutaran melalui pemutar resmi situs jika didukung", color = Muted, fontSize = 10.sp)
+                    }
+                    TextButton(onClick = onClose) { Text("Tutup", color = Green) }
+                }
+                AndroidView(
+                    factory = { context ->
+                        WebView(context).apply {
+                            settings.javaScriptEnabled = true
+                            settings.domStorageEnabled = true
+                            settings.loadsImagesAutomatically = true
+                            settings.mediaPlaybackRequiresUserGesture = true
+                            webChromeClient = WebChromeClient()
+                            webViewClient = WebViewClient()
+                            loadUrl(url)
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth().weight(1f)
+                )
+                Text(
+                    "GENJUR STREAM tidak mengambil URL video, melewati login, atau membuka DRM. Jika penyedia mewajibkan aplikasi resminya, pemutaran di sini mungkin tidak tersedia.",
+                    color = Muted, fontSize = 10.sp
+                )
+            }
+        }
     }
 }
 
@@ -1330,14 +1377,23 @@ private data class RepositoryExtension(
 @Composable
 private fun GenjurStreamApp(activity: MainActivity) {
     var showRepositories by remember { mutableStateOf(false) }
+    var providerUrl by remember { mutableStateOf<String?>(null) }
     Box(Modifier.fillMaxSize()) {
-        GenjurStreamHome(activity) { showRepositories = true }
-        if (showRepositories) RepositoryDialog(activity) { showRepositories = false }
+        GenjurStreamHome(activity, onOpenSources = { showRepositories = true }, onOpenWebsite = { url ->
+            showRepositories = false
+            providerUrl = url
+        })
+        if (showRepositories) RepositoryDialog(activity, onOpenWebsite = { url ->
+            providerUrl = url
+        }) { showRepositories = false }
+        providerUrl?.let { url ->
+            ProviderWebDialog(url = url, onClose = { providerUrl = null })
+        }
     }
 }
 
 @Composable
-private fun RepositoryDialog(activity: MainActivity, onClose: () -> Unit) {
+private fun RepositoryDialog(activity: MainActivity, onOpenWebsite: (String) -> Unit, onClose: () -> Unit) {
     val prefs = activity.getSharedPreferences("genjur_stream_sources", 0)
     fun readRepositories(): List<SavedRepository> = runCatching {
         val a = JSONArray(prefs.getString("repositories", "[]"))
@@ -1534,10 +1590,8 @@ private fun RepositoryDialog(activity: MainActivity, onClose: () -> Unit) {
                                 if (extension.isExternal) {
                                     if (extension.freeNote.isNotBlank()) Text(extension.freeNote, color = Muted, fontSize = 10.sp)
                                     TextButton(onClick = {
-                                        runCatching {
-                                            activity.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(extension.websiteUrl)))
-                                        }.onFailure { error = "Tidak dapat membuka situs penyedia." }
-                                    }) { Text("Buka layanan resmi", color = Green) }
+                                        onOpenWebsite(extension.websiteUrl)
+                                    }) { Text("Buka di GENJUR STREAM", color = Green) }
                                 } else if (extension.isCloudStream) {
                                     if (extension.language.isNotBlank()) Text("Bahasa: ${extension.language}", color = Muted, fontSize = 10.sp)
                                     if (extension.tvTypes.isNotBlank()) Text("Kategori: ${extension.tvTypes}", color = Muted, fontSize = 10.sp)
