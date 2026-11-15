@@ -62,6 +62,9 @@ import androidx.media3.common.MimeTypes
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import androidx.media3.ui.PlayerNotificationManager
+import com.arthenica.ffmpegkit.FFmpegKit
+import com.arthenica.ffmpegkit.FFprobeKit
+import com.arthenica.ffmpegkit.ReturnCode
 import androidx.media3.common.Player
 import androidx.core.content.FileProvider
 import androidx.core.content.ContextCompat
@@ -494,16 +497,117 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                 downloadMessage = "Gagal memulai download: ${error.message ?: "kesalahan sistem"}"
             }
     }
+    val adaptiveSessions = remember { mutableMapOf<Long, Long>() }
+    fun setAdaptiveState(id: Long, percent: Int, label: String) {
+        activity.runOnUiThread {
+            downloadStates = downloadStates + (id to (percent.coerceIn(0, 100) to label))
+        }
+    }
+    fun startAdaptiveDownload(title: String, pageUrl: String, mediaUrl: String) {
+        val uri = Uri.parse(mediaUrl)
+        if (uri.scheme !in listOf("http", "https") || uri.host.isNullOrBlank()) {
+            downloadMessage = "Alamat streaming tidak valid."
+            return
+        }
+        if (downloads.any { it.movie.downloadUrl == mediaUrl }) {
+            downloadMessage = "Streaming ini sudah ada di daftar Unduhan."
+            return
+        }
+        val id = -System.currentTimeMillis().coerceAtLeast(1L)
+        val outputDir = activity.getExternalFilesDir(Environment.DIRECTORY_MOVIES)
+        if (outputDir == null || (!outputDir.exists() && !outputDir.mkdirs())) {
+            downloadMessage = "Gagal menyiapkan folder penyimpanan MP4."
+            return
+        }
+        val outputFile = File(outputDir, "genjur_${kotlin.math.abs(id)}.mp4")
+        val safeTitle = title.ifBlank { "Video dari situs" }
+        val movie = FeedMovie(
+            title = safeTitle,
+            description = "Streaming HLS/DASH yang dikonversi menjadi MP4.",
+            category = "Sumber Web",
+            videoUrl = Uri.fromFile(outputFile).toString(),
+            licenseId = "User-provided website",
+            termsUrl = pageUrl,
+            attribution = "Situs sumber: ${Uri.parse(pageUrl).host.orEmpty()}",
+            downloadUrl = mediaUrl,
+            downloadAllowed = true
+        )
+        downloads = listOf(DownloadEntry(id, movie)) + downloads
+        persistDownloads(downloads)
+        downloadStates = downloadStates + (id to (0 to "Menyiapkan"))
+        downloadMessage = "Sedang membaca durasi streaming sebelum membuat MP4."
+
+        val pageUri = Uri.parse(pageUrl)
+        val cookieManager = android.webkit.CookieManager.getInstance()
+        val cookies = sequenceOf(mediaUrl, pageUrl)
+            .mapNotNull { url -> runCatching { cookieManager.getCookie(url) }.getOrNull() }
+            .firstOrNull { it.isNotBlank() }
+        val headers = buildString {
+            append("User-Agent: Mozilla/5.0 (Linux; Android 11) AppleWebKit/537.36 Chrome/120.0.0.0 Mobile Safari/537.36\r\n")
+            if (pageUrl.startsWith("http")) {
+                append("Referer: $pageUrl\r\n")
+                if (!pageUri.host.isNullOrBlank()) append("Origin: ${pageUri.scheme}://${pageUri.host}\r\n")
+            }
+            if (!cookies.isNullOrBlank()) append("Cookie: $cookies\r\n")
+        }
+        val probeArgs = mutableListOf("-v", "error", "-show_entries", "format=duration", "-of", "json")
+        probeArgs.addAll(listOf("-headers", headers, mediaUrl))
+        FFprobeKit.executeWithArgumentsAsync(probeArgs.toTypedArray()) { probeSession ->
+            val durationMs = runCatching {
+                val seconds = JSONObject(probeSession.output.orEmpty())
+                    .optJSONObject("format")?.optString("duration")?.toDoubleOrNull() ?: 0.0
+                (seconds * 1000.0).toLong().coerceAtLeast(0L)
+            }.getOrDefault(0L)
+            setAdaptiveState(id, 0, "Mengunduh")
+            val args = mutableListOf(
+                "-y", "-hide_banner", "-loglevel", "warning",
+                "-headers", headers,
+                "-i", mediaUrl,
+                "-map", "0:v:0",
+                "-map", "0:a:0?",
+                "-c", "copy",
+                "-movflags", "+faststart",
+                "-f", "mp4",
+                outputFile.absolutePath
+            )
+            FFmpegKit.executeWithArgumentsAsync(
+                args.toTypedArray(),
+                { session ->
+                    activity.runOnUiThread {
+                        adaptiveSessions.remove(id)
+                        if (ReturnCode.isSuccess(session.returnCode) && outputFile.exists() && outputFile.length() > 0L) {
+                            downloadStates = downloadStates + (id to (100 to "Selesai"))
+                            downloadMessage = "MP4 selesai dibuat: ${formatVideoSize(outputFile.length())}."
+                        } else {
+                            outputFile.delete()
+                            val detail = session.failStackTrace.orEmpty().ifBlank { session.output.orEmpty() }
+                                .lineSequence().lastOrNull { it.isNotBlank() }?.take(140)
+                            downloadStates = downloadStates + (id to (0 to "Gagal"))
+                            downloadMessage = "Gagal membuat MP4. ${detail ?: "Sumber tidak didukung atau memerlukan DRM."}"
+                        }
+                    }
+                },
+                null,
+                { statistics ->
+                    val percent = if (durationMs > 0L) {
+                        ((statistics.time.toLong() * 100L) / durationMs).toInt().coerceIn(0, 99)
+                    } else 0
+                    setAdaptiveState(id, percent, "Mengunduh")
+                }
+            ).also { session -> adaptiveSessions[id] = session.sessionId }
+        }
+    }
     fun startWebVideoDownload(title: String, pageUrl: String, mediaUrl: String) {
         val uri = Uri.parse(mediaUrl)
         val path = uri.path.orEmpty().lowercase()
         val adaptiveStream = path.endsWith(".m3u8") || path.endsWith(".mpd")
-        val knownVideoFile = listOf(".mp4", ".m4v", ".webm", ".mov", ".mkv").any { path.endsWith(it) }
         val validHttpUrl = uri.scheme in listOf("http", "https") && !uri.host.isNullOrBlank()
-        if (!validHttpUrl || adaptiveStream) {
-            downloadMessage = if (adaptiveStream)
-                "Sumber memakai streaming HLS/DASH. Pengunduhan format ini belum didukung."
-            else "Alamat video tidak valid."
+        if (!validHttpUrl) {
+            downloadMessage = "Alamat video tidak valid."
+            return
+        }
+        if (adaptiveStream) {
+            startAdaptiveDownload(title, pageUrl, mediaUrl)
             return
         }
         val safeTitle = title.ifBlank { "Video dari situs" }
@@ -540,23 +644,33 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
         while (true) {
             val states = mutableMapOf<Long, Pair<Int, String>>()
             downloads.forEach { entry ->
-                val query = DownloadManager.Query().setFilterById(entry.id)
-                val cursor = downloadManager.query(query)
-                cursor?.use {
-                    if (it.moveToFirst()) {
-                        val status = it.getInt(it.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS))
-                        val soFar = it.getLong(it.getColumnIndexOrThrow(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR))
-                        val total = it.getLong(it.getColumnIndexOrThrow(DownloadManager.COLUMN_TOTAL_SIZE_BYTES))
-                        val percent = if (total > 0) ((soFar * 100) / total).toInt() else 0
-                        val label = when (status) {
-                            DownloadManager.STATUS_SUCCESSFUL -> "Selesai"
-                            DownloadManager.STATUS_FAILED -> "Gagal"
-                            DownloadManager.STATUS_PAUSED -> "Dijeda"
-                            DownloadManager.STATUS_PENDING -> "Menunggu"
-                            else -> "Mengunduh"
-                        }
-                        states[entry.id] = percent to label
-                    } else states[entry.id] = 0 to "Tidak ditemukan"
+                if (entry.id < 0L) {
+                    val path = Uri.parse(entry.movie.videoUrl).path.orEmpty()
+                    val file = File(path)
+                    states[entry.id] = when {
+                        file.exists() && file.length() > 0L -> 100 to "Selesai"
+                        downloadStates[entry.id]?.second == "Gagal" -> downloadStates[entry.id]!!
+                        else -> downloadStates[entry.id] ?: (0 to "Menyiapkan")
+                    }
+                } else {
+                    val query = DownloadManager.Query().setFilterById(entry.id)
+                    val cursor = downloadManager.query(query)
+                    cursor?.use {
+                        if (it.moveToFirst()) {
+                            val status = it.getInt(it.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS))
+                            val soFar = it.getLong(it.getColumnIndexOrThrow(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR))
+                            val total = it.getLong(it.getColumnIndexOrThrow(DownloadManager.COLUMN_TOTAL_SIZE_BYTES))
+                            val percent = if (total > 0) ((soFar * 100) / total).toInt() else 0
+                            val label = when (status) {
+                                DownloadManager.STATUS_SUCCESSFUL -> "Selesai"
+                                DownloadManager.STATUS_FAILED -> "Gagal"
+                                DownloadManager.STATUS_PAUSED -> "Dijeda"
+                                DownloadManager.STATUS_PENDING -> "Menunggu"
+                                else -> "Mengunduh"
+                            }
+                            states[entry.id] = percent to label
+                        } else states[entry.id] = 0 to "Tidak ditemukan"
+                    }
                 }
             }
             downloadStates = states
@@ -1026,12 +1140,17 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                                 } else {
                                     downloads.forEach { entry ->
                                         val state = downloadStates[entry.id] ?: (0 to "Menyiapkan")
-                                        val query = DownloadManager.Query().setFilterById(entry.id)
                                         var completedUri: Uri? = null
-                                        downloadManager.query(query)?.use { cursor ->
-                                            if (cursor.moveToFirst() &&
-                                                cursor.getInt(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS)) == DownloadManager.STATUS_SUCCESSFUL) {
-                                                completedUri = downloadManager.getUriForDownloadedFile(entry.id)
+                                        if (entry.id < 0L) {
+                                            val localFile = File(Uri.parse(entry.movie.videoUrl).path.orEmpty())
+                                            if (localFile.exists() && localFile.length() > 0L) completedUri = Uri.fromFile(localFile)
+                                        } else {
+                                            val query = DownloadManager.Query().setFilterById(entry.id)
+                                            downloadManager.query(query)?.use { cursor ->
+                                                if (cursor.moveToFirst() &&
+                                                    cursor.getInt(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS)) == DownloadManager.STATUS_SUCCESSFUL) {
+                                                    completedUri = downloadManager.getUriForDownloadedFile(entry.id)
+                                                }
                                             }
                                         }
                                         Card(
@@ -1060,8 +1179,14 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                                                         }) { Text("Putar offline", color = Green) }
                                                     }
                                                     TextButton(onClick = {
-                                                        downloadManager.remove(entry.id)
+                                                        if (entry.id < 0L) {
+                                                            adaptiveSessions[entry.id]?.let { FFmpegKit.cancel(it) }
+                                                            File(Uri.parse(entry.movie.videoUrl).path.orEmpty()).delete()
+                                                        } else {
+                                                            downloadManager.remove(entry.id)
+                                                        }
                                                         downloads = downloads.filterNot { it.id == entry.id }
+                                                        downloadStates = downloadStates - entry.id
                                                         persistDownloads(downloads)
                                                     }) { Text("Hapus", color = Muted) }
                                                 }
