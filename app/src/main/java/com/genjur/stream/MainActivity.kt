@@ -831,9 +831,6 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                             }
                         }
                     }
-                    Spacer(Modifier.height(18.dp))
-                    Text("GENJUR STREAM • Versi ${BuildConfig.VERSION_NAME}", color = Color(0xFF777180),
-                        fontSize = 10.sp, modifier = Modifier.padding(vertical = 16.dp))
                 }
 
                 Row(
