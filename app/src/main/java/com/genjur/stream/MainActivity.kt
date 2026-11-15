@@ -1159,7 +1159,7 @@ private fun searchWebSources(query: String): List<SourceSearchResult> {
     val encoded = java.net.URLEncoder.encode(query, "UTF-8")
     val endpoints = listOf(
         "https://www.google.com/search?q=$encoded",
-        "https://www.google.com/search?gbv=1&q=$encoded",
+        "https://www.bing.com/search?format=rss&q=$encoded",
         "https://www.bing.com/search?q=$encoded"
     )
     val blockedHosts = setOf(
@@ -1175,7 +1175,7 @@ private fun searchWebSources(query: String): List<SourceSearchResult> {
             instanceFollowRedirects = true
             requestMethod = "GET"
             setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 11) AppleWebKit/537.36 Chrome/120.0.0.0 Mobile Safari/537.36")
-            setRequestProperty("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
+            setRequestProperty("Accept", "application/rss+xml,application/xml,text/html,application/xhtml+xml;q=0.9,*/*;q=0.8")
             setRequestProperty("Accept-Language", "id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7")
         }
         try {
@@ -1186,14 +1186,33 @@ private fun searchWebSources(query: String): List<SourceSearchResult> {
             }
             val html = connection.inputStream.bufferedReader().use { it.readText() }
             val document = Jsoup.parse(html)
-            val anchors = when {
-                endpoint.contains("bing.com") ->
+            val candidates = mutableListOf<Pair<String, String>>()
+
+            if (endpoint.contains("format=rss")) {
+                document.select("item").forEach { item ->
+                    candidates.add(item.selectFirst("title")?.text().orEmpty() to
+                        item.selectFirst("link")?.text().orEmpty())
+                }
+            } else {
+                val selected = if (endpoint.contains("bing.com")) {
                     document.select("li.b_algo h2 a, h2 a")
-                else ->
+                } else {
                     document.select("a:has(h3)")
+                }
+                selected.forEach { anchor ->
+                    candidates.add(anchor.text().trim() to
+                        anchor.absUrl("href").ifBlank { anchor.attr("href") })
+                }
+                if (candidates.isEmpty()) {
+                    document.select("a[href]").forEach { anchor ->
+                        val title = anchor.text().trim()
+                        val href = anchor.absUrl("href").ifBlank { anchor.attr("href") }
+                        if (title.length >= 3 && href.startsWith("http")) candidates.add(title to href)
+                    }
+                }
             }
-            val results = anchors.mapNotNull { anchor ->
-                val raw = anchor.absUrl("href").ifBlank { anchor.attr("href") }
+
+            val results = candidates.mapNotNull { (candidateTitle, raw) ->
                 if (raw.isBlank()) return@mapNotNull null
                 val resolved = runCatching {
                     val wrapped = Uri.parse(raw)
@@ -1209,11 +1228,11 @@ private fun searchWebSources(query: String): List<SourceSearchResult> {
                     blockedHosts.any { host == it || host.endsWith(".$it") } ||
                     uri.userInfo != null || host.matches(Regex("\\d{1,3}(\\.\\d{1,3}){3}"))
                 if (suspicious) return@mapNotNull null
-                val title = anchor.text().trim().ifBlank { host }
-                SourceSearchResult(title, uri.toString(), host)
+                SourceSearchResult(candidateTitle.trim().ifBlank { host }, uri.toString(), host)
             }.distinctBy { it.host }.take(12)
+
             if (results.isNotEmpty()) return results
-            lastError = java.io.IOException("Mesin pencari tidak mengirim hasil yang bisa dibaca")
+            lastError = java.io.IOException("Hasil mesin pencari diterima, tetapi tautan situs tidak ditemukan atau tidak lolos filter.")
         } catch (e: Exception) {
             lastError = e
         } finally {
