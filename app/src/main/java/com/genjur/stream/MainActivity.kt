@@ -1465,7 +1465,8 @@ private fun SourceLinksScreen(activity: MainActivity, onOpenLink: (String) -> Un
                 DropdownMenu(
                     expanded = savedSourcesDropdownExpanded,
                     onDismissRequest = { savedSourcesDropdownExpanded = false },
-                    modifier = Modifier.background(Panel)
+                    modifier = Modifier.background(Panel),
+                    offset = androidx.compose.ui.unit.DpOffset(0.dp, 48.dp)
                 ) {
                     links.forEachIndexed { index, item ->
                         DropdownMenuItem(
