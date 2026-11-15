@@ -886,7 +886,7 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                     }
                 }
             }
-            if (savedSourceMenu.isNotEmpty()) {
+            if (savedSourceMenu.isNotEmpty() && selectedTab == "Beranda") {
                 Column(
                     modifier = Modifier.align(Alignment.BottomEnd).padding(end = 16.dp, bottom = 82.dp),
                     horizontalAlignment = Alignment.End
