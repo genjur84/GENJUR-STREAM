@@ -3,19 +3,19 @@
   "provider": {
     "id": "genjur-public-domain-catalog",
     "name": "Arsip Film Domain Publik",
-    "version": "1.0.1",
-    "description": "Katalog film klasik yang status domain publiknya didokumentasikan per karya."
+    "version": "1.0.2",
+    "description": "Katalog film klasik domain publik dengan sumber video dan poster yang ditautkan dari Wikimedia Commons."
   },
   "rights": {
     "redistributionAllowed": true,
     "licenseId": "Public Domain Mark 1.0",
     "termsUrl": "https://creativecommons.org/publicdomain/mark/1.0/",
-    "attribution": "Sumber berkas: Wikimedia Commons. A Trip to the Moon (1902), Georges Méliès; status domain publik ditandai pada halaman berkas Wikimedia Commons."
+    "attribution": "Sumber berkas: Wikimedia Commons. A Trip to the Moon (1902), Georges Méliès; Alice in Wonderland (1903), Cecil Hepworth dan Percy Stow; The Great Train Robbery (1903), Edwin S. Porter. Karya-karya ini ditandai domain publik pada halaman berkas masing-masing."
   },
   "items": [
     {
       "title": "A Trip to the Moon (Le Voyage dans la Lune)",
-      "description": "Film fiksi ilmiah bisu karya Georges Méliès, dirilis pada 1902. Salinan digital yang digunakan ditandai sebagai domain publik pada Wikimedia Commons. Pemutaran menggunakan berkas WebM; dukungan codec bergantung pada perangkat.",
+      "description": "Film fiksi ilmiah bisu karya Georges Méliès, dirilis pada 1902. Salinan digital ditandai domain publik pada Wikimedia Commons. Pemutaran menggunakan berkas WebM; dukungan codec bergantung pada perangkat.",
       "category": "Film Klasik",
       "videoUrl": "https://commons.wikimedia.org/wiki/Special:Redirect/file/Le_Voyage_dans_la_Lune_%281902%29.webm",
       "posterUrl": "https://commons.wikimedia.org/wiki/Special:FilePath/Trip-to-moon-1902.jpg",
@@ -26,6 +26,36 @@
         "Film bisu"
       ],
       "duration": "12 menit 46 detik",
+      "downloadAllowed": false
+    },
+    {
+      "title": "Alice in Wonderland",
+      "description": "Adaptasi film bisu awal dari kisah Alice karya Lewis Carroll, disutradarai Cecil Hepworth dan Percy Stow. Versi 1903 ini ditandai domain publik pada Wikimedia Commons.",
+      "category": "Fantasi",
+      "videoUrl": "https://commons.wikimedia.org/wiki/Special:Redirect/file/Alice_in_Wonderland_%281903%29_-_yt.webm",
+      "posterUrl": "https://commons.wikimedia.org/wiki/Special:FilePath/Alice_in_Wonderland_1903_film_title.jpg",
+      "releaseYear": "1903",
+      "genres": [
+        "Fantasi",
+        "Petualangan",
+        "Film bisu"
+      ],
+      "duration": "8 menit 21 detik",
+      "downloadAllowed": false
+    },
+    {
+      "title": "The Great Train Robbery",
+      "description": "Film pendek koboi dan kriminal karya Edwin S. Porter, dirilis pada 1903. Berkas video yang digunakan ditandai domain publik pada Wikimedia Commons.",
+      "category": "Aksi",
+      "videoUrl": "https://commons.wikimedia.org/wiki/Special:Redirect/file/The_Great_Train_Robbery_%281903%29_-_yt.webm",
+      "posterUrl": "https://commons.wikimedia.org/wiki/Special:FilePath/The_Great_Train_Robbery%2C_Edwin_S._Porter%2C_Edison_Films%2C_1903_Poster.jpg",
+      "releaseYear": "1903",
+      "genres": [
+        "Western",
+        "Kriminal",
+        "Film bisu"
+      ],
+      "duration": "11 menit 51 detik",
       "downloadAllowed": false
     }
   ]
