@@ -18,6 +18,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import androidx.media3.common.MediaItem
+import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.ui.PlayerView
 import androidx.core.content.FileProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -59,6 +65,7 @@ fun GenjurStreamHome(activity: MainActivity) {
     var feedMovies by remember { mutableStateOf(emptyList<FeedMovie>()) }
     var feedLoading by remember { mutableStateOf(false) }
     var feedMessage by remember { mutableStateOf("Tambahkan sumber feed JSON, lalu muat katalog.") }
+    var selectedMovie by remember { mutableStateOf<FeedMovie?>(null) }
     val scope = rememberCoroutineScope()
 
     fun refreshCatalog() {
@@ -241,8 +248,8 @@ fun GenjurStreamHome(activity: MainActivity) {
                         Text(movie.category, color = Green, fontSize = 11.sp)
                         Text(movie.description, color = Muted, fontSize = 13.sp)
                         if (movie.videoUrl.startsWith("https://")) {
-                            TextButton(onClick = { activity.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(movie.videoUrl))) }) {
-                                Text("Putar video")
+                            TextButton(onClick = { selectedMovie = movie }) {
+                                Text("Putar di GENJUR STREAM")
                             }
                         }
                     }
@@ -251,6 +258,58 @@ fun GenjurStreamHome(activity: MainActivity) {
             Spacer(Modifier.height(26.dp))
             Text("GENJUR STREAM  •  Versi ${BuildConfig.VERSION_NAME}", color = Color(0xFF718096),
                 fontSize = 11.sp, modifier = Modifier.padding(bottom = 10.dp))
+        }
+    }
+
+    selectedMovie?.let { movie ->
+        InAppVideoPlayer(activity, movie, onClose = { selectedMovie = null })
+    }
+}
+
+
+@Composable
+private fun InAppVideoPlayer(activity: MainActivity, movie: FeedMovie, onClose: () -> Unit) {
+    val player = remember(movie.videoUrl) {
+        ExoPlayer.Builder(activity).build().apply {
+            setMediaItem(MediaItem.fromUri(movie.videoUrl))
+            prepare()
+            playWhenReady = true
+        }
+    }
+    DisposableEffect(player) {
+        onDispose { player.release() }
+    }
+    Dialog(
+        onDismissRequest = onClose,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Surface(
+            modifier = Modifier.fillMaxWidth().fillMaxHeight(0.88f).padding(12.dp),
+            shape = RoundedCornerShape(20.dp),
+            color = Panel
+        ) {
+            Column(Modifier.fillMaxSize().padding(12.dp)) {
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(movie.title, color = Color.White, fontWeight = FontWeight.Bold,
+                        modifier = Modifier.weight(1f))
+                    TextButton(onClick = onClose) { Text("Tutup", color = Green) }
+                }
+                AndroidView(
+                    factory = { context ->
+                        PlayerView(context).apply {
+                            this.player = player
+                            useController = true
+                        }
+                    },
+                    update = { it.player = player },
+                    modifier = Modifier.fillMaxWidth().weight(1f)
+                )
+                Text("Pemutaran langsung di GENJUR STREAM", color = Muted, fontSize = 11.sp)
+            }
         }
     }
 }
