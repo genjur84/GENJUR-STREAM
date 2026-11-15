@@ -1021,7 +1021,27 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                     else Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = horizontal)
                 ) {
                     if (selectedTab == "Beranda") {
-                        // Bagian Lanjutkan Menonton di Beranda dihapus sesuai permintaan.
+                        // Sumber terakhir tetap tersedia di Beranda sampai pengguna memilih None.
+                        if (browserInitialUrl.isNotBlank() && selectedSourceName != "Sumber Link") {
+                            Card(
+                                modifier = Modifier.fillMaxWidth().clickable { selectedTab = "Browser Sumber" },
+                                colors = CardDefaults.cardColors(containerColor = Panel),
+                                shape = RoundedCornerShape(14.dp)
+                            ) {
+                                Row(
+                                    Modifier.fillMaxWidth().padding(14.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Column(Modifier.weight(1f)) {
+                                        Text("Sumber terakhir dibuka", color = Muted, fontSize = 11.sp)
+                                        Text(selectedSourceName, color = Color.White, fontWeight = FontWeight.Bold)
+                                        Text(Uri.parse(browserInitialUrl).host.orEmpty(), color = Muted, fontSize = 10.sp, maxLines = 1)
+                                    }
+                                    Text("Buka lagi  ›", color = Green, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
                     } else {
                         if (selectedTab != "Browser Sumber") {
                             Text(selectedTab, color = Color.White, fontSize = 27.sp, fontWeight = FontWeight.ExtraBold)
@@ -1109,6 +1129,8 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                             "Sumber Link" -> {
                                 SourceLinksScreen(activity = activity, onOpenLink = { link ->
                                     browserInitialUrl = link
+                                    selectedSourceName = savedSourceMenu.firstOrNull { it.url == link }?.name
+                                        ?: Uri.parse(link).host.orEmpty().ifBlank { "Sumber Link" }
                                     selectedTab = "Browser Sumber"
                                 })
                             }
@@ -1395,6 +1417,7 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                             onClick = {
                                 selectedTab = "Beranda"
                                 selectedSourceName = "Sumber Link"
+                                browserInitialUrl = ""
                                 sourceMenuExpanded = false
                             }
                         )
