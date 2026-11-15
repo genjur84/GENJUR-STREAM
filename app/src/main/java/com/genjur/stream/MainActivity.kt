@@ -423,9 +423,8 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                             Text("Hiburan pilihanmu", color = Muted, fontSize = 10.sp)
                         }
                     }
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        TextButton(onClick = { selectedTab = "Cari" }) { Text("⌕", color = Color.White, fontSize = 25.sp) }
-                        TextButton(onClick = onOpenSources) { Text("⋮", color = Color.White, fontSize = 25.sp) }
+                    TextButton(onClick = { selectedTab = "Cari" }) {
+                        Text("⌕", color = Color.White, fontSize = 25.sp)
                     }
                 }
 
@@ -456,14 +455,9 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                                     Text("Temukan tontonan dari katalog sumber resmi dan berizin.",
                                         color = Color(0xFFD4CEDD), fontSize = 13.sp, lineHeight = 18.sp)
                                     Spacer(Modifier.height(16.dp))
-                                    Row(horizontalArrangement = Arrangement.spacedBy(9.dp)) {
-                                        Button(onClick = { selectedTab = "Kategori" },
-                                            colors = ButtonDefaults.buttonColors(containerColor = Green, contentColor = Color.White),
-                                            shape = RoundedCornerShape(12.dp)) { Text("Jelajahi") }
-                                        OutlinedButton(onClick = onOpenSources, shape = RoundedCornerShape(12.dp)) {
-                                            Text("Sumber", color = Color.White)
-                                        }
-                                    }
+                                    Button(onClick = { selectedTab = "Kategori" },
+                                        colors = ButtonDefaults.buttonColors(containerColor = Green, contentColor = Color.White),
+                                        shape = RoundedCornerShape(12.dp)) { Text("Jelajahi") }
                                 }
                             }
                         }
@@ -479,7 +473,6 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                                     Spacer(Modifier.height(5.dp))
                                     Text("Tambahkan sumber resmi untuk mulai mengisi katalog GENJUR STREAM.",
                                         color = Muted, fontSize = 12.sp)
-                                    TextButton(onClick = onOpenSources) { Text("＋ Tambah sumber", color = Green) }
                                 }
                             }
                         } else {
@@ -1028,25 +1021,6 @@ private fun RepositoryDialog(activity: MainActivity, onClose: () -> Unit) {
                     label = { Text("Nama repositori") }, singleLine = true)
                 OutlinedTextField(value = url, onValueChange = { url = it },
                     label = { Text("URL repositori") }, singleLine = true)
-                Button(enabled = !loading, onClick = {
-                    val n = name.trim()
-                    val u = url.trim()
-                    val valid = runCatching { Uri.parse(u).let { it.scheme == "https" && !it.host.isNullOrBlank() } }.getOrDefault(false)
-                    when {
-                        n.isBlank() -> error = "Masukkan nama repositori."
-                        !valid -> error = "Masukkan URL repositori HTTPS yang benar."
-                        repositories.any { it.url.equals(u, true) } -> error = "Repositori sudah ditambahkan."
-                        else -> {
-                            val repo = SavedRepository(n, u)
-                            repositories = repositories + repo
-                            saveRepositories()
-                            name = ""; url = ""
-                            loadRepository(repo)
-                        }
-                    }
-                }, colors = ButtonDefaults.buttonColors(containerColor = Green, contentColor = Bg)) {
-                    Text(if (loading) "Memuat..." else "Tambah repositori")
-                }
                 error?.let { Text(it, color = MaterialTheme.colorScheme.error, fontSize = 12.sp) }
                 if (repositories.isNotEmpty()) {
                     Text("Repositori tersimpan", color = Color.White, fontWeight = FontWeight.Bold)
@@ -1104,6 +1078,39 @@ private fun RepositoryDialog(activity: MainActivity, onClose: () -> Unit) {
                 }
             }
         },
-        confirmButton = { TextButton(onClick = onClose) { Text("Selesai") } }
+        confirmButton = {
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                TextButton(onClick = onClose, modifier = Modifier.weight(1f)) { Text("Selesai") }
+                Button(
+                    enabled = !loading,
+                    modifier = Modifier.weight(1.6f),
+                    onClick = {
+                        val n = name.trim()
+                        val u = url.trim()
+                        val valid = runCatching {
+                            Uri.parse(u).let { it.scheme == "https" && !it.host.isNullOrBlank() }
+                        }.getOrDefault(false)
+                        when {
+                            n.isBlank() -> error = "Masukkan nama repositori."
+                            !valid -> error = "Masukkan URL repositori HTTPS yang benar."
+                            repositories.any { it.url.equals(u, true) } -> error = "Repositori sudah ditambahkan."
+                            else -> {
+                                val repo = SavedRepository(n, u)
+                                repositories = repositories + repo
+                                saveRepositories()
+                                name = ""
+                                url = ""
+                                loadRepository(repo)
+                            }
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Green, contentColor = Bg)
+                ) { Text(if (loading) "Memuat..." else "Tambah repositori") }
+            }
+        }
     )
 }
