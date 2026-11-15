@@ -64,6 +64,7 @@ import androidx.media3.ui.PlayerNotificationManager
 import androidx.media3.common.Player
 import androidx.core.content.FileProvider
 import androidx.core.content.ContextCompat
+import androidx.core.app.NotificationCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -317,6 +318,31 @@ class MainActivity : ComponentActivity() {
             .apply()
         scheduleBackgroundCatalogChecks()
         setContent { MaterialTheme { GenjurStreamApp(this) } }
+    }
+
+    fun showWebPlaybackNotification(title: String, pageUrl: String) {
+        if (Build.VERSION.SDK_INT >= 33 &&
+            ContextCompat.checkSelfPermission(this, android.Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        ) return
+        val openApp = PendingIntent.getActivity(
+            this, 8403,
+            Intent(this, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            },
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        val notification = NotificationCompat.Builder(this, PLAYBACK_NOTIFICATION_CHANNEL)
+            .setSmallIcon(android.R.drawable.ic_media_play)
+            .setContentTitle(title.ifBlank { "Video terdeteksi" })
+            .setContentText("Video mulai diputar di halaman sumber GENJUR STREAM")
+            .setSubText("Pemutar situs aktif")
+            .setContentIntent(openApp)
+            .setOngoing(false)
+            .setAutoCancel(true)
+            .setCategory(NotificationCompat.CATEGORY_TRANSPORT)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .build()
+        getSystemService(NotificationManager::class.java).notify(PLAYBACK_NOTIFICATION_ID, notification)
     }
 
     private fun scheduleBackgroundCatalogChecks() {
@@ -863,6 +889,7 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                                     SourceBrowser(initialUrl = browserInitialUrl, fullScreen = true, onPlaybackStarted = { pageTitle, pageUrl ->
                                         val safeTitle = pageTitle.trim().takeIf { it.isNotBlank() }
                                             ?: Uri.parse(pageUrl).host.orEmpty().ifBlank { "Video dari situs" }
+                                        activity.showWebPlaybackNotification(safeTitle, pageUrl)
                                         recordWatch(FeedMovie(
                                             title = safeTitle,
                                             description = "Tontonan yang mulai diputar melalui Browser Sumber.",
