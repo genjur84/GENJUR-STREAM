@@ -1377,6 +1377,7 @@ private fun SourceBrowser(initialUrl: String, fullScreen: Boolean = false, onPla
     var pageTitle by remember { mutableStateOf("Masukkan alamat situs sumber video.") }
     var isLoading by remember(initialUrl) { mutableStateOf(initialUrl.isNotBlank()) }
     var webView by remember { mutableStateOf<WebView?>(null) }
+    val loadingFallback = remember { Runnable { isLoading = false } }
     Column(Modifier.fillMaxSize().padding(if (fullScreen) 0.dp else 8.dp), verticalArrangement = Arrangement.spacedBy(if (fullScreen) 4.dp else 8.dp)) {
         if (!fullScreen) Text("Buka situs sumber video di dalam GENJUR STREAM. Gunakan hanya situs dan video yang boleh kamu akses.", color = Muted, fontSize = 12.sp)
         if (!fullScreen) {
@@ -1421,8 +1422,17 @@ private fun SourceBrowser(initialUrl: String, fullScreen: Boolean = false, onPla
                     webViewClient = object : WebViewClient() {
                         override fun onPageStarted(view: WebView, url: String, favicon: android.graphics.Bitmap?) {
                             isLoading = true
+                            view.removeCallbacks(loadingFallback)
+                            // Pengaman: jangan biarkan overlay menutupi situs tanpa batas waktu.
+                            view.postDelayed(loadingFallback, 12000L)
+                        }
+                        override fun onPageCommitVisible(view: WebView, url: String) {
+                            // Konten utama sudah mulai tampil; iklan/iframe tidak perlu menahan overlay.
+                            view.removeCallbacks(loadingFallback)
+                            isLoading = false
                         }
                         override fun onPageFinished(view: WebView, url: String) {
+                            view.removeCallbacks(loadingFallback)
                             isLoading = false
                             pageTitle = view.title?.takeIf { it.isNotBlank() } ?: url
                             address = url
@@ -1451,7 +1461,10 @@ private fun SourceBrowser(initialUrl: String, fullScreen: Boolean = false, onPla
                             )
                         }
                         override fun onReceivedError(view: WebView, request: WebResourceRequest, error: android.webkit.WebResourceError) {
-                            if (request.isForMainFrame) isLoading = false
+                            if (request.isForMainFrame) {
+                                view.removeCallbacks(loadingFallback)
+                                isLoading = false
+                            }
                         }
                         override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
                             val scheme = request.url.scheme
