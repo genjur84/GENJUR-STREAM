@@ -2001,7 +2001,9 @@ private fun SourceBrowser(
                                             document.querySelectorAll('source[src],iframe[src],[data-src],[data-video],[data-url]').forEach(function(el) {
                                                 ['src','data-src','data-video','data-url'].forEach(function(attr) {
                                                     var candidate = el.getAttribute(attr);
-                                                    if (candidate) reportMedia(document.title, new URL(candidate, location.href).href, 'Sumber video ditemukan');
+                                                    if (candidate && (el.tagName === 'SOURCE' || /\.(m3u8|mpd|mp4|m4v|webm|mov|mkv)(?:$|[?#&])/i.test(candidate))) {
+                                                        reportMedia(document.title, new URL(candidate, location.href).href, 'Sumber video ditemukan');
+                                                    }
                                                 });
                                             });
                                         } catch(e) {}
