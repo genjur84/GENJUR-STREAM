@@ -233,6 +233,7 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
     var category by remember { mutableStateOf("Semua") }
     var selectedTab by remember { mutableStateOf("Beranda") }
     var browserVideoUrl by remember { mutableStateOf<String?>(null) }
+    var browserInitialUrl by remember { mutableStateOf("") }
     var updateVersion by remember { mutableStateOf<String?>(null) }
     var updateUrl by remember { mutableStateOf<String?>(null) }
     var checking by remember { mutableStateOf(true) }
@@ -697,8 +698,14 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                                         unfocusedTextColor = Color.White, focusedBorderColor = Green,
                                         unfocusedBorderColor = Color(0xFF393344), cursorColor = Green))
                             }
+                            "Sumber Link" -> {
+                                SourceLinksScreen(activity = activity, onOpenLink = { link ->
+                                    browserInitialUrl = link
+                                    selectedTab = "Browser Sumber"
+                                })
+                            }
                             "Browser Sumber" -> {
-                                SourceBrowser(onVideoDetected = { detected -> browserVideoUrl = detected })
+                                SourceBrowser(initialUrl = browserInitialUrl, onVideoDetected = { detected -> browserVideoUrl = detected })
                                 browserVideoUrl?.let { videoUrl ->
                                     Spacer(Modifier.height(12.dp))
                                     Card(colors = CardDefaults.cardColors(containerColor = Panel)) {
@@ -854,7 +861,7 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     // Pencarian tetap berada di ikon kaca pembesar bagian atas.
-                    listOf("Beranda" to "⌂", "Browser Sumber" to "◎", "Kategori" to "▦", "Unduhan" to "⇩", "Favorit" to "♡", "Riwayat" to "◷", "Pengaturan" to "⚙").forEach { (tab, glyph) ->
+                    listOf("Beranda" to "⌂", "Sumber Link" to "↗", "Browser Sumber" to "◎", "Kategori" to "▦", "Unduhan" to "⇩", "Favorit" to "♡", "Riwayat" to "◷", "Pengaturan" to "⚙").forEach { (tab, glyph) ->
                         Column(
                             modifier = Modifier.weight(1f).clickable {
                                 if (tab == "Pengaturan") onOpenSources() else selectedTab = tab
@@ -1029,10 +1036,122 @@ private fun MovieDetailDialog(
     }
 }
 
+
+private data class SavedSourceLink(val name: String, val url: String)
+
 @Composable
-private fun SourceBrowser(onVideoDetected: (String) -> Unit) {
-    var address by remember { mutableStateOf("") }
-    var currentUrl by remember { mutableStateOf("") }
+private fun SourceLinksScreen(activity: MainActivity, onOpenLink: (String) -> Unit) {
+    val prefs = remember { activity.getSharedPreferences("genjur_stream_saved_links", 0) }
+    fun readLinks(): List<SavedSourceLink> = runCatching {
+        val array = JSONArray(prefs.getString("items", "[]"))
+        (0 until array.length()).mapNotNull { index ->
+            val item = array.optJSONObject(index) ?: return@mapNotNull null
+            val name = item.optString("name").trim()
+            val url = item.optString("url").trim()
+            if (name.isNotBlank() && url.isNotBlank()) SavedSourceLink(name, url) else null
+        }
+    }.getOrDefault(emptyList())
+
+    var links by remember { mutableStateOf(readLinks()) }
+    var name by remember { mutableStateOf("") }
+    var url by remember { mutableStateOf("") }
+    var editingIndex by remember { mutableStateOf<Int?>(null) }
+    var message by remember { mutableStateOf<String?>(null) }
+
+    fun persist(items: List<SavedSourceLink>) {
+        val array = JSONArray()
+        items.forEach { array.put(JSONObject().put("name", it.name).put("url", it.url)) }
+        prefs.edit().putString("items", array.toString()).apply()
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Text("Simpan alamat situs yang ingin dibuka langsung dari GENJUR STREAM.",
+            color = Muted, fontSize = 12.sp)
+        OutlinedTextField(
+            value = name, onValueChange = { name = it },
+            modifier = Modifier.fillMaxWidth(), singleLine = true,
+            label = { Text("Nama sumber") },
+            placeholder = { Text("Contoh: Situs Film Resmi") }
+        )
+        OutlinedTextField(
+            value = url, onValueChange = { url = it },
+            modifier = Modifier.fillMaxWidth(), singleLine = true,
+            label = { Text("Link situs (HTTPS)") },
+            placeholder = { Text("https://contoh.com") }
+        )
+        message?.let { Text(it, color = if (it.startsWith("Tersimpan")) Green else MaterialTheme.colorScheme.error, fontSize = 11.sp) }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(onClick = {
+                val cleanName = name.trim()
+                val cleanUrl = url.trim()
+                val uri = Uri.parse(cleanUrl)
+                when {
+                    cleanName.isBlank() -> message = "Masukkan nama sumber."
+                    uri.scheme != "https" || uri.host.isNullOrBlank() -> message = "Link harus berupa alamat HTTPS yang valid."
+                    links.anyIndexed { index, item -> item.url.equals(cleanUrl, true) && index != editingIndex } ->
+                        message = "Link tersebut sudah tersimpan."
+                    else -> {
+                        val updated = links.toMutableList()
+                        val item = SavedSourceLink(cleanName, cleanUrl)
+                        val index = editingIndex
+                        if (index == null) updated.add(item) else updated[index] = item
+                        links = updated
+                        persist(links)
+                        name = ""; url = ""; editingIndex = null
+                        message = "Tersimpan."
+                    }
+                }
+            }, colors = ButtonDefaults.buttonColors(containerColor = Green)) {
+                Text(if (editingIndex == null) "Simpan link" else "Simpan perubahan")
+            }
+            if (editingIndex != null) {
+                TextButton(onClick = { name = ""; url = ""; editingIndex = null; message = null }) {
+                    Text("Batal", color = Muted)
+                }
+            }
+        }
+        Text("Daftar sumber (${links.size})", color = Color.White, fontWeight = FontWeight.Bold)
+        if (links.isEmpty()) {
+            Text("Belum ada link tersimpan.", color = Muted, fontSize = 12.sp)
+        } else {
+            links.forEachIndexed { index, item ->
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = Panel),
+                    shape = RoundedCornerShape(14.dp)
+                ) {
+                    Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(item.name, color = Color.White, fontWeight = FontWeight.Bold)
+                        Text(item.url, color = Muted, fontSize = 10.sp, maxLines = 2)
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            TextButton(onClick = { onOpenLink(item.url) }) { Text("Buka", color = Green) }
+                            TextButton(onClick = {
+                                name = item.name; url = item.url; editingIndex = index; message = null
+                            }) { Text("Edit", color = Muted) }
+                            TextButton(onClick = {
+                                links = links.filterIndexed { i, _ -> i != index }
+                                persist(links)
+                                if (editingIndex == index) { name = ""; url = ""; editingIndex = null }
+                                message = "Link dihapus."
+                            }) { Text("Hapus", color = Muted) }
+                        }
+                    }
+                }
+            }
+        }
+        Text("Gunakan hanya situs yang kamu berhak akses. GENJUR STREAM tidak melewati login atau DRM.",
+            color = Muted, fontSize = 10.sp)
+    }
+}
+
+private inline fun <T> List<T>.anyIndexed(predicate: (Int, T) -> Boolean): Boolean {
+    forEachIndexed { index, item -> if (predicate(index, item)) return true }
+    return false
+}
+@Composable
+private fun SourceBrowser(initialUrl: String, onVideoDetected: (String) -> Unit) {
+    var address by remember(initialUrl) { mutableStateOf(initialUrl) }
+    var currentUrl by remember(initialUrl) { mutableStateOf(initialUrl) }
     var pageTitle by remember { mutableStateOf("Masukkan alamat situs sumber video.") }
     var webView by remember { mutableStateOf<WebView?>(null) }
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
