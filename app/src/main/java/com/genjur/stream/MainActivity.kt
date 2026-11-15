@@ -1487,7 +1487,7 @@ private fun SourceLinksScreen(activity: MainActivity, onOpenLink: (String) -> Un
             val selectedIndex = selectedSavedSourceIndex?.takeIf { it in links.indices }
             Box {
                 OutlinedButton(
-                    onClick = { savedSourcesDropdownExpanded = true },
+                    onClick = { savedSourcesDropdownExpanded = !savedSourcesDropdownExpanded },
                     modifier = Modifier.fillMaxWidth(),
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
                     border = BorderStroke(1.dp, Color(0xFF77718A))
