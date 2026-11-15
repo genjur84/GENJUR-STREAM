@@ -41,7 +41,9 @@ The feed URL must return JSON with an explicit distribution-rights declaration:
       "description": "Synopsis supplied by the authorized provider.",
       "category": "Drama",
       "posterUrl": "https://catalog.example.org/posters/example-film.jpg",
-      "videoUrl": "https://media.example.org/authorized-title.mp4"
+      "videoUrl": "https://media.example.org/authorized-title.mp4",
+      "downloadAllowed": true,
+      "downloadUrl": "https://media.example.org/authorized-title-download.mp4"
     }
   ]
 }
@@ -55,6 +57,8 @@ The current feed reader requires:
 - an `items` array; each item must have a non-empty `title`;
 - `posterUrl` is optional; when present it must be a valid HTTPS image URL and is shown on the catalog card and detail page.
 - `videoUrl` may be empty for metadata-only catalog entries, otherwise it must be a valid HTTPS URL.
+- Offline downloads are opt-in per item: set `downloadAllowed: true` only when the provider's license explicitly permits downloading, and supply `downloadUrl` as a direct HTTPS `.mp4` file URL. The app rejects non-MP4 download URLs and does not treat ordinary streaming/HLS URLs as downloadable files.
+- Downloaded MP4 files are stored in the app-specific Movies folder, shown in the Unduhan tab with progress, and can be played offline or deleted. A missing/false `downloadAllowed` value disables the download action.
 
 Use only catalog metadata, artwork, and playback URLs that the provider has authorized you to redistribute or display. A repository index is not itself proof of rights; each feed provider remains responsible for its license and terms.
 
