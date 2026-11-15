@@ -47,7 +47,7 @@ Pengujian remote fisik dan kompatibilitas setiap merek TV tetap perlu dilakukan;
 
 ## Rencana berikutnya
 
-Lihat [roadmap arsitektur](docs/ROADMAP.md) untuk favorit, riwayat tontonan, katalog lintas sumber, dan penyempurnaan navigasi TV.
+Lihat [roadmap arsitektur](docs/ROADMAP.md) untuk favorit, riwayat tontonan, katalog lintas sumber, dan penyempurnaan navigasi TV. Gunakan [checklist uji HP dan Android TV](docs/DEVICE_TEST_CHECKLIST.md) saat menguji APK.
 
 ## Batas penggunaan sumber
 
