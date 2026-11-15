@@ -497,9 +497,13 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
     fun startWebVideoDownload(title: String, pageUrl: String, mediaUrl: String) {
         val uri = Uri.parse(mediaUrl)
         val path = uri.path.orEmpty().lowercase()
-        val directFile = listOf(".mp4", ".m4v", ".webm", ".mov", ".mkv").any { path.endsWith(it) }
-        if (!directFile || uri.scheme !in listOf("http", "https") || uri.host.isNullOrBlank()) {
-            downloadMessage = "GENJUR belum menemukan URL file video langsung yang bisa diunduh."
+        val adaptiveStream = path.endsWith(".m3u8") || path.endsWith(".mpd")
+        val knownVideoFile = listOf(".mp4", ".m4v", ".webm", ".mov", ".mkv").any { path.endsWith(it) }
+        val validHttpUrl = uri.scheme in listOf("http", "https") && !uri.host.isNullOrBlank()
+        if (!validHttpUrl || adaptiveStream) {
+            downloadMessage = if (adaptiveStream)
+                "Sumber memakai streaming HLS/DASH. Pengunduhan format ini belum didukung."
+            else "Alamat video tidak valid."
             return
         }
         val safeTitle = title.ifBlank { "Video dari situs" }
@@ -1885,8 +1889,8 @@ private fun SourceBrowser(
                             post {
                                 val uri = Uri.parse(videoUrl)
                                 val path = uri.path.orEmpty().lowercase()
-                                val playableMedia = Regex("""\.(m3u8|mpd|mp4|m4v|webm|mov|mkv)(?:$|[?#&])""").containsMatchIn(videoUrl.lowercase())
-                                if (playableMedia && uri.scheme in listOf("http", "https") && !uri.host.isNullOrBlank()) {
+                                val adaptiveStream = uri.path.orEmpty().lowercase().let { it.endsWith(".m3u8") || it.endsWith(".mpd") }
+                                if (!adaptiveStream && uri.scheme in listOf("http", "https") && !uri.host.isNullOrBlank()) {
                                     detectedVideoTitle = title
                                     detectedVideoPage = pageUrl
                                     val label = detectedQualityLabel(quality, videoUrl)
@@ -1952,14 +1956,17 @@ private fun SourceBrowser(
                                     window.__genjurPlaybackHooked = true;
                                     function reportMedia(title, url, quality) {
                                         try {
-                                            if (!url || !/\.(m3u8|mpd|mp4|m4v|webm|mov|mkv)(?:$|[?#&])/i.test(url)) return;
+                                            if (!url || !/^https?:\/\//i.test(url)) return;
                                             var entry = performance.getEntriesByName(url).slice(-1)[0];
                                             var size = entry ? (entry.encodedBodySize || entry.transferSize || 0) : 0;
                                             GenjurPlayback.onVideoAvailable(title || document.title || 'Video dari situs', location.href, url, quality || 'Kualitas tersedia', size);
                                         } catch(e) {}
                                     }
                                     function reportLink(a) {
-                                        try { reportMedia(a.textContent, a.href, a.getAttribute('data-quality') || 'Link video langsung'); } catch(e) {}
+                                        try {
+                                            if (/\.(m3u8|mpd|mp4|m4v|webm|mov|mkv)(?:$|[?#&])/i.test(a.href))
+                                                reportMedia(a.textContent, a.href, a.getAttribute('data-quality') || 'Link video langsung');
+                                        } catch(e) {}
                                     }
                                     function hookVideo(v) {
                                         if (v.__genjurPlaybackHooked) return;
