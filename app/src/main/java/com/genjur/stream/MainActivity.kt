@@ -712,6 +712,11 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                                         TextButton(onClick = { selectedTab = "Sumber Link" }) {
                                             Text("Kelola Sumber Link  ›", color = Green)
                                         }
+                                        Spacer(Modifier.height(12.dp))
+                                        HorizontalDivider(color = Color(0xFF393344))
+                                        Spacer(Modifier.height(10.dp))
+                                        Text("GENJUR STREAM", color = Muted, fontSize = 11.sp)
+                                        Text("Genjur versi ${BuildConfig.VERSION_NAME}", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Medium)
                                     }
                                 }
                             }
