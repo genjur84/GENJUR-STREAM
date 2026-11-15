@@ -46,6 +46,8 @@ private val Green = Color(0xFF8B5CF6)
 private val Muted = Color(0xFFACB7C5)
 
 
+private data class StreamOption(val quality: String, val videoUrl: String)
+
 private data class FeedMovie(
     val title: String,
     val description: String,
@@ -61,7 +63,8 @@ private data class FeedMovie(
     val downloadUrl: String = "",
     val downloadAllowed: Boolean = false,
     val subtitleUrl: String = "",
-    val subtitleLanguage: String = ""
+    val subtitleLanguage: String = "",
+    val streamOptions: List<StreamOption> = emptyList()
 )
 private fun movieKey(movie: FeedMovie): String =
     "${movie.title.trim().lowercase()}|${movie.videoUrl.trim()}|${movie.licenseId}"
@@ -73,6 +76,7 @@ private fun encodeMovie(movie: FeedMovie): JSONObject = JSONObject().apply {
     put("releaseYear", movie.releaseYear); put("genres", JSONArray(movie.genres)); put("duration", movie.duration)
     put("downloadUrl", movie.downloadUrl); put("downloadAllowed", movie.downloadAllowed)
     put("subtitleUrl", movie.subtitleUrl); put("subtitleLanguage", movie.subtitleLanguage)
+    put("streams", JSONArray().apply { movie.streamOptions.forEach { put(JSONObject().put("quality", it.quality).put("videoUrl", it.videoUrl)) } })
 }
 
 private fun decodeMovie(json: JSONObject): FeedMovie {
@@ -89,7 +93,12 @@ private fun decodeMovie(json: JSONObject): FeedMovie {
         downloadUrl = json.optString("downloadUrl"),
         downloadAllowed = json.optBoolean("downloadAllowed", false),
         subtitleUrl = json.optString("subtitleUrl"),
-        subtitleLanguage = json.optString("subtitleLanguage", "id")
+        subtitleLanguage = json.optString("subtitleLanguage", "id"),
+        streamOptions = json.optJSONArray("streams")?.let { arr ->
+            (0 until arr.length()).mapNotNull { index -> arr.optJSONObject(index)?.let { item ->
+                StreamOption(item.optString("quality", "Otomatis"), item.optString("videoUrl"))
+            } }.filter { it.videoUrl.isNotBlank() }
+        } ?: emptyList()
     )
 }
 
@@ -283,6 +292,20 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                                             "URL subtitle harus HTTPS yang valid"
                                         }
                                     }
+                                    val streamsArray = item.optJSONArray("streams")
+                                    val streamOptions = if (streamsArray != null) {
+                                        (0 until streamsArray.length()).mapNotNull { index ->
+                                            val stream = streamsArray.optJSONObject(index) ?: return@mapNotNull null
+                                            val quality = stream.optString("quality", "Otomatis").trim().ifBlank { "Otomatis" }
+                                            val streamUrl = stream.optString("videoUrl").trim()
+                                            if (streamUrl.isBlank()) return@mapNotNull null
+                                            val streamUri = Uri.parse(streamUrl)
+                                            require(streamUri.scheme == "https" && !streamUri.host.isNullOrBlank()) {
+                                                "URL video untuk kualitas $quality harus HTTPS yang valid"
+                                            }
+                                            StreamOption(quality, streamUrl)
+                                        }.distinctBy { it.quality.lowercase() }
+                                    } else emptyList()
                                     val downloadLink = item.optString("downloadUrl").trim()
                                     val downloadAllowed = item.optBoolean("downloadAllowed", false)
                                     require(!downloadAllowed || downloadLink.isNotBlank()) {
@@ -310,7 +333,8 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                                         downloadUrl = downloadLink,
                                         downloadAllowed = downloadAllowed,
                                         subtitleUrl = subtitleLink,
-                                        subtitleLanguage = item.optString("subtitleLanguage", "id").trim()
+                                        subtitleLanguage = item.optString("subtitleLanguage", "id").trim(),
+                                        streamOptions = streamOptions
                                     ))
                                 }
                             }
@@ -327,7 +351,7 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
             }
             feedLoading = false
             result.onSuccess { (movies, loadedSources, sourceErrors) ->
-                feedMovies = movies
+                feedMovies = movies.distinctBy { "${it.title.trim().lowercase()}|${it.releaseYear.trim()}" }
                 feedMessage = when {
                     loadedSources == 0 -> "Tidak ada sumber yang berhasil dibaca. " +
                         sourceErrors.take(2).joinToString(" • ")
@@ -339,6 +363,14 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
             }.onFailure { feedMessage = it.message ?: "Gagal memuat katalog." }
         }
     }
+    LaunchedEffect(Unit) {
+        refreshCatalog()
+        while (true) {
+            delay(6 * 60 * 60 * 1000L)
+            refreshCatalog()
+        }
+    }
+
     val categories = listOf("Semua") + (listOf("Film", "Serial", "Animasi", "Dokumenter") + feedMovies.map { it.category }).map { it.trim() }.filter { it.isNotBlank() }.distinct()
 
     LaunchedEffect(Unit) {
@@ -700,11 +732,11 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
             isDownloaded = downloads.any { movieKey(it.movie) == movieKey(movie) },
             onDownload = { startDownload(movie) },
             onClose = { selectedMovie = null },
-            onPlay = {
-                if (movie.videoUrl.isNotBlank()) {
-                    recordWatch(movie)
+            onPlay = { selectedVersion ->
+                if (selectedVersion.videoUrl.isNotBlank()) {
+                    recordWatch(selectedVersion)
                     selectedMovie = null
-                    playingMovie = movie
+                    playingMovie = selectedVersion
                 }
             }
         )
@@ -758,8 +790,9 @@ private fun MovieDetailDialog(
     isDownloaded: Boolean,
     onDownload: () -> Unit,
     onClose: () -> Unit,
-    onPlay: () -> Unit
+    onPlay: (FeedMovie) -> Unit
 ) {
+    var selectedStreamUrl by remember(movie) { mutableStateOf(movie.streamOptions.firstOrNull()?.videoUrl ?: movie.videoUrl) }
     Dialog(onDismissRequest = onClose, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Surface(Modifier.fillMaxWidth().fillMaxHeight(0.9f).padding(12.dp),
             shape = RoundedCornerShape(22.dp), color = Panel) {
@@ -800,6 +833,21 @@ private fun MovieDetailDialog(
                     Spacer(Modifier.height(8.dp))
                     Text(movie.description.ifBlank { "Sinopsis belum tersedia." },
                         color = Muted, fontSize = 14.sp, lineHeight = 22.sp)
+                    val availableStreams = movie.streamOptions.ifEmpty {
+                        if (movie.videoUrl.isNotBlank()) listOf(StreamOption("Otomatis", movie.videoUrl)) else emptyList()
+                    }
+                    if (availableStreams.isNotEmpty()) {
+                        Spacer(Modifier.height(16.dp))
+                        Text("PILIH KUALITAS VIDEO", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        Spacer(Modifier.height(8.dp))
+                        availableStreams.forEach { stream ->
+                            FilterChip(
+                                selected = selectedStreamUrl == stream.videoUrl,
+                                onClick = { selectedStreamUrl = stream.videoUrl },
+                                label = { Text(stream.quality) }
+                            )
+                        }
+                    }
                     Spacer(Modifier.height(20.dp))
                     Divider(color = Color(0xFF393344))
                     Spacer(Modifier.height(14.dp))
@@ -818,10 +866,10 @@ private fun MovieDetailDialog(
                         Text("Unduhan tidak diizinkan oleh sumber ini.", color = Muted, fontSize = 11.sp)
                     }
                     Spacer(Modifier.height(12.dp))
-                    Button(onClick = onPlay, enabled = movie.videoUrl.isNotBlank(), modifier = Modifier.fillMaxWidth(),
+                    Button(onClick = { onPlay(movie.copy(videoUrl = selectedStreamUrl)) }, enabled = selectedStreamUrl.isNotBlank(), modifier = Modifier.fillMaxWidth(),
                         colors = ButtonDefaults.buttonColors(containerColor = Green, contentColor = Color.White,
                             disabledContainerColor = Color(0xFF393344), disabledContentColor = Muted)) {
-                        Text(if (movie.videoUrl.isBlank()) "Video belum tersedia" else "▶  Putar sekarang")
+                        Text(if (selectedStreamUrl.isBlank()) "Video belum tersedia" else "▶  Putar ${availableStreams.firstOrNull { it.videoUrl == selectedStreamUrl }?.quality ?: "sekarang"}")
                     }
                     TextButton(onClick = onClose, modifier = Modifier.fillMaxWidth()) { Text("Kembali ke katalog", color = Green) }
                 }
