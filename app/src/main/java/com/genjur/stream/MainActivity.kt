@@ -476,7 +476,7 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                                             shape = RoundedCornerShape(14.dp)
                                         ) {
                                             Row(Modifier.fillMaxWidth().padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
-                                                MoviePoster(movie.posterUrl, movie.title, 92.dp)
+                                                MoviePoster(movie.posterUrl, movie.title, 92.dp, 72.dp)
                                                 Spacer(Modifier.width(12.dp))
                                                 Column(Modifier.weight(1f)) {
                                                     Text(movie.title, color = Color.White, fontWeight = FontWeight.Bold)
@@ -572,11 +572,18 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
 
 
 @Composable
-private fun MoviePoster(url: String, title: String, height: androidx.compose.ui.unit.Dp) {
+private fun MoviePoster(
+    url: String,
+    title: String,
+    height: androidx.compose.ui.unit.Dp,
+    width: androidx.compose.ui.unit.Dp? = null
+) {
     var failed by remember(url) { mutableStateOf(false) }
+    val posterModifier = if (width == null) Modifier.fillMaxWidth().height(height)
+        else Modifier.width(width).height(height)
     if (url.isBlank() || failed) {
         Box(
-            Modifier.fillMaxWidth().height(height)
+            posterModifier
                 .background(Color(0xFF302541), RoundedCornerShape(10.dp)),
             contentAlignment = Alignment.Center
         ) {
@@ -593,7 +600,7 @@ private fun MoviePoster(url: String, title: String, height: androidx.compose.ui.
             model = url,
             contentDescription = "Poster $title",
             contentScale = ContentScale.Crop,
-            modifier = Modifier.fillMaxWidth().height(height),
+            modifier = posterModifier,
             onError = { failed = true }
         )
     }
