@@ -31,6 +31,68 @@
       "feedUrl": "",
       "websiteUrl": "https://archive.org/details/movies",
       "freeNote": "Tautan membuka situs resmi; belum menjadi katalog internal GENJUR."
+    },
+    {
+      "id": "viu-indonesia",
+      "name": "Viu Indonesia",
+      "description": "Layanan streaming drama Asia, film, dan acara hiburan melalui situs resmi Viu.",
+      "language": "Beragam",
+      "contentTypes": [
+        "Drama Asia",
+        "Film",
+        "Acara TV"
+      ],
+      "subtitleLanguages": [],
+      "feedUrl": "",
+      "websiteUrl": "https://www.viu.com/ott/id/",
+      "freeNote": "Periksa ikon/pilihan subtitle pada setiap judul. Subtitle Indonesia bergantung pada judul dan wilayah."
+    },
+    {
+      "id": "iqiyi-indonesia",
+      "name": "iQIYI",
+      "description": "Layanan streaming drama Asia, film, anime, dan variety show melalui situs resmi iQIYI.",
+      "language": "Beragam",
+      "contentTypes": [
+        "Drama Asia",
+        "Film",
+        "Anime",
+        "Variety Show"
+      ],
+      "subtitleLanguages": [],
+      "feedUrl": "",
+      "websiteUrl": "https://www.iq.com/",
+      "freeNote": "Periksa pilihan subtitle pada halaman setiap judul; ketersediaan bahasa Indonesia dapat berbeda."
+    },
+    {
+      "id": "netflix-indonesia",
+      "name": "Netflix Indonesia",
+      "description": "Layanan streaming film, serial, anime, dan dokumenter melalui situs resmi Netflix.",
+      "language": "Beragam",
+      "contentTypes": [
+        "Film",
+        "Serial",
+        "Anime",
+        "Dokumenter"
+      ],
+      "subtitleLanguages": [],
+      "feedUrl": "",
+      "websiteUrl": "https://www.netflix.com/id/",
+      "freeNote": "Bahasa subtitle berbeda menurut judul, wilayah, dan pengaturan akun. Periksa menu Audio & Subtitles."
+    },
+    {
+      "id": "disney-plus-indonesia",
+      "name": "Disney+ (Hotstar)",
+      "description": "Layanan streaming Disney+ untuk film dan serial internasional serta konten lokal.",
+      "language": "Beragam",
+      "contentTypes": [
+        "Film",
+        "Serial",
+        "Dokumenter"
+      ],
+      "subtitleLanguages": [],
+      "feedUrl": "",
+      "websiteUrl": "https://www.disneyplus.com/",
+      "freeNote": "Periksa pilihan subtitle Indonesia pada setiap judul; katalog dan bahasa mengikuti wilayah serta akun."
     }
   ]
 }
