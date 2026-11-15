@@ -1020,28 +1020,8 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                     if (selectedTab == "Browser Sumber") Modifier.weight(1f).fillMaxWidth()
                     else Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = horizontal)
                 ) {
-                    if (selectedTab == "Beranda") {
-                        // Sumber terakhir tetap tersedia di Beranda sampai pengguna memilih None.
-                        if (browserInitialUrl.isNotBlank() && selectedSourceName != "Sumber Link") {
-                            Card(
-                                modifier = Modifier.fillMaxWidth().clickable { selectedTab = "Browser Sumber" },
-                                colors = CardDefaults.cardColors(containerColor = Panel),
-                                shape = RoundedCornerShape(14.dp)
-                            ) {
-                                Row(
-                                    Modifier.fillMaxWidth().padding(14.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Column(Modifier.weight(1f)) {
-                                        Text("Sumber terakhir dibuka", color = Muted, fontSize = 11.sp)
-                                        Text(selectedSourceName, color = Color.White, fontWeight = FontWeight.Bold)
-                                        Text(Uri.parse(browserInitialUrl).host.orEmpty(), color = Muted, fontSize = 10.sp, maxLines = 1)
-                                    }
-                                    Text("Buka lagi  ›", color = Green, fontWeight = FontWeight.Bold)
-                                }
-                            }
-                        }
+                    if (selectedTab == "Beranda" || selectedTab == "Browser Sumber") {
+                        // Halaman sumber ditampilkan pada lapisan WebView persisten di area Beranda.
                     } else {
                         if (selectedTab != "Browser Sumber") {
                             Text(selectedTab, color = Color.White, fontSize = 27.sp, fontWeight = FontWeight.ExtraBold)
@@ -1108,7 +1088,7 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                                                 // Sertakan domain sumber sebagai kata kunci biasa, bukan operator site:
                                                 "https://www.google.com/search?q=" + Uri.encode("${search.trim()} $host")
                                             }
-                                            selectedTab = "Browser Sumber"
+                                            selectedTab = "Beranda"
                                         }
                                     },
                                     modifier = Modifier.fillMaxWidth(),
@@ -1154,46 +1134,6 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                                         Text("GENJUR STREAM", color = Muted, fontSize = 11.sp)
                                         Text("Genjur versi ${BuildConfig.VERSION_NAME}", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Medium)
                                     }
-                                }
-                            }
-                            "Browser Sumber" -> {
-                                // Buat WebView baru setiap kali alamat sumber berubah.
-                                // Ini mencegah callback loading dari situs sebelumnya
-                                // menimpa status loading situs yang baru dibuka.
-                                key(browserInitialUrl) {
-                                    SourceBrowser(
-                                        initialUrl = browserInitialUrl,
-                                        fullScreen = true,
-                                        onPlaybackStarted = { pageTitle, pageUrl ->
-                                            val safeTitle = pageTitle.trim().takeIf { it.isNotBlank() }
-                                                ?: Uri.parse(pageUrl).host.orEmpty().ifBlank { "Video dari situs" }
-                                            activity.showWebPlaybackNotification(safeTitle, pageUrl)
-                                            recordWatch(FeedMovie(
-                                                title = safeTitle,
-                                                description = "Tontonan yang mulai diputar melalui Browser Sumber.",
-                                                category = "Sumber Web",
-                                                videoUrl = pageUrl,
-                                                licenseId = "User-provided website",
-                                                termsUrl = pageUrl,
-                                                attribution = "Situs sumber: ${Uri.parse(pageUrl).host.orEmpty()}"
-                                            ))
-                                        },
-                                        onPlayCandidate = { title, pageUrl, mediaUrl ->
-                                            val safeTitle = title.ifBlank { "Video dari situs" }
-                                            playingMovie = FeedMovie(
-                                                title = safeTitle,
-                                                description = "Video terdeteksi dari pemutar situs.",
-                                                category = "Sumber Web",
-                                                videoUrl = mediaUrl,
-                                                licenseId = "User-provided website",
-                                                termsUrl = pageUrl,
-                                                attribution = "Situs sumber: ${Uri.parse(pageUrl).host.orEmpty()}"
-                                            )
-                                        },
-                                        onDownloadCandidate = { title, pageUrl, mediaUrl ->
-                                            startWebVideoDownload(title, pageUrl, mediaUrl)
-                                        }
-                                    )
                                 }
                             }
                             "Kategori" -> {
@@ -1399,6 +1339,57 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                                 modifier = Modifier.size(if (tvLayout) 27.dp else 25.dp)
                             )
                         }
+                    }
+                }
+            }
+            // WebView tetap berada di komposisi saat berpindah tab agar posisi,
+            // sesi login, dan halaman situs tidak di-reset. Saat tab lain aktif,
+            // WebView dipindahkan ke luar layar tanpa dihancurkan.
+            if (browserInitialUrl.isNotBlank()) {
+                val sourceVisible = selectedTab == "Beranda" || selectedTab == "Browser Sumber"
+                Box(
+                    Modifier
+                        .align(Alignment.TopCenter)
+                        .fillMaxWidth()
+                        .padding(top = if (selectedTab == "Browser Sumber") 0.dp else 78.dp)
+                        .height(maxHeight - if (selectedTab == "Browser Sumber") 70.dp else 148.dp)
+                        .offset(x = if (sourceVisible) 0.dp else 2000.dp)
+                ) {
+                    key(browserInitialUrl) {
+                        SourceBrowser(
+                            initialUrl = browserInitialUrl,
+                            fullScreen = true,
+                            active = sourceVisible,
+                            onPlaybackStarted = { pageTitle, pageUrl ->
+                                val safeTitle = pageTitle.trim().takeIf { it.isNotBlank() }
+                                    ?: Uri.parse(pageUrl).host.orEmpty().ifBlank { "Video dari situs" }
+                                activity.showWebPlaybackNotification(safeTitle, pageUrl)
+                                recordWatch(FeedMovie(
+                                    title = safeTitle,
+                                    description = "Tontonan yang mulai diputar melalui Browser Sumber.",
+                                    category = "Sumber Web",
+                                    videoUrl = pageUrl,
+                                    licenseId = "User-provided website",
+                                    termsUrl = pageUrl,
+                                    attribution = "Situs sumber: ${Uri.parse(pageUrl).host.orEmpty()}"
+                                ))
+                            },
+                            onPlayCandidate = { title, pageUrl, mediaUrl ->
+                                val safeTitle = title.ifBlank { "Video dari situs" }
+                                playingMovie = FeedMovie(
+                                    title = safeTitle,
+                                    description = "Video terdeteksi dari pemutar situs.",
+                                    category = "Sumber Web",
+                                    videoUrl = mediaUrl,
+                                    licenseId = "User-provided website",
+                                    termsUrl = pageUrl,
+                                    attribution = "Situs sumber: ${Uri.parse(pageUrl).host.orEmpty()}"
+                                )
+                            },
+                            onDownloadCandidate = { title, pageUrl, mediaUrl ->
+                                startWebVideoDownload(title, pageUrl, mediaUrl)
+                            }
+                        )
                     }
                 }
             }
@@ -1969,6 +1960,7 @@ private inline fun <T> List<T>.anyIndexed(predicate: (Int, T) -> Boolean): Boole
 private fun SourceBrowser(
     initialUrl: String,
     fullScreen: Boolean = false,
+    active: Boolean = true,
     onPlaybackStarted: (String, String) -> Unit,
     onPlayCandidate: (String, String, String) -> Unit,
     onDownloadCandidate: (String, String, String) -> Unit
@@ -1993,7 +1985,7 @@ private fun SourceBrowser(
     var isLoading by remember(initialUrl) { mutableStateOf(initialUrl.isNotBlank()) }
     var webView by remember { mutableStateOf<WebView?>(null) }
     val loadingFallback = remember { Runnable { isLoading = false } }
-    BackHandler(enabled = webView?.canGoBack() == true) {
+    BackHandler(enabled = active && webView?.canGoBack() == true) {
         webView?.goBack()
     }
     Column(Modifier.fillMaxSize().padding(if (fullScreen) 0.dp else 8.dp), verticalArrangement = Arrangement.spacedBy(if (fullScreen) 4.dp else 8.dp)) {
