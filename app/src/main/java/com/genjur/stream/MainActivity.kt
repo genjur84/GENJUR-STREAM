@@ -50,7 +50,10 @@ private data class FeedMovie(
     val licenseId: String,
     val termsUrl: String,
     val attribution: String,
-    val posterUrl: String = ""
+    val posterUrl: String = "",
+    val releaseYear: String = "",
+    val genres: List<String> = emptyList(),
+    val duration: String = ""
 )
 private fun savedFeedUrls(activity: MainActivity): List<String> = runCatching {
     val prefs = activity.getSharedPreferences("genjur_stream_sources", 0)
@@ -141,9 +144,26 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                                     require(posterUrl.isBlank() || (posterUri.scheme == "https" && !posterUri.host.isNullOrBlank())) {
                                         "URL poster harus menggunakan HTTPS yang valid"
                                     }
+                                    val genresArray = item.optJSONArray("genres")
+                                    val genres = if (genresArray != null) {
+                                        (0 until genresArray.length()).map { genresArray.optString(it).trim() }
+                                            .filter { it.isNotBlank() }.distinct()
+                                    } else {
+                                        item.optString("genre").split(",").map { it.trim() }
+                                            .filter { it.isNotBlank() }.distinct()
+                                    }
                                     movies.add(FeedMovie(
-                                        title, item.optString("description", "Sinopsis belum tersedia."),
-                                        item.optString("category", "Film"), videoUrl, licenseId, termsUrl, attribution, posterUrl
+                                        title = title,
+                                        description = item.optString("description", "Sinopsis belum tersedia."),
+                                        category = item.optString("category", "Film"),
+                                        videoUrl = videoUrl,
+                                        licenseId = licenseId,
+                                        termsUrl = termsUrl,
+                                        attribution = attribution,
+                                        posterUrl = posterUrl,
+                                        releaseYear = item.optString("releaseYear").trim(),
+                                        genres = genres,
+                                        duration = item.optString("duration").trim()
                                     ))
                                 }
                             }
@@ -398,7 +418,7 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                             Spacer(Modifier.height(14.dp))
                             feedMovies.filter { movie ->
                                 (category == "Semua" || selectedTab != "Kategori" || movie.category.equals(category, true)) &&
-                                    (search.isBlank() || movie.title.contains(search, true) || movie.description.contains(search, true))
+                                    (search.isBlank() || movie.title.contains(search, true) || movie.description.contains(search, true) || movie.genres.any { it.contains(search, true) })
                             }.forEach { movie ->
                                 Card(Modifier.fillMaxWidth().padding(bottom = 9.dp), colors = CardDefaults.cardColors(containerColor = Panel)) {
                                     Row(Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -489,24 +509,47 @@ private fun MovieDetailDialog(movie: FeedMovie, onClose: () -> Unit, onPlay: () 
         Surface(Modifier.fillMaxWidth().fillMaxHeight(0.9f).padding(12.dp),
             shape = RoundedCornerShape(22.dp), color = Panel) {
             Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-                MoviePoster(url = movie.posterUrl, title = movie.title, height = 360.dp)
-                Column(Modifier.padding(20.dp)) {
-                    Text(movie.title, color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.ExtraBold)
-                    Spacer(Modifier.height(7.dp))
-                    Text(movie.category, color = Green, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                Box {
+                    MoviePoster(url = movie.posterUrl, title = movie.title, height = 300.dp)
+                    TextButton(
+                        onClick = onClose,
+                        modifier = Modifier.align(Alignment.TopEnd).padding(10.dp),
+                        colors = ButtonDefaults.textButtonColors(containerColor = Color(0xAA09090D))
+                    ) { Text("✕ Tutup", color = Color.White) }
+                }
+                Column(Modifier.padding(horizontal = 20.dp, vertical = 18.dp)) {
+                    Text(movie.title, color = Color.White, fontSize = 25.sp, lineHeight = 30.sp,
+                        fontWeight = FontWeight.ExtraBold)
+                    Spacer(Modifier.height(9.dp))
+                    Text(
+                        listOf(movie.category, movie.releaseYear, movie.duration)
+                            .filter { it.isNotBlank() }.joinToString("  •  "),
+                        color = Green, fontSize = 12.sp, fontWeight = FontWeight.SemiBold
+                    )
+                    if (movie.genres.isNotEmpty()) {
+                        Spacer(Modifier.height(10.dp))
+                        Text(movie.genres.joinToString("  •  "), color = Color(0xFFD5C9E8), fontSize = 12.sp)
+                    }
+                    Spacer(Modifier.height(22.dp))
+                    Divider(color = Color(0xFF393344))
                     Spacer(Modifier.height(16.dp))
-                    Text("Sinopsis", color = Color.White, fontWeight = FontWeight.Bold)
-                    Spacer(Modifier.height(6.dp))
-                    Text(movie.description.ifBlank { "Sinopsis belum tersedia." }, color = Muted, fontSize = 14.sp, lineHeight = 21.sp)
+                    Text("SINOPSIS", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.height(8.dp))
+                    Text(movie.description.ifBlank { "Sinopsis belum tersedia." },
+                        color = Muted, fontSize = 14.sp, lineHeight = 22.sp)
+                    Spacer(Modifier.height(20.dp))
+                    Divider(color = Color(0xFF393344))
                     Spacer(Modifier.height(14.dp))
-                    Text("Sumber: ${movie.attribution}", color = Muted, fontSize = 10.sp)
+                    Text("INFORMASI SUMBER", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.height(6.dp))
+                    Text(movie.attribution, color = Muted, fontSize = 12.sp)
                     Spacer(Modifier.height(20.dp))
                     Button(onClick = onPlay, enabled = movie.videoUrl.isNotBlank(), modifier = Modifier.fillMaxWidth(),
                         colors = ButtonDefaults.buttonColors(containerColor = Green, contentColor = Color.White,
                             disabledContainerColor = Color(0xFF393344), disabledContentColor = Muted)) {
                         Text(if (movie.videoUrl.isBlank()) "Video belum tersedia" else "▶  Putar sekarang")
                     }
-                    TextButton(onClick = onClose, modifier = Modifier.fillMaxWidth()) { Text("Kembali", color = Green) }
+                    TextButton(onClick = onClose, modifier = Modifier.fillMaxWidth()) { Text("Kembali ke katalog", color = Green) }
                 }
             }
         }
