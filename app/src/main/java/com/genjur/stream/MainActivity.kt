@@ -150,7 +150,7 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
             }.onFailure { feedMessage = it.message ?: "Gagal memuat katalog." }
         }
     }
-    val categories = listOf("Semua", "Film", "Serial", "Animasi", "Dokumenter")
+    val categories = listOf("Semua") + (listOf("Film", "Serial", "Animasi", "Dokumenter") + feedMovies.map { it.category }).map { it.trim() }.filter { it.isNotBlank() }.distinct()
 
     LaunchedEffect(Unit) {
         val result = withContext(Dispatchers.IO) {
