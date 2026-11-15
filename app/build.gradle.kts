@@ -34,8 +34,8 @@ android {
         applicationId = "com.genjur.stream"
         minSdk = 23
         targetSdk = 35
-        versionCode = 7
-        versionName = "0.5.2"
+        versionCode = System.getenv("GENJUR_VERSION_CODE")?.toIntOrNull() ?: 8
+        versionName = System.getenv("GENJUR_VERSION_NAME") ?: "0.5.3"
     }
 
     buildTypes {
