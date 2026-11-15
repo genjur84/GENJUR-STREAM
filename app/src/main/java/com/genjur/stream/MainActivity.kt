@@ -776,7 +776,9 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                                             browserInitialUrl = if (host == "youtube.com" || host.endsWith(".youtube.com") || host == "youtu.be") {
                                                 "https://www.youtube.com/results?search_query=$query"
                                             } else {
-                                                "https://www.google.com/search?q=" + Uri.encode("site:$host ${search.trim()}")
+                                                // Gunakan mode hasil web Google dan pertahankan kata kunci di depan
+                                                // agar hasil lebih dekat dengan pencarian Chrome, tetapi tetap memprioritaskan domain sumber.
+                                                "https://www.google.com/search?udm=14&q=" + Uri.encode("${search.trim()} site:$host")
                                             }
                                             selectedTab = "Browser Sumber"
                                         }
@@ -1590,6 +1592,11 @@ private fun SourceBrowser(initialUrl: String, fullScreen: Boolean = false, onPla
                 WebView(context).apply {
                     settings.javaScriptEnabled = true
                     settings.domStorageEnabled = true
+                    // Hilangkan penanda Android WebView agar Google tidak menyajikan
+                    // halaman pencarian versi terbatas untuk embedded WebView.
+                    settings.userAgentString = settings.userAgentString
+                        .replace("; wv)", ")")
+                        .replace(" Version/4.0", "")
                     settings.loadsImagesAutomatically = true
                     settings.mediaPlaybackRequiresUserGesture = true
                     settings.javaScriptCanOpenWindowsAutomatically = false
