@@ -885,7 +885,7 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                     }
                 }
             }
-            if (selectedTab != "Browser Sumber" && savedSourceMenu.isNotEmpty()) {
+            if (savedSourceMenu.isNotEmpty()) {
                 Column(
                     modifier = Modifier.align(Alignment.BottomEnd).padding(end = 16.dp, bottom = 82.dp),
                     horizontalAlignment = Alignment.End
