@@ -125,10 +125,11 @@ private data class StreamOption(val quality: String, val videoUrl: String, val s
 
 private fun detectedQualityLabel(label: String, videoUrl: String): String {
     val source = "$label $videoUrl"
-    val match = Regex("""(?i)(2160|1440|1080|720|480|360)\\s*p?""").find(source)
+    val match = Regex("""(?i)(2160|1440|1080|720|480|360)\s*p?""").find(source)
+        ?: Regex("""(?i)(?:height|res|quality)[=_:/-]?(2160|1440|1080|720|480|360)""").find(source)
     if (match != null) return "${match.groupValues[1]}p"
     if (source.contains("4k", ignoreCase = true)) return "2160p"
-    return "Kualitas asli (resolusi tidak terdeteksi)"
+    return "Kualitas sumber (otomatis)"
 }
 
 private data class FeedMovie(
