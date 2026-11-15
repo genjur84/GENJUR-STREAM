@@ -1,8 +1,10 @@
-# GENJUR STREAM Repository Format
+# GENJUR STREAM Repository and Plugin Format
 
-GENJUR STREAM repositories are HTTPS-hosted JSON indexes. The app reads metadata only; it does not download or execute extension code.
+GENJUR STREAM uses a small, data-only plugin contract. A plugin is a JSON catalog feed referenced by an HTTPS repository index. It is not executable Kotlin, JavaScript, or a CloudStream `.cs3` binary.
 
-## Repository index
+## 1. Repository index
+
+The repository URL must return JSON in this shape:
 
 ```json
 {
@@ -19,9 +21,9 @@ GENJUR STREAM repositories are HTTPS-hosted JSON indexes. The app reads metadata
 }
 ```
 
-Each extension requires a unique `id`, a display `name`, and an HTTPS `feedUrl`.
+Each extension requires a unique `id`, a display `name`, and an HTTPS `feedUrl`. The app reads the index, lists extensions, and lets the user install or remove GENJUR feed extensions.
 
-## Catalog feed
+## 2. Catalog feed (GENJUR plugin payload)
 
 The feed URL must return JSON with an explicit distribution-rights declaration:
 
@@ -44,13 +46,30 @@ The feed URL must return JSON with an explicit distribution-rights declaration:
 }
 ```
 
-Use only catalog metadata, artwork, and playback URLs that the provider has authorized you to redistribute or display. The app validates the rights declaration when loading a feed. A repository index is not itself proof of rights; each feed provider remains responsible for its license and terms.
+The current feed reader requires:
+- `rights.redistributionAllowed` to be `true`;
+- a non-empty `rights.licenseId`;
+- an HTTPS `rights.termsUrl`;
+- a non-empty `rights.attribution`;
+- an `items` array; each item must have a non-empty `title`;
+- `videoUrl` may be empty for metadata-only catalog entries, otherwise it must be a valid HTTPS URL.
 
-The current app version supports JSON catalog feeds. It does not execute downloaded scripts, scrape arbitrary website pages, or treat a normal website homepage as a repository index.
+Use only catalog metadata, artwork, and playback URLs that the provider has authorized you to redistribute or display. A repository index is not itself proof of rights; each feed provider remains responsible for its license and terms.
 
+## 3. How to test the included demo
 
-## CloudStream repository discovery (read-only)
+Add this repository URL in GENJUR STREAM:
 
-The app can also read a CloudStream repository manifest with `manifestVersion: 1` and its `pluginLists` array. It fetches each HTTPS plugin-list JSON file and displays plugin metadata such as name, language, supported media types, and the HTTPS `.cs3` file URL.
+`https://raw.githubusercontent.com/genjur84/GENJUR-STREAM/main/samples/repository-film-lokal.json`
 
-This is discovery-only compatibility. GENJUR STREAM does not download, install, or execute CloudStream `.cs3` code. Those plugins use the CloudStream runtime and are not GENJUR STREAM feed extensions. To play content in GENJUR STREAM, use a compatible JSON catalog feed with the rights declaration described above.
+Then:
+1. Select the discovered “Katalog Film Indonesia (Demo)” extension and tap “Pasang ekstensi”.
+2. Return to the home screen.
+3. Tap “Muat katalog dari sumber”.
+4. The three fictional demo titles should appear as metadata-only entries. They intentionally have no playback URL.
+
+## 4. CloudStream compatibility boundary
+
+GENJUR STREAM can read a CloudStream repository manifest with `manifestVersion: 1` and its `pluginLists` array. It fetches each HTTPS plugin-list JSON file and displays plugin metadata such as name, language, supported media types, and the HTTPS `.cs3` file URL.
+
+This is discovery-only compatibility. GENJUR STREAM does not download, install, or execute CloudStream `.cs3` code. Those plugins require the CloudStream runtime and are not GENJUR STREAM feed extensions. The supported path is to provide a GENJUR JSON repository and catalog feed. The app does not execute downloaded scripts or scrape arbitrary website pages.
