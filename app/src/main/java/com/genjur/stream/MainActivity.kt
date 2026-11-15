@@ -26,6 +26,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.media3.common.MediaItem
+import androidx.media3.common.MimeTypes
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import androidx.core.content.FileProvider
@@ -58,7 +59,9 @@ private data class FeedMovie(
     val genres: List<String> = emptyList(),
     val duration: String = "",
     val downloadUrl: String = "",
-    val downloadAllowed: Boolean = false
+    val downloadAllowed: Boolean = false,
+    val subtitleUrl: String = "",
+    val subtitleLanguage: String = ""
 )
 private fun movieKey(movie: FeedMovie): String =
     "${movie.title.trim().lowercase()}|${movie.videoUrl.trim()}|${movie.licenseId}"
@@ -69,6 +72,7 @@ private fun encodeMovie(movie: FeedMovie): JSONObject = JSONObject().apply {
     put("attribution", movie.attribution); put("posterUrl", movie.posterUrl)
     put("releaseYear", movie.releaseYear); put("genres", JSONArray(movie.genres)); put("duration", movie.duration)
     put("downloadUrl", movie.downloadUrl); put("downloadAllowed", movie.downloadAllowed)
+    put("subtitleUrl", movie.subtitleUrl); put("subtitleLanguage", movie.subtitleLanguage)
 }
 
 private fun decodeMovie(json: JSONObject): FeedMovie {
@@ -83,7 +87,9 @@ private fun decodeMovie(json: JSONObject): FeedMovie {
             (0 until genres.length()).map { genres.optString(it) }.filter { it.isNotBlank() },
         duration = json.optString("duration"),
         downloadUrl = json.optString("downloadUrl"),
-        downloadAllowed = json.optBoolean("downloadAllowed", false)
+        downloadAllowed = json.optBoolean("downloadAllowed", false),
+        subtitleUrl = json.optString("subtitleUrl"),
+        subtitleLanguage = json.optString("subtitleLanguage", "id")
     )
 }
 
@@ -270,6 +276,13 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                                         item.optString("genre").split(",").map { it.trim() }
                                             .filter { it.isNotBlank() }.distinct()
                                     }
+                                    val subtitleLink = item.optString("subtitleUrl").trim()
+                                    if (subtitleLink.isNotBlank()) {
+                                        val subtitleUri = Uri.parse(subtitleLink)
+                                        require(subtitleUri.scheme == "https" && !subtitleUri.host.isNullOrBlank()) {
+                                            "URL subtitle harus HTTPS yang valid"
+                                        }
+                                    }
                                     val downloadLink = item.optString("downloadUrl").trim()
                                     val downloadAllowed = item.optBoolean("downloadAllowed", false)
                                     require(!downloadAllowed || downloadLink.isNotBlank()) {
@@ -295,7 +308,9 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                                         genres = genres,
                                         duration = item.optString("duration").trim(),
                                         downloadUrl = downloadLink,
-                                        downloadAllowed = downloadAllowed
+                                        downloadAllowed = downloadAllowed,
+                                        subtitleUrl = subtitleLink,
+                                        subtitleLanguage = item.optString("subtitleLanguage", "id").trim()
                                     ))
                                 }
                             }
@@ -819,7 +834,21 @@ private fun MovieDetailDialog(
 private fun InAppVideoPlayer(activity: MainActivity, movie: FeedMovie, onClose: () -> Unit) {
     val player = remember(movie.videoUrl) {
         ExoPlayer.Builder(activity).build().apply {
-            setMediaItem(MediaItem.fromUri(movie.videoUrl))
+            val mediaItem = MediaItem.Builder().setUri(movie.videoUrl).apply {
+                if (movie.subtitleUrl.isNotBlank()) {
+                    val subtitleUri = Uri.parse(movie.subtitleUrl)
+                    val mimeType = if (subtitleUri.path.orEmpty().lowercase().endsWith(".vtt"))
+                        MimeTypes.TEXT_VTT else MimeTypes.APPLICATION_SUBRIP
+                    setSubtitleConfigurations(listOf(
+                        MediaItem.SubtitleConfiguration.Builder(subtitleUri)
+                            .setMimeType(mimeType)
+                            .setLanguage(movie.subtitleLanguage.ifBlank { "id" })
+                            .setSelectionFlags(androidx.media3.common.C.SELECTION_FLAG_DEFAULT)
+                            .build()
+                    ))
+                }
+            }.build()
+            setMediaItem(mediaItem)
             prepare()
             playWhenReady = true
         }
@@ -856,7 +885,7 @@ private fun InAppVideoPlayer(activity: MainActivity, movie: FeedMovie, onClose: 
                     update = { it.player = player },
                     modifier = Modifier.fillMaxWidth().weight(1f)
                 )
-                Text("Pemutaran langsung di GENJUR STREAM", color = Muted, fontSize = 11.sp)
+                Text(if (movie.subtitleUrl.isNotBlank()) "Subtitle: ${movie.subtitleLanguage.ifBlank { "Indonesia" }} (aktifkan CC di pemutar)" else "Subtitle eksternal belum tersedia untuk judul ini.", color = Muted, fontSize = 11.sp)
             }
         }
     }
@@ -873,7 +902,9 @@ private data class RepositoryExtension(
     val pluginUrl: String = "",
     val language: String = "",
     val tvTypes: String = "",
-    val isCloudStream: Boolean = false
+    val isCloudStream: Boolean = false,
+    val subtitleLanguages: String = "",
+    val contentTypes: String = ""
 )
 
 @Composable
@@ -902,7 +933,8 @@ private fun RepositoryDialog(activity: MainActivity, onClose: () -> Unit) {
             RepositoryExtension(o.optString("id"), o.optString("name"),
                 o.optString("description"), o.optString("feedUrl"), o.optString("repositoryUrl"),
                 o.optString("pluginUrl"), o.optString("language"), o.optString("tvTypes"),
-                o.optBoolean("isCloudStream", false))
+                o.optBoolean("isCloudStream", false), o.optString("subtitleLanguages"),
+                o.optString("contentTypes"))
         }
     }.getOrDefault(emptyList())
 
@@ -926,7 +958,8 @@ private fun RepositoryDialog(activity: MainActivity, onClose: () -> Unit) {
             .put("description", it.description).put("feedUrl", it.feedUrl)
             .put("repositoryUrl", it.repositoryUrl).put("pluginUrl", it.pluginUrl)
             .put("language", it.language).put("tvTypes", it.tvTypes)
-            .put("isCloudStream", it.isCloudStream)) }
+            .put("isCloudStream", it.isCloudStream).put("subtitleLanguages", it.subtitleLanguages)
+            .put("contentTypes", it.contentTypes)) }
         prefs.edit().putString("installed_extensions", a.toString()).apply()
     }
     fun loadRepository(repository: SavedRepository) {
@@ -955,9 +988,18 @@ private fun RepositoryDialog(activity: MainActivity, onClose: () -> Unit) {
                                 feedUri.scheme == "https" && !feedUri.host.isNullOrBlank()) {
                                 "Ekstensi ditolak: id, nama, atau feedUrl tidak valid."
                             }
+                            val subtitleArray = item.optJSONArray("subtitleLanguages")
+                            val subtitleLanguages = if (subtitleArray == null) "" else
+                                (0 until subtitleArray.length()).map { subtitleArray.optString(it).trim() }
+                                    .filter { it.isNotBlank() }.distinct().joinToString(", ")
+                            val typeArray = item.optJSONArray("contentTypes")
+                            val contentTypes = if (typeArray == null) "" else
+                                (0 until typeArray.length()).map { typeArray.optString(it).trim() }
+                                    .filter { it.isNotBlank() }.distinct().joinToString(", ")
                             parsed.add(RepositoryExtension(id, extName,
-                                item.optString("description", "Ekstensi katalog resmi."),
-                                feed, repository.url))
+                                item.optString("description", "Penyedia katalog film."),
+                                feed, repository.url, language = item.optString("language"),
+                                subtitleLanguages = subtitleLanguages, contentTypes = contentTypes))
                         }
                     } else if (root.optInt("manifestVersion", 0) == 1) {
                         val pluginLists = root.optJSONArray("pluginLists")
@@ -993,7 +1035,11 @@ private fun RepositoryDialog(activity: MainActivity, onClose: () -> Unit) {
                                     pluginUrl,
                                     language,
                                     typeNames,
-                                    true
+                                    true,
+                                    item.optJSONArray("subtitleLanguages")?.let { a ->
+                                        (0 until a.length()).map { a.optString(it) }.filter { it.isNotBlank() }.joinToString(", ")
+                                    }.orEmpty(),
+                                    typeNames
                                 ))
                             }
                         }
@@ -1044,13 +1090,16 @@ private fun RepositoryDialog(activity: MainActivity, onClose: () -> Unit) {
                 }
                 if (loading) LinearProgressIndicator(Modifier.fillMaxWidth(), color = Green)
                 if (discovered.isNotEmpty()) {
-                    Text("Penyedia film ditemukan", color = Color.White, fontWeight = FontWeight.Bold)
+                    Text("Daftar penyedia (${discovered.size})", color = Color.White, fontWeight = FontWeight.Bold)
                     discovered.forEach { extension ->
                         val isInstalled = installed.any { it.id == extension.id && it.repositoryUrl == extension.repositoryUrl }
                         Card(colors = CardDefaults.cardColors(containerColor = Panel)) {
                             Column(Modifier.fillMaxWidth().padding(10.dp)) {
                                 Text(extension.name, color = Color.White, fontWeight = FontWeight.Bold)
                                 Text(extension.description, color = Muted, fontSize = 11.sp)
+                                if (extension.language.isNotBlank()) Text("Bahasa konten: ${extension.language}", color = Muted, fontSize = 10.sp)
+                                if (extension.subtitleLanguages.isNotBlank()) Text("Subtitle: ${extension.subtitleLanguages}", color = Muted, fontSize = 10.sp)
+                                if (extension.contentTypes.isNotBlank()) Text("Jenis: ${extension.contentTypes}", color = Muted, fontSize = 10.sp)
                                 if (extension.isCloudStream) {
                                     if (extension.language.isNotBlank()) Text("Bahasa: ${extension.language}", color = Muted, fontSize = 10.sp)
                                     if (extension.tvTypes.isNotBlank()) Text("Kategori: ${extension.tvTypes}", color = Muted, fontSize = 10.sp)
@@ -1072,7 +1121,7 @@ private fun RepositoryDialog(activity: MainActivity, onClose: () -> Unit) {
                     Text("Tekan Periksa ekstensi pada repositori untuk memuat daftar ekstensi.",
                         color = Muted, fontSize = 11.sp)
                 }
-                Text("Ekstensi terpasang: ${installed.size}", color = Color.White, fontWeight = FontWeight.Bold)
+                Text("Penyedia terpasang: ${installed.size}", color = Color.White, fontWeight = FontWeight.Bold)
                 installed.forEach { ext ->
                     Text("• ${ext.name}", color = Muted, fontSize = 12.sp)
                 }
