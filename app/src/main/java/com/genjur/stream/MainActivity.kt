@@ -881,10 +881,10 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     // Pencarian tetap berada di ikon kaca pembesar bagian atas.
-                    listOf("Beranda" to "⌂", "Sumber Link" to "↗", "Browser Sumber" to "◎", "Kategori" to "▦", "Unduhan" to "⇩", "Favorit" to "♡", "Riwayat" to "◷", "Pengaturan" to "⚙").forEach { (tab, glyph) ->
+                    listOf("Beranda" to "⌂", "Sumber Link" to "↗", "Browser Sumber" to "◎", "Kategori" to "▦", "Unduhan" to "⇩", "Favorit" to "♡", "Riwayat" to "◷").forEach { (tab, glyph) ->
                         Column(
                             modifier = Modifier.width(if (tvLayout) 104.dp else 76.dp).clickable {
-                                if (tab == "Pengaturan") onOpenSources() else selectedTab = tab
+                                selectedTab = tab
                             }.padding(vertical = 5.dp),
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.Center
@@ -1376,18 +1376,7 @@ private data class RepositoryExtension(
 
 @Composable
 private fun GenjurStreamApp(activity: MainActivity) {
-    var showRepositories by remember { mutableStateOf(false) }
-    var providerUrl by remember { mutableStateOf<String?>(null) }
-    Box(Modifier.fillMaxSize()) {
-        GenjurStreamHome(activity) { showRepositories = true }
-        if (showRepositories) RepositoryDialog(activity, onOpenWebsite = { url ->
-            showRepositories = false
-            providerUrl = url
-        }) { showRepositories = false }
-        providerUrl?.let { url ->
-            ProviderWebDialog(url = url, onClose = { providerUrl = null })
-        }
-    }
+    GenjurStreamHome(activity)
 }
 
 @Composable
