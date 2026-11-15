@@ -1368,26 +1368,28 @@ private fun SourceBrowser(initialUrl: String, fullScreen: Boolean = false, onPla
     var webView by remember { mutableStateOf<WebView?>(null) }
     Column(Modifier.fillMaxSize().padding(if (fullScreen) 0.dp else 8.dp), verticalArrangement = Arrangement.spacedBy(if (fullScreen) 4.dp else 8.dp)) {
         if (!fullScreen) Text("Buka situs sumber video di dalam GENJUR STREAM. Gunakan hanya situs dan video yang boleh kamu akses.", color = Muted, fontSize = 12.sp)
-        OutlinedTextField(value = address, onValueChange = { address = it },
-            modifier = Modifier.fillMaxWidth(), singleLine = true,
-            placeholder = { Text("https://contoh.com", color = Muted) },
-            colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White,
-                unfocusedTextColor = Color.White, focusedBorderColor = Green,
-                unfocusedBorderColor = Color(0xFF393344), cursorColor = Green))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(onClick = {
-                val entered = address.trim()
-                val normalized = if (entered.startsWith("https://", true) || entered.startsWith("http://", true)) entered else "https://" + entered
-                val uri = Uri.parse(normalized)
-                if ((uri.scheme == "https" || uri.scheme == "http") && !uri.host.isNullOrBlank()) {
-                    currentUrl = normalized
-                    webView?.loadUrl(normalized)
-                } else pageTitle = "Alamat situs tidak valid."
-            }, colors = ButtonDefaults.buttonColors(containerColor = Green)) { Text("Buka situs") }
-            TextButton(onClick = { webView?.goBack() }, enabled = webView?.canGoBack() == true) { Text("Kembali", color = Green) }
-            TextButton(onClick = { webView?.reload() }, enabled = currentUrl.isNotBlank()) { Text("Muat ulang", color = Green) }
+        if (!fullScreen) {
+            OutlinedTextField(value = address, onValueChange = { address = it },
+                modifier = Modifier.fillMaxWidth(), singleLine = true,
+                placeholder = { Text("https://contoh.com", color = Muted) },
+                colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White,
+                    unfocusedTextColor = Color.White, focusedBorderColor = Green,
+                    unfocusedBorderColor = Color(0xFF393344), cursorColor = Green))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(onClick = {
+                    val entered = address.trim()
+                    val normalized = if (entered.startsWith("https://", true) || entered.startsWith("http://", true)) entered else "https://" + entered
+                    val uri = Uri.parse(normalized)
+                    if ((uri.scheme == "https" || uri.scheme == "http") && !uri.host.isNullOrBlank()) {
+                        currentUrl = normalized
+                        webView?.loadUrl(normalized)
+                    } else pageTitle = "Alamat situs tidak valid."
+                }, colors = ButtonDefaults.buttonColors(containerColor = Green)) { Text("Buka situs") }
+                TextButton(onClick = { webView?.goBack() }, enabled = webView?.canGoBack() == true) { Text("Kembali", color = Green) }
+                TextButton(onClick = { webView?.reload() }, enabled = currentUrl.isNotBlank()) { Text("Muat ulang", color = Green) }
+            }
+            Text(pageTitle, color = Muted, fontSize = 11.sp, maxLines = 2)
         }
-        Text(pageTitle, color = Muted, fontSize = 11.sp, maxLines = 2)
         AndroidView(
             factory = { context ->
                 WebView(context).apply {
