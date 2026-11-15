@@ -1778,7 +1778,7 @@ private fun SourceBrowser(
                                     function reportLink(a) {
                                         try {
                                             var href = a.href || '';
-                                            if (/\\.(mp4|webm|mov|mkv)(?:$|[?#])/i.test(href)) {
+                                            if (/\.(mp4|webm|mov|mkv)(?:$|[?#])/i.test(href)) {
                                                 GenjurPlayback.onVideoAvailable(a.textContent || document.title || 'Video dari situs', location.href, href);
                                             }
                                         } catch(e) {}
