@@ -6,6 +6,7 @@ import android.net.Uri
 import android.os.Bundle
 import android.os.Environment
 import android.webkit.WebChromeClient
+import android.webkit.JavascriptInterface
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -59,6 +60,11 @@ private val Panel = Color(0xFF191821)
 private val Green = Color(0xFF8B5CF6)
 private val Muted = Color(0xFFACB7C5)
 
+
+private class PlaybackStartedBridge(private val onPlayback: (String, String) -> Unit) {
+    @JavascriptInterface
+    fun onVideoPlay(title: String, pageUrl: String) { onPlayback(title, pageUrl) }
+}
 
 private data class StreamOption(val quality: String, val videoUrl: String)
 
@@ -235,7 +241,6 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
     var search by remember { mutableStateOf("") }
     var category by remember { mutableStateOf("Semua") }
     var selectedTab by remember { mutableStateOf("Beranda") }
-    var browserVideoUrl by remember { mutableStateOf<String?>(null) }
     var browserInitialUrl by remember { mutableStateOf("") }
     var browserAllowVideoDetection by remember { mutableStateOf(true) }
     var updateVersion by remember { mutableStateOf<String?>(null) }
@@ -652,35 +657,35 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                             Text("Lanjutkan Menonton", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
                             TextButton(onClick = { selectedTab = "Unduhan" }) { Text("Lihat semua  →", color = Green) }
                         }
-                        if (feedMovies.isEmpty()) {
+                        if (watchHistory.isEmpty()) {
                             Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = Panel), shape = RoundedCornerShape(18.dp)) {
                                 Column(Modifier.padding(18.dp)) {
                                     Text("Belum ada tontonan", color = Color.White, fontWeight = FontWeight.Bold)
                                     Spacer(Modifier.height(5.dp))
-                                    Text("Tambahkan sumber resmi untuk mulai mengisi katalog GENJUR STREAM.",
+                                    Text("Film yang mulai kamu tonton dari player atau Browser Sumber akan muncul di sini.",
                                         color = Muted, fontSize = 12.sp)
                                 }
                             }
                         } else {
-                            feedMovies.take(12).chunked(if (tvLayout) 4 else 2).forEach { rowMovies ->
-                                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                                    rowMovies.forEach { movie ->
-                                        Card(Modifier.weight(1f).padding(bottom = 8.dp), shape = RoundedCornerShape(16.dp),
-                                            colors = CardDefaults.cardColors(containerColor = Panel)) {
-                                            Column(Modifier.padding(12.dp)) {
-                                                MoviePoster(
-                                                    url = movie.posterUrl,
-                                                    title = movie.title,
-                                                    height = if (tvLayout) 210.dp else 170.dp
-                                                )
-                                                Spacer(Modifier.height(8.dp))
-                                                Text(movie.title, color = Color.White, fontWeight = FontWeight.Bold, maxLines = 2)
-                                                Text(movie.category, color = Green, fontSize = 11.sp)
-                                                TextButton(onClick = { selectedMovie = movie }) { Text("Lihat detail", color = Green) }
-                                            }
+                            watchHistory.take(12).forEach { movie ->
+                                Card(Modifier.fillMaxWidth().padding(bottom = 9.dp),
+                                    shape = RoundedCornerShape(16.dp),
+                                    colors = CardDefaults.cardColors(containerColor = Panel)) {
+                                    Row(Modifier.fillMaxWidth().padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                                        MoviePoster(movie.posterUrl, movie.title, 104.dp, 76.dp)
+                                        Spacer(Modifier.width(12.dp))
+                                        Column(Modifier.weight(1f)) {
+                                            Text(movie.title, color = Color.White, fontWeight = FontWeight.Bold, maxLines = 2)
+                                            Text(if (movie.category == "Sumber Web") "Dari Browser Sumber" else movie.category,
+                                                color = Green, fontSize = 11.sp)
+                                            TextButton(onClick = {
+                                                if (movie.category == "Sumber Web") {
+                                                    browserInitialUrl = movie.videoUrl
+                                                    selectedTab = "Browser Sumber"
+                                                } else selectedMovie = movie
+                                            }) { Text("▶  Lanjutkan", color = Green) }
                                         }
                                     }
-                                    repeat((if (tvLayout) 4 else 2) - rowMovies.size) { Spacer(Modifier.weight(1f)) }
                                 }
                             }
                         }
@@ -724,31 +729,19 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                                 })
                             }
                             "Browser Sumber" -> {
-                                SourceBrowser(initialUrl = browserInitialUrl, allowVideoDetection = browserAllowVideoDetection,
-                                    onVideoDetected = { detected -> browserVideoUrl = detected })
-                                browserVideoUrl?.let { videoUrl ->
-                                    Spacer(Modifier.height(12.dp))
-                                    Card(colors = CardDefaults.cardColors(containerColor = Panel)) {
-                                        Column(Modifier.fillMaxWidth().padding(12.dp)) {
-                                            Text("Tautan video terdeteksi", color = Color.White, fontWeight = FontWeight.Bold)
-                                            Text(videoUrl, color = Muted, fontSize = 10.sp, maxLines = 2)
-                                            Button(onClick = {
-                                                playingMovie = FeedMovie(
-                                                    title = "Video dari Browser Sumber",
-                                                    description = "Video dibuka dari situs yang dikunjungi pengguna.",
-                                                    category = "Sumber Web",
-                                                    videoUrl = videoUrl,
-                                                    licenseId = "User-provided source",
-                                                    termsUrl = "https://www.google.com/",
-                                                    attribution = "Sumber situs yang dibuka pengguna"
-                                                )
-                                            }, colors = ButtonDefaults.buttonColors(containerColor = Green)) {
-                                                Text("Putar di GENJUR Player", color = Color.White)
-                                            }
-                                        }
-                                    }
-                                }
-                            }
+                                SourceBrowser(initialUrl = browserInitialUrl, onPlaybackStarted = { pageTitle, pageUrl ->
+                                    val safeTitle = pageTitle.trim().takeIf { it.isNotBlank() }
+                                        ?: Uri.parse(pageUrl).host.orEmpty().ifBlank { "Video dari situs" }
+                                    recordWatch(FeedMovie(
+                                        title = safeTitle,
+                                        description = "Tontonan yang mulai diputar melalui Browser Sumber.",
+                                        category = "Sumber Web",
+                                        videoUrl = pageUrl,
+                                        licenseId = "User-provided website",
+                                        termsUrl = pageUrl,
+                                        attribution = "Situs sumber: ${Uri.parse(pageUrl).host.orEmpty()}"
+                                    ))
+                                })
                             "Kategori" -> {
                                 categories.forEach { item ->
                                     FilterChip(selected = category == item, onClick = { category = item },
@@ -1178,7 +1171,7 @@ private inline fun <T> List<T>.anyIndexed(predicate: (Int, T) -> Boolean): Boole
     return false
 }
 @Composable
-private fun SourceBrowser(initialUrl: String, allowVideoDetection: Boolean = true, onVideoDetected: (String) -> Unit) {
+private fun SourceBrowser(initialUrl: String, onPlaybackStarted: (String, String) -> Unit) {
     var address by remember(initialUrl) { mutableStateOf(initialUrl) }
     var currentUrl by remember(initialUrl) { mutableStateOf(initialUrl) }
     var pageTitle by remember { mutableStateOf("Masukkan alamat situs sumber video.") }
@@ -1213,26 +1206,40 @@ private fun SourceBrowser(initialUrl: String, allowVideoDetection: Boolean = tru
                     settings.loadsImagesAutomatically = true
                     settings.mediaPlaybackRequiresUserGesture = true
                     webChromeClient = WebChromeClient()
+                    addJavascriptInterface(PlaybackStartedBridge { title, pageUrl ->
+                        post { onPlaybackStarted(title, pageUrl) }
+                    }, "GenjurPlayback")
                     webViewClient = object : WebViewClient() {
                         override fun onPageFinished(view: WebView, url: String) {
                             pageTitle = view.title?.takeIf { it.isNotBlank() } ?: url
                             address = url
+                            view.evaluateJavascript(
+                                """(function(){
+                                    if (window.__genjurPlaybackHooked) return;
+                                    window.__genjurPlaybackHooked = true;
+                                    function hookVideo(v) {
+                                        if (v.__genjurPlaybackHooked) return;
+                                        v.__genjurPlaybackHooked = true;
+                                        v.addEventListener('play', function() {
+                                            try { GenjurPlayback.onVideoPlay(document.title || 'Video dari situs', location.href); } catch(e) {}
+                                        }, { once: true });
+                                    }
+                                    document.querySelectorAll('video').forEach(hookVideo);
+                                    new MutationObserver(function(records) {
+                                        records.forEach(function(record) {
+                                            record.addedNodes.forEach(function(node) {
+                                                if (node.tagName === 'VIDEO') hookVideo(node);
+                                                if (node.querySelectorAll) node.querySelectorAll('video').forEach(hookVideo);
+                                            });
+                                        });
+                                    }).observe(document.documentElement, { childList: true, subtree: true });
+                                })();""",
+                                null
+                            )
                         }
                         override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
                             val scheme = request.url.scheme
                             return scheme != "https" && scheme != "http"
-                        }
-                        override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): android.webkit.WebResourceResponse? {
-                            if (allowVideoDetection) {
-                                val candidate = request.url.toString()
-                                val path = request.url.path.orEmpty().lowercase()
-                                val cleanPath = path.substringBefore("?")
-                                val looksLikeVideo = listOf(".mp4", ".m3u8", ".mpd", ".webm", ".m4v").any { cleanPath.endsWith(it) }
-                                if (looksLikeVideo && candidate.startsWith("https://")) {
-                                    view.post { onVideoDetected(candidate) }
-                                }
-                            }
-                            return super.shouldInterceptRequest(view, request)
                         }
                     }
                     webView = this
