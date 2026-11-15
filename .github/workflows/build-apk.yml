@@ -63,7 +63,15 @@ jobs:
           git add latest.json
           if ! git diff --cached --quiet; then
             git commit -m "Update latest app version [skip ci]"
-            git push
+            # Another workflow or source update may push while this build is running.
+            # Rebase the version update onto the newest main before pushing.
+            git fetch origin main
+            if ! git rebase origin/main; then
+              git checkout --theirs latest.json
+              git add latest.json
+              GIT_EDITOR=true git rebase --continue
+            fi
+            git push origin HEAD:main
           fi
 
       - name: Upload APK artifact
