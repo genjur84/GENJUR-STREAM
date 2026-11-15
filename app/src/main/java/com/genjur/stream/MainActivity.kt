@@ -433,7 +433,12 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
     val downloadManager = remember { activity.getSystemService(DownloadManager::class.java) }
     fun persistDownloads(items: List<DownloadEntry>) {
         libraryPrefs.edit().putString("downloads", JSONArray().apply {
-            items.forEach { put(JSONObject().put("id", it.id).put("    fun startDownload(movie: FeedMovie) {
+            items.forEach { entry ->
+                put(JSONObject().put("id", entry.id).put("movie", encodeMovie(entry.movie)))
+            }
+        }.toString()).apply()
+    }
+    fun startDownload(movie: FeedMovie) {
         if (!movie.downloadAllowed || movie.downloadUrl.isBlank()) {
             downloadMessage = "Sumber ini belum memberikan tautan unduhan langsung."
             return
@@ -507,10 +512,6 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
             termsUrl = pageUrl,
             attribution = "Situs sumber: ${Uri.parse(pageUrl).host.orEmpty()}",
             downloadUrl = mediaUrl,
-            downloadAllowed = true
-        ))
-    }
-adUrl = mediaUrl,
             downloadAllowed = true
         ))
     }
