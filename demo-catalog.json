@@ -1,0 +1,14 @@
+{
+  "sourceName": "GENJUR STREAM - Katalog Uji",
+  "items": [
+    {
+      "id": "uji-big-buck-bunny-30s",
+      "title": "Big Buck Bunny (Cuplikan Uji 30 Detik)",
+      "description": "Video uji pemutar GENJUR STREAM. Animasi pendek dari Blender Foundation, dilisensikan dengan Creative Commons Attribution 3.0. Kredit: (c) copyright 2008, Blender Foundation / www.bigbuckbunny.org",
+      "posterUrl": "",
+      "videoUrl": "https://raw.githubusercontent.com/bower-media-samples/big-buck-bunny-480p-30s/master/video.mp4",
+      "category": "Animasi",
+      "type": "video/mp4"
+    }
+  ]
+}
