@@ -904,7 +904,10 @@ private data class RepositoryExtension(
     val tvTypes: String = "",
     val isCloudStream: Boolean = false,
     val subtitleLanguages: String = "",
-    val contentTypes: String = ""
+    val contentTypes: String = "",
+    val websiteUrl: String = "",
+    val isExternal: Boolean = false,
+    val freeNote: String = ""
 )
 
 @Composable
@@ -934,7 +937,8 @@ private fun RepositoryDialog(activity: MainActivity, onClose: () -> Unit) {
                 o.optString("description"), o.optString("feedUrl"), o.optString("repositoryUrl"),
                 o.optString("pluginUrl"), o.optString("language"), o.optString("tvTypes"),
                 o.optBoolean("isCloudStream", false), o.optString("subtitleLanguages"),
-                o.optString("contentTypes"))
+                o.optString("contentTypes"), o.optString("websiteUrl"),
+                o.optBoolean("isExternal", false), o.optString("freeNote"))
         }
     }.getOrDefault(emptyList())
 
@@ -959,7 +963,8 @@ private fun RepositoryDialog(activity: MainActivity, onClose: () -> Unit) {
             .put("repositoryUrl", it.repositoryUrl).put("pluginUrl", it.pluginUrl)
             .put("language", it.language).put("tvTypes", it.tvTypes)
             .put("isCloudStream", it.isCloudStream).put("subtitleLanguages", it.subtitleLanguages)
-            .put("contentTypes", it.contentTypes)) }
+            .put("contentTypes", it.contentTypes).put("websiteUrl", it.websiteUrl)
+            .put("isExternal", it.isExternal).put("freeNote", it.freeNote)) }
         prefs.edit().putString("installed_extensions", a.toString()).apply()
     }
     fun loadRepository(repository: SavedRepository) {
@@ -988,9 +993,12 @@ private fun RepositoryDialog(activity: MainActivity, onClose: () -> Unit) {
                             val extName = item.optString("name").trim()
                             val feed = item.optString("feedUrl").trim()
                             val feedUri = Uri.parse(feed)
-                            require(id.isNotBlank() && extName.isNotBlank() &&
-                                feedUri.scheme == "https" && !feedUri.host.isNullOrBlank()) {
-                                "Ekstensi ditolak: id, nama, atau feedUrl tidak valid."
+                            val website = item.optString("websiteUrl").trim()
+                            val websiteUri = Uri.parse(website)
+                            val isExternal = websiteUri.scheme == "https" && !websiteUri.host.isNullOrBlank()
+                            val validFeed = feedUri.scheme == "https" && !feedUri.host.isNullOrBlank()
+                            require(id.isNotBlank() && extName.isNotBlank() && (validFeed || isExternal)) {
+                                "Penyedia ditolak: isi feedUrl atau websiteUrl HTTPS yang valid."
                             }
                             val subtitleArray = item.optJSONArray("subtitleLanguages")
                             val subtitleLanguages = if (subtitleArray == null) "" else
@@ -1003,7 +1011,9 @@ private fun RepositoryDialog(activity: MainActivity, onClose: () -> Unit) {
                             parsed.add(RepositoryExtension(id, extName,
                                 item.optString("description", "Penyedia katalog film."),
                                 feed, repository.url, language = item.optString("language"),
-                                subtitleLanguages = subtitleLanguages, contentTypes = contentTypes))
+                                subtitleLanguages = subtitleLanguages, contentTypes = contentTypes,
+                                websiteUrl = website, isExternal = isExternal,
+                                freeNote = item.optString("freeNote")))
                         }
                     } else if (root.optInt("manifestVersion", 0) == 1) {
                         val pluginLists = root.optJSONArray("pluginLists")
@@ -1065,7 +1075,7 @@ private fun RepositoryDialog(activity: MainActivity, onClose: () -> Unit) {
         text = {
             Column(Modifier.heightIn(max = 520.dp).verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(9.dp)) {
-                Text("Tambahkan repositori untuk menemukan penyedia situs film. Setiap penyedia memasok katalog dan tautan pemutaran yang kompatibel. GENJUR STREAM membaca feed JSON HTTPS dan tidak menjalankan kode/plugin pihak ketiga.",
+                Text("Tambahkan repositori untuk menemukan penyedia film. Daftar dapat berisi katalog feed GENJUR atau tautan ke layanan streaming resmi. GENJUR STREAM tidak menjalankan kode/plugin pihak ketiga.",
                     color = Muted, fontSize = 12.sp)
                 OutlinedTextField(value = name, onValueChange = { name = it },
                     label = { Text("Nama repositori") }, singleLine = true)
@@ -1104,7 +1114,14 @@ private fun RepositoryDialog(activity: MainActivity, onClose: () -> Unit) {
                                 if (extension.language.isNotBlank()) Text("Bahasa konten: ${extension.language}", color = Muted, fontSize = 10.sp)
                                 if (extension.subtitleLanguages.isNotBlank()) Text("Subtitle: ${extension.subtitleLanguages}", color = Muted, fontSize = 10.sp)
                                 if (extension.contentTypes.isNotBlank()) Text("Jenis: ${extension.contentTypes}", color = Muted, fontSize = 10.sp)
-                                if (extension.isCloudStream) {
+                                if (extension.isExternal) {
+                                    if (extension.freeNote.isNotBlank()) Text(extension.freeNote, color = Muted, fontSize = 10.sp)
+                                    TextButton(onClick = {
+                                        runCatching {
+                                            activity.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(extension.websiteUrl)))
+                                        }.onFailure { error = "Tidak dapat membuka situs penyedia." }
+                                    }) { Text("Buka layanan resmi", color = Green) }
+                                } else if (extension.isCloudStream) {
                                     if (extension.language.isNotBlank()) Text("Bahasa: ${extension.language}", color = Muted, fontSize = 10.sp)
                                     if (extension.tvTypes.isNotBlank()) Text("Kategori: ${extension.tvTypes}", color = Muted, fontSize = 10.sp)
                                     Text("File: ${extension.pluginUrl.substringAfterLast('/')}", color = Muted, fontSize = 10.sp)
