@@ -10,19 +10,22 @@
       "title": "Senja di Kota Lama",
       "description": "Contoh sinopsis fiktif tentang dua sahabat yang bertemu kembali di sebuah kota tua.",
       "category": "Drama Indonesia",
-      "videoUrl": ""
+      "videoUrl": "",
+      "posterUrl": "https://picsum.photos/seed/genjur-senja/600/900"
     },
     {
       "title": "Warung Tengah Malam",
       "description": "Contoh sinopsis fiktif komedi tentang kejadian lucu di sebuah warung kecil.",
       "category": "Komedi Indonesia",
-      "videoUrl": ""
+      "videoUrl": "",
+      "posterUrl": "https://picsum.photos/seed/genjur-warung/600/900"
     },
     {
       "title": "Jejak dari Timur",
       "description": "Contoh sinopsis fiktif petualangan keluarga yang menjelajahi keindahan alam Indonesia.",
       "category": "Petualangan Indonesia",
-      "videoUrl": ""
+      "videoUrl": "",
+      "posterUrl": "https://picsum.photos/seed/genjur-jejak/600/900"
     }
   ]
 }
