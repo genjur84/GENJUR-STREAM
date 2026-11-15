@@ -285,6 +285,7 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
     var selectedTab by remember { mutableStateOf("Beranda") }
     var savedSourceMenu by remember { mutableStateOf(emptyList<SavedSourceLink>()) }
     var sourceMenuExpanded by remember { mutableStateOf(false) }
+    var selectedSourceName by remember { mutableStateOf("Sumber Link") }
     LaunchedEffect(selectedTab) {
         val prefs = activity.getSharedPreferences("genjur_stream_saved_links", 0)
         savedSourceMenu = runCatching {
@@ -872,6 +873,7 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                                 text = { Text(source.name, color = Color.White, maxLines = 1) },
                                 onClick = {
                                     browserInitialUrl = source.url
+                                    selectedSourceName = source.name
                                     selectedTab = "Browser Sumber"
                                     sourceMenuExpanded = false
                                 }
@@ -884,7 +886,7 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                         shape = RoundedCornerShape(24.dp),
                         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp)
                     ) {
-                        Text("Sumber Link  ▾", fontWeight = FontWeight.Bold)
+                        Text("$selectedSourceName  ▾", fontWeight = FontWeight.Bold)
                     }
                 }
             }
