@@ -357,6 +357,7 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                             val items = root.optJSONArray("items") ?: error("feed tidak memiliki array items")
                             for (i in 0 until items.length()) {
                                 val item = items.optJSONObject(i) ?: continue
+                                if (!item.optBoolean("freeToWatch", false)) continue
                                 val title = item.optString("title").trim()
                                 val videoUrl = item.optString("videoUrl").trim()
                                 if (title.isNotEmpty()) {
