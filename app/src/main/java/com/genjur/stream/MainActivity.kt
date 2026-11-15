@@ -1153,6 +1153,41 @@ private fun MovieDetailDialog(
 }
 
 
+private data class SourceSearchResult(val title: String, val url: String, val host: String)
+
+private fun searchWebSources(query: String): List<SourceSearchResult> {
+    val encoded = java.net.URLEncoder.encode(query, "UTF-8")
+    val endpoint = "https://html.duckduckgo.com/html/?q=$encoded"
+    val connection = (URL(endpoint).openConnection() as java.net.HttpURLConnection).apply {
+        connectTimeout = 12000
+        readTimeout = 15000
+        setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 11) AppleWebKit/537.36 Chrome/120 Mobile Safari/537.36")
+    }
+    try {
+        val html = connection.inputStream.bufferedReader().use { it.readText() }
+        val document = Jsoup.parse(html)
+        val blockedHosts = setOf("bit.ly", "tinyurl.com", "t.co", "is.gd", "cutt.ly", "shorturl.at")
+        return document.select(".result").mapNotNull { result ->
+            val anchor = result.selectFirst("a.result__a") ?: return@mapNotNull null
+            val raw = anchor.attr("href")
+            val resolved = runCatching {
+                val wrapped = Uri.parse(raw)
+                wrapped.getQueryParameter("uddg") ?: raw
+            }.getOrDefault(raw)
+            val uri = runCatching { Uri.parse(resolved) }.getOrNull() ?: return@mapNotNull null
+            val host = uri.host?.lowercase()?.removePrefix("www.") ?: return@mapNotNull null
+            val suspicious = uri.scheme != "https" || host.isBlank() || !host.contains(".") ||
+                host.startsWith("xn--") || host.split(".").any { it.startsWith("xn--") } ||
+                blockedHosts.any { host == it || host.endsWith(".$it") } ||
+                uri.userInfo != null || host.matches(Regex("\\d{1,3}(\\.\\d{1,3}){3}"))
+            if (suspicious) return@mapNotNull null
+            val title = anchor.text().trim().ifBlank { host }
+            SourceSearchResult(title, uri.toString(), host)
+        }.distinctBy { it.host }.take(12)
+    } finally {
+        connection.disconnect()
+    }
+}
 private data class SavedSourceLink(val name: String, val url: String)
 
 @Composable
@@ -1174,26 +1209,25 @@ private fun SourceLinksScreen(activity: MainActivity, onOpenLink: (String) -> Un
     var editingIndex by remember { mutableStateOf<Int?>(null) }
     var message by remember { mutableStateOf<String?>(null) }
     var sourceSearch by remember { mutableStateOf("") }
+    var searchResults by remember { mutableStateOf<List<SourceSearchResult>>(emptyList()) }
+    var searching by remember { mutableStateOf(false) }
+    var searchError by remember { mutableStateOf<String?>(null) }
 
-    // Direktori terbatas ke domain resmi penyedia yang dikenal.
-    val officialSources = listOf(
-        SavedSourceLink("YouTube", "https://www.youtube.com"),
-        SavedSourceLink("Internet Archive", "https://archive.org"),
-        SavedSourceLink("Viu", "https://www.viu.com"),
-        SavedSourceLink("iQIYI", "https://www.iq.com"),
-        SavedSourceLink("Netflix", "https://www.netflix.com"),
-        SavedSourceLink("Prime Video", "https://www.primevideo.com"),
-        SavedSourceLink("Disney+ Hotstar", "https://www.hotstar.com"),
-        SavedSourceLink("Vidio", "https://www.vidio.com")
-    )
-    val matchingSources = remember(sourceSearch) {
-        if (sourceSearch.isBlank()) emptyList()
-        else officialSources.filter {
-            it.name.contains(sourceSearch.trim(), ignoreCase = true) ||
-                Uri.parse(it.url).host.orEmpty().contains(sourceSearch.trim(), ignoreCase = true)
+    LaunchedEffect(sourceSearch) {
+        val term = sourceSearch.trim()
+        searchResults = emptyList()
+        searchError = null
+        if (term.length < 2) {
+            searching = false
+        } else {
+            searching = true
+            delay(650)
+            val result = runCatching { withContext(Dispatchers.IO) { searchWebSources(term) } }
+            result.onSuccess { searchResults = it }
+                .onFailure { searchError = "Pencarian gagal. Periksa koneksi atau coba lagi." }
+            searching = false
         }
     }
-
     fun persist(items: List<SavedSourceLink>) {
         val array = JSONArray()
         items.forEach { array.put(JSONObject().put("name", it.name).put("url", it.url)) }
@@ -1201,20 +1235,25 @@ private fun SourceLinksScreen(activity: MainActivity, onOpenLink: (String) -> Un
     }
 
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Text("Cari penyedia resmi yang sudah masuk direktori GENJUR STREAM.",
+        Text("Cari alamat situs di internet. Hasil disaring dengan pemeriksaan dasar sebelum dipilih.",
             color = Muted, fontSize = 12.sp)
         OutlinedTextField(
             value = sourceSearch, onValueChange = { sourceSearch = it },
             modifier = Modifier.fillMaxWidth(), singleLine = true,
-            label = { Text("Cari nama penyedia") },
-            placeholder = { Text("Contoh: Viu, iQIYI, YouTube") }
+            label = { Text("Cari situs atau nama domain") },
+            placeholder = { Text("Ketik kata kunci pencarian") }
         )
-        if (sourceSearch.isNotBlank()) {
-            if (matchingSources.isEmpty()) {
-                Text("Tidak ditemukan di direktori resmi. Alamat yang tidak terverifikasi tidak disarankan.",
-                    color = Muted, fontSize = 11.sp)
+        if (searching) {
+            LinearProgressIndicator(Modifier.fillMaxWidth(), color = Green)
+            Text("Mencari di internet…", color = Muted, fontSize = 11.sp)
+        }
+        searchError?.let { Text(it, color = MaterialTheme.colorScheme.error, fontSize = 11.sp) }
+        if (!searching && searchError == null && sourceSearch.trim().length >= 2) {
+            if (searchResults.isEmpty()) {
+                Text("Tidak ada hasil yang lolos penyaringan dasar.", color = Muted, fontSize = 11.sp)
             } else {
-                matchingSources.forEach { candidate ->
+                Text("Hasil pencarian (${searchResults.size})", color = Color.White, fontWeight = FontWeight.Bold)
+                searchResults.forEach { candidate ->
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         colors = CardDefaults.cardColors(containerColor = Panel),
@@ -1226,15 +1265,15 @@ private fun SourceLinksScreen(activity: MainActivity, onOpenLink: (String) -> Un
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Column(Modifier.weight(1f)) {
-                                Text(candidate.name, color = Color.White, fontWeight = FontWeight.Bold)
-                                Text(candidate.url, color = Muted, fontSize = 10.sp)
-                                Text("Domain resmi dalam direktori", color = Green, fontSize = 10.sp)
+                                Text(candidate.title, color = Color.White, fontWeight = FontWeight.Bold)
+                                Text(candidate.host, color = Muted, fontSize = 10.sp)
+                                Text("Lolos filter dasar — belum terverifikasi aman", color = Color(0xFFFFC857), fontSize = 10.sp)
                             }
                             TextButton(onClick = {
-                                name = candidate.name
+                                name = candidate.title
                                 url = candidate.url
                                 editingIndex = null
-                                message = "Alamat dipilih. Periksa lalu tekan Simpan link."
+                                message = "Hasil dipilih. Periksa alamat sebelum menyimpan."
                             }) { Text("Pilih", color = Green) }
                         }
                     }
