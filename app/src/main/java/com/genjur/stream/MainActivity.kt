@@ -60,10 +60,25 @@ import java.util.concurrent.TimeUnit
 import org.json.JSONObject
 import org.json.JSONArray
 import java.io.File
+import java.io.ByteArrayInputStream
 import java.net.URL
 import org.jsoup.Jsoup
 
 private const val UPDATE_INFO_URL = "https://raw.githubusercontent.com/genjur84/GENJUR-STREAM/main/latest.json"
+
+/** Domain iklan dan pelacak umum untuk pemblokiran dasar di WebView. */
+private val GENJUR_AD_HOSTS = setOf(
+    "doubleclick.net", "googlesyndication.com", "googleadservices.com",
+    "adservice.google.com", "adnxs.com", "popads.net", "popcash.net",
+    "propellerads.com", "exoclick.com", "trafficjunky.net", "juicyads.com",
+    "taboola.com", "outbrain.com", "mgid.com", "scorecardresearch.com",
+    "zedo.com", "adsterra.com", "hilltopads.net", "onclickalgo.com"
+)
+
+private fun isGenjurAdHost(host: String?): Boolean {
+    val normalized = host?.lowercase()?.trim('.') ?: return false
+    return GENJUR_AD_HOSTS.any { normalized == it || normalized.endsWith(".$it") }
+}
 private val Bg = Color(0xFF09090D)
 private val Panel = Color(0xFF191821)
 private val Green = Color(0xFF8B5CF6)
@@ -1443,6 +1458,8 @@ private fun SourceBrowser(initialUrl: String, fullScreen: Boolean = false, onPla
                     settings.domStorageEnabled = true
                     settings.loadsImagesAutomatically = true
                     settings.mediaPlaybackRequiresUserGesture = true
+                    settings.javaScriptCanOpenWindowsAutomatically = false
+                    settings.setSupportMultipleWindows(false)
                     // Jangan gunakan progress WebView untuk indikator buffering.
                     // Iklan/iframe dapat mengubah progres setelah halaman utama selesai.
                     webChromeClient = WebChromeClient()
@@ -1450,6 +1467,14 @@ private fun SourceBrowser(initialUrl: String, fullScreen: Boolean = false, onPla
                         post { onPlaybackStarted(title, pageUrl) }
                     }, "GenjurPlayback")
                     webViewClient = object : WebViewClient() {
+                        override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): android.webkit.WebResourceResponse? {
+                            if (!request.isForMainFrame && isGenjurAdHost(request.url.host)) {
+                                return android.webkit.WebResourceResponse(
+                                    "text/plain", "utf-8", ByteArrayInputStream(ByteArray(0))
+                                )
+                            }
+                            return super.shouldInterceptRequest(view, request)
+                        }
                         override fun onPageStarted(view: WebView, url: String, favicon: android.graphics.Bitmap?) {
                             isLoading = true
                             view.removeCallbacks(loadingFallback)
