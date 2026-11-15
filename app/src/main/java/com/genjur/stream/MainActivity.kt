@@ -94,59 +94,77 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                     val urls = savedFeedUrls(activity)
                     require(urls.isNotEmpty()) { "Belum ada sumber. Tambahkan sumber terlebih dahulu." }
                     val movies = mutableListOf<FeedMovie>()
+                    val sourceErrors = mutableListOf<String>()
+                    var loadedSources = 0
+
                     urls.forEach { sourceUrl ->
-                        val connection = URL(sourceUrl).openConnection()
-                        connection.connectTimeout = 12000
-                        connection.readTimeout = 20000
-                        val root = JSONObject(connection.getInputStream().bufferedReader().use { it.readText() })
-                        val rights = root.optJSONObject("rights")
-                            ?: error("Sumber ditolak: metadata hak distribusi tidak tersedia.")
-                        val redistributionAllowed = rights.optBoolean("redistributionAllowed", false)
-                        val licenseId = rights.optString("licenseId").trim()
-                        val termsUrl = rights.optString("termsUrl").trim()
-                        val attribution = rights.optString("attribution").trim()
-                        val termsUri = Uri.parse(termsUrl)
-                        require(
-                            redistributionAllowed &&
-                                licenseId.isNotBlank() &&
-                                termsUri.scheme == "https" &&
-                                !termsUri.host.isNullOrBlank() &&
-                                attribution.isNotBlank()
-                        ) {
-                            "Sumber ditolak: izin distribusi, lisensi, tautan ketentuan, atau atribusi belum lengkap."
-                        }
-                        val items = root.optJSONArray("items") ?: error("Feed tidak memiliki array items.")
-                        for (i in 0 until items.length()) {
-                            val item = items.optJSONObject(i) ?: continue
-                            val title = item.optString("title").trim()
-                            val videoUrl = item.optString("videoUrl").trim()
-                            if (title.isNotEmpty()) {
-                                val videoUri = Uri.parse(videoUrl)
-                                require(
-                                    videoUrl.isBlank() ||
-                                        (videoUri.scheme == "https" && !videoUri.host.isNullOrBlank())
-                                ) {
-                                    "Sumber ditolak: URL video harus menggunakan HTTPS yang valid."
+                        val sourceResult = runCatching {
+                            val connection = URL(sourceUrl).openConnection()
+                            connection.connectTimeout = 12000
+                            connection.readTimeout = 20000
+                            val root = JSONObject(connection.getInputStream().bufferedReader().use { it.readText() })
+                            val rights = root.optJSONObject("rights")
+                                ?: error("metadata hak distribusi tidak tersedia")
+                            val redistributionAllowed = rights.optBoolean("redistributionAllowed", false)
+                            val licenseId = rights.optString("licenseId").trim()
+                            val termsUrl = rights.optString("termsUrl").trim()
+                            val attribution = rights.optString("attribution").trim()
+                            val termsUri = Uri.parse(termsUrl)
+                            require(
+                                redistributionAllowed &&
+                                    licenseId.isNotBlank() &&
+                                    termsUri.scheme == "https" &&
+                                    !termsUri.host.isNullOrBlank() &&
+                                    attribution.isNotBlank()
+                            ) {
+                                "izin distribusi, lisensi, tautan ketentuan, atau atribusi belum lengkap"
+                            }
+                            val items = root.optJSONArray("items") ?: error("feed tidak memiliki array items")
+                            for (i in 0 until items.length()) {
+                                val item = items.optJSONObject(i) ?: continue
+                                val title = item.optString("title").trim()
+                                val videoUrl = item.optString("videoUrl").trim()
+                                if (title.isNotEmpty()) {
+                                    val videoUri = Uri.parse(videoUrl)
+                                    require(
+                                        videoUrl.isBlank() ||
+                                            (videoUri.scheme == "https" && !videoUri.host.isNullOrBlank())
+                                    ) {
+                                        "URL video harus menggunakan HTTPS yang valid"
+                                    }
+                                    movies.add(FeedMovie(
+                                        title,
+                                        item.optString("description", "Sinopsis belum tersedia."),
+                                        item.optString("category", "Film"),
+                                        videoUrl,
+                                        licenseId,
+                                        termsUrl,
+                                        attribution
+                                    ))
                                 }
-                                movies.add(FeedMovie(
-                                    title,
-                                    item.optString("description", "Sinopsis belum tersedia."),
-                                    item.optString("category", "Film"),
-                                    videoUrl,
-                                    licenseId,
-                                    termsUrl,
-                                    attribution
-                                ))
                             }
                         }
+                        sourceResult.onSuccess {
+                            loadedSources++
+                        }.onFailure { failure ->
+                            val host = Uri.parse(sourceUrl).host ?: "Sumber"
+                            sourceErrors.add("$host: ${failure.message ?: "gagal dibaca"}")
+                        }
                     }
-                    movies
+                    Triple(movies, loadedSources, sourceErrors)
                 }
             }
             feedLoading = false
-            result.onSuccess {
-                feedMovies = it
-                feedMessage = if (it.isEmpty()) "Feed terbaca, tetapi belum ada item tontonan." else "${it.size} tontonan berhasil dimuat."
+            result.onSuccess { (movies, loadedSources, sourceErrors) ->
+                feedMovies = movies
+                feedMessage = when {
+                    loadedSources == 0 -> "Tidak ada sumber yang berhasil dibaca. " +
+                        sourceErrors.take(2).joinToString(" • ")
+                    sourceErrors.isNotEmpty() -> "${movies.size} tontonan dimuat dari $loadedSources sumber. " +
+                        "${sourceErrors.size} sumber dilewati."
+                    movies.isEmpty() -> "Feed terbaca, tetapi belum ada item tontonan."
+                    else -> "${movies.size} tontonan berhasil dimuat dari $loadedSources sumber."
+                }
             }.onFailure { feedMessage = it.message ?: "Gagal memuat katalog." }
         }
     }
