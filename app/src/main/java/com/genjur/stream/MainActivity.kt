@@ -616,30 +616,35 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
         // JavascriptInterface dipanggil dari thread WebView khusus, sedangkan state Compose
         // dan DownloadManager harus disentuh dari main/UI thread.
         activity.runOnUiThread {
-            val uri = Uri.parse(mediaUrl)
-            val path = uri.path.orEmpty().lowercase()
-            val adaptiveStream = path.endsWith(".m3u8") || path.endsWith(".mpd")
-            val validHttpUrl = uri.scheme in listOf("http", "https") && !uri.host.isNullOrBlank()
-            if (!validHttpUrl) {
-                downloadMessage = "Alamat video tidak valid."
-                return@runOnUiThread
+            try {
+                val uri = Uri.parse(mediaUrl)
+                val path = uri.path.orEmpty().lowercase()
+                val adaptiveStream = path.endsWith(".m3u8") || path.endsWith(".mpd")
+                val validHttpUrl = uri.scheme in listOf("http", "https") && !uri.host.isNullOrBlank()
+                if (!validHttpUrl) {
+                    downloadMessage = "Alamat video tidak valid."
+                    return@runOnUiThread
+                }
+                if (adaptiveStream) {
+                    startAdaptiveDownload(title, pageUrl, mediaUrl)
+                    return@runOnUiThread
+                }
+                val safeTitle = title.ifBlank { "Video dari situs" }
+                startDownload(FeedMovie(
+                    title = safeTitle,
+                    description = "Video langsung terdeteksi dari halaman sumber.",
+                    category = "Sumber Web",
+                    videoUrl = mediaUrl,
+                    licenseId = "User-provided website",
+                    termsUrl = pageUrl,
+                    attribution = "Situs sumber: ${Uri.parse(pageUrl).host.orEmpty()}",
+                    downloadUrl = mediaUrl,
+                    downloadAllowed = true
+                ))
+            } catch (error: Exception) {
+                downloadMessage = "Download gagal disiapkan: ${error.message ?: error.javaClass.simpleName}"
+                android.util.Log.e("GENJUR_DOWNLOAD", "Gagal memulai unduhan dari WebView", error)
             }
-            if (adaptiveStream) {
-                startAdaptiveDownload(title, pageUrl, mediaUrl)
-                return@runOnUiThread
-            }
-            val safeTitle = title.ifBlank { "Video dari situs" }
-            startDownload(FeedMovie(
-                title = safeTitle,
-                description = "Video langsung terdeteksi dari halaman sumber.",
-                category = "Sumber Web",
-                videoUrl = mediaUrl,
-                licenseId = "User-provided website",
-                termsUrl = pageUrl,
-                attribution = "Situs sumber: ${Uri.parse(pageUrl).host.orEmpty()}",
-                downloadUrl = mediaUrl,
-                downloadAllowed = true
-            ))
         }
     }
     fun persistMovies(key: String, movies: List<FeedMovie>) {
