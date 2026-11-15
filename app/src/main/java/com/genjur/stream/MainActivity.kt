@@ -55,6 +55,35 @@ private data class FeedMovie(
     val genres: List<String> = emptyList(),
     val duration: String = ""
 )
+private fun movieKey(movie: FeedMovie): String =
+    "${movie.title.trim().lowercase()}|${movie.videoUrl.trim()}|${movie.licenseId}"
+
+private fun encodeMovie(movie: FeedMovie): JSONObject = JSONObject().apply {
+    put("title", movie.title); put("description", movie.description); put("category", movie.category)
+    put("videoUrl", movie.videoUrl); put("licenseId", movie.licenseId); put("termsUrl", movie.termsUrl)
+    put("attribution", movie.attribution); put("posterUrl", movie.posterUrl)
+    put("releaseYear", movie.releaseYear); put("genres", JSONArray(movie.genres)); put("duration", movie.duration)
+}
+
+private fun decodeMovie(json: JSONObject): FeedMovie {
+    val genres = json.optJSONArray("genres")
+    return FeedMovie(
+        title = json.optString("title"), description = json.optString("description"),
+        category = json.optString("category"), videoUrl = json.optString("videoUrl"),
+        licenseId = json.optString("licenseId"), termsUrl = json.optString("termsUrl"),
+        attribution = json.optString("attribution"), posterUrl = json.optString("posterUrl"),
+        releaseYear = json.optString("releaseYear"),
+        genres = if (genres == null) emptyList() else
+            (0 until genres.length()).map { genres.optString(it) }.filter { it.isNotBlank() },
+        duration = json.optString("duration")
+    )
+}
+
+private fun readSavedMovies(activity: MainActivity, key: String): List<FeedMovie> = runCatching {
+    val array = JSONArray(activity.getSharedPreferences("genjur_stream_library", 0).getString(key, "[]"))
+    (0 until array.length()).mapNotNull { array.optJSONObject(it)?.let(::decodeMovie) }
+}.getOrDefault(emptyList())
+
 private fun savedFeedUrls(activity: MainActivity): List<String> = runCatching {
     val prefs = activity.getSharedPreferences("genjur_stream_sources", 0)
     val legacy = JSONArray(prefs.getString("items", "[]"))
@@ -91,6 +120,24 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
     var feedMessage by remember { mutableStateOf("Tambahkan sumber feed JSON, lalu muat katalog.") }
     var selectedMovie by remember { mutableStateOf<FeedMovie?>(null) }
     var playingMovie by remember { mutableStateOf<FeedMovie?>(null) }
+    var favoriteMovies by remember { mutableStateOf(readSavedMovies(activity, "favorites")) }
+    var watchHistory by remember { mutableStateOf(readSavedMovies(activity, "history")) }
+    val libraryPrefs = remember { activity.getSharedPreferences("genjur_stream_library", 0) }
+    fun persistMovies(key: String, movies: List<FeedMovie>) {
+        libraryPrefs.edit().putString(key, JSONArray().apply {
+            movies.forEach { put(encodeMovie(it)) }
+        }.toString()).apply()
+    }
+    fun toggleFavorite(movie: FeedMovie) {
+        favoriteMovies = if (favoriteMovies.any { movieKey(it) == movieKey(movie) }) {
+            favoriteMovies.filterNot { movieKey(it) == movieKey(movie) }
+        } else listOf(movie) + favoriteMovies
+        persistMovies("favorites", favoriteMovies)
+    }
+    fun recordWatch(movie: FeedMovie) {
+        watchHistory = (listOf(movie) + watchHistory.filterNot { movieKey(it) == movieKey(movie) }).take(50)
+        persistMovies("history", watchHistory)
+    }
     val scope = rememberCoroutineScope()
 
     fun refreshCatalog() {
@@ -413,6 +460,45 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                                 }
                             }
                             "Unduhan" -> Text("Daftar unduhan akan tampil di sini setelah fitur unduhan diaktifkan.", color = Muted)
+                            "Favorit", "Riwayat" -> {
+                                val savedList = if (selectedTab == "Favorit") favoriteMovies else watchHistory
+                                if (savedList.isEmpty()) {
+                                    Text(
+                                        if (selectedTab == "Favorit") "Belum ada film favorit. Buka detail film lalu tekan ♡ Favorit."
+                                        else "Belum ada riwayat. Film yang diputar akan muncul di sini.",
+                                        color = Muted, fontSize = 13.sp
+                                    )
+                                } else {
+                                    savedList.forEach { movie ->
+                                        Card(
+                                            Modifier.fillMaxWidth().padding(bottom = 9.dp),
+                                            colors = CardDefaults.cardColors(containerColor = Panel),
+                                            shape = RoundedCornerShape(14.dp)
+                                        ) {
+                                            Row(Modifier.fillMaxWidth().padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                                                MoviePoster(movie.posterUrl, movie.title, 92.dp)
+                                                Spacer(Modifier.width(12.dp))
+                                                Column(Modifier.weight(1f)) {
+                                                    Text(movie.title, color = Color.White, fontWeight = FontWeight.Bold)
+                                                    Text(movie.category, color = Green, fontSize = 11.sp)
+                                                    TextButton(onClick = { selectedMovie = movie }) {
+                                                        Text("Lihat detail", color = Green)
+                                                    }
+                                                }
+                                                if (selectedTab == "Favorit") {
+                                                    TextButton(onClick = { toggleFavorite(movie) }) { Text("Hapus", color = Muted) }
+                                                }
+                                            }
+                                        }
+                                    }
+                                    if (selectedTab == "Riwayat") {
+                                        TextButton(onClick = {
+                                            watchHistory = emptyList()
+                                            persistMovies("history", watchHistory)
+                                        }) { Text("Hapus semua riwayat", color = Muted) }
+                                    }
+                                }
+                            }
                         }
                         if (selectedTab == "Cari" || selectedTab == "Kategori") {
                             Spacer(Modifier.height(14.dp))
@@ -449,7 +535,7 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                     horizontalArrangement = Arrangement.SpaceEvenly,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    listOf("Beranda" to "⌂", "Kategori" to "▦", "Cari" to "⌕", "Unduhan" to "⇩", "Pengaturan" to "⚙").forEach { (tab, glyph) ->
+                    listOf("Beranda" to "⌂", "Kategori" to "▦", "Cari" to "⌕", "Favorit" to "♡", "Riwayat" to "◷", "Pengaturan" to "⚙").forEach { (tab, glyph) ->
                         TextButton(onClick = { if (tab == "Pengaturan") onOpenSources() else selectedTab = tab },
                             modifier = Modifier.weight(1f)) {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -465,9 +551,19 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
     }
 
     selectedMovie?.let { movie ->
-        MovieDetailDialog(movie, onClose = { selectedMovie = null }, onPlay = {
-            if (movie.videoUrl.isNotBlank()) { selectedMovie = null; playingMovie = movie }
-        })
+        MovieDetailDialog(
+            movie = movie,
+            isFavorite = favoriteMovies.any { movieKey(it) == movieKey(movie) },
+            onToggleFavorite = { toggleFavorite(movie) },
+            onClose = { selectedMovie = null },
+            onPlay = {
+                if (movie.videoUrl.isNotBlank()) {
+                    recordWatch(movie)
+                    selectedMovie = null
+                    playingMovie = movie
+                }
+            }
+        )
     }
     playingMovie?.let { movie ->
         InAppVideoPlayer(activity, movie, onClose = { playingMovie = null })
@@ -504,7 +600,13 @@ private fun MoviePoster(url: String, title: String, height: androidx.compose.ui.
 }
 
 @Composable
-private fun MovieDetailDialog(movie: FeedMovie, onClose: () -> Unit, onPlay: () -> Unit) {
+private fun MovieDetailDialog(
+    movie: FeedMovie,
+    isFavorite: Boolean,
+    onToggleFavorite: () -> Unit,
+    onClose: () -> Unit,
+    onPlay: () -> Unit
+) {
     Dialog(onDismissRequest = onClose, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Surface(Modifier.fillMaxWidth().fillMaxHeight(0.9f).padding(12.dp),
             shape = RoundedCornerShape(22.dp), color = Panel) {
@@ -520,6 +622,14 @@ private fun MovieDetailDialog(movie: FeedMovie, onClose: () -> Unit, onPlay: () 
                 Column(Modifier.padding(horizontal = 20.dp, vertical = 18.dp)) {
                     Text(movie.title, color = Color.White, fontSize = 25.sp, lineHeight = 30.sp,
                         fontWeight = FontWeight.ExtraBold)
+                    Spacer(Modifier.height(10.dp))
+                    OutlinedButton(
+                        onClick = onToggleFavorite,
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = if (isFavorite) Color(0xFFFF7AA8) else Color.White)
+                    ) {
+                        Text(if (isFavorite) "♥  Hapus dari Favorit" else "♡  Tambahkan ke Favorit")
+                    }
                     Spacer(Modifier.height(9.dp))
                     Text(
                         listOf(movie.category, movie.releaseYear, movie.duration)
