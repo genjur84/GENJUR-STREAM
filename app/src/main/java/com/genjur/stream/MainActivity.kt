@@ -109,6 +109,68 @@ private fun decodeMovie(json: JSONObject): FeedMovie {
     )
 }
 
+
+private fun cleanCommonsText(value: String): String =
+    value.replace(Regex("<[^>]+>"), " ").replace(Regex("\\s+"), " ").trim()
+
+private fun loadWikimediaPublicDomainMovies(): List<FeedMovie> {
+    val apiUrl = "https://commons.wikimedia.org/w/api.php?action=query&generator=categorymembers&gcmtitle=Category%3AVideos_of_films_in_the_public_domain&gcmtype=file&gcmlimit=50&prop=imageinfo&iiprop=url%7Cmime%7Cextmetadata&iiurlwidth=480&format=json&formatversion=2"
+    val connection = URL(apiUrl).openConnection()
+    connection.connectTimeout = 15000
+    connection.readTimeout = 30000
+    connection.setRequestProperty("User-Agent", "GENJUR-STREAM/1.0 (Android app; public-domain catalog)")
+    val root = JSONObject(connection.getInputStream().bufferedReader().use { it.readText() })
+    val pages = root.optJSONObject("query")?.optJSONArray("pages")
+        ?: error("Wikimedia Commons tidak mengembalikan daftar film.")
+    val movies = mutableListOf<FeedMovie>()
+    for (i in 0 until pages.length()) {
+        val page = pages.optJSONObject(i) ?: continue
+        val fileName = page.optString("title").removePrefix("File:").trim()
+        val info = page.optJSONArray("imageinfo")?.optJSONObject(0) ?: continue
+        val mime = info.optString("mime").lowercase()
+        if (!mime.startsWith("video/")) continue
+        val videoUrl = info.optString("url").trim()
+        if (!videoUrl.startsWith("https://")) continue
+        val metadata = info.optJSONObject("extmetadata") ?: continue
+        fun meta(key: String): String =
+            cleanCommonsText(metadata.optJSONObject(key)?.optString("value").orEmpty())
+        val license = meta("LicenseShortName")
+        val licenseLower = license.lowercase()
+        val isPublicDomain = licenseLower.contains("public domain") || licenseLower == "pd"
+        val isCc0 = licenseLower.contains("cc0")
+        val isAttributionLicense = licenseLower.startsWith("cc by") &&
+            !licenseLower.contains("nc") && !licenseLower.contains("nd")
+        if (!isPublicDomain && !isCc0 && !isAttributionLicense) continue
+        val licenseUrl = meta("LicenseUrl").ifBlank {
+            if (isPublicDomain) "https://creativecommons.org/publicdomain/mark/1.0/" else ""
+        }
+        if (!licenseUrl.startsWith("https://")) continue
+        val title = fileName.substringBeforeLast(".").replace('_', ' ')
+            .replace(Regex("\\s+"), " ").trim()
+        if (title.isBlank()) continue
+        val artist = meta("Artist")
+        val description = meta("ImageDescription").ifBlank {
+            "Video film dari kategori domain publik Wikimedia Commons. Periksa halaman sumber untuk konteks dan ketentuan penggunaan."
+        }
+        val attribution = if (artist.isBlank()) "Wikimedia Commons — $fileName"
+            else "$artist; Wikimedia Commons — $fileName"
+        val poster = info.optString("thumburl").takeIf { it.startsWith("https://") }.orEmpty()
+        val year = Regex("\\b(?:18|19|20)\\d{2}\\b").find(fileName)?.value.orEmpty()
+        movies.add(FeedMovie(
+            title = title,
+            description = description,
+            category = "Film Domain Publik",
+            videoUrl = videoUrl,
+            licenseId = license.ifBlank { "Public Domain" },
+            termsUrl = licenseUrl,
+            attribution = attribution,
+            posterUrl = poster,
+            releaseYear = year
+        ))
+    }
+    return movies.distinctBy { it.videoUrl }.sortedBy { it.title.lowercase() }
+}
+
 private data class DownloadEntry(val id: Long, val movie: FeedMovie)
 
 private fun readDownloads(activity: MainActivity): List<DownloadEntry> = runCatching {
@@ -265,6 +327,10 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                             connection.connectTimeout = 12000
                             connection.readTimeout = 20000
                             val root = JSONObject(connection.getInputStream().bufferedReader().use { it.readText() })
+                            if (root.optString("catalogType") == "wikimedia_public_domain_videos") {
+                                movies.addAll(loadWikimediaPublicDomainMovies())
+                                return@runCatching
+                            }
                             val rights = root.optJSONObject("rights")
                                 ?: error("metadata hak distribusi tidak tersedia")
                             val redistributionAllowed = rights.optBoolean("redistributionAllowed", false)
