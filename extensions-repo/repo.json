@@ -12,6 +12,91 @@
         "Film Klasik"
       ],
       "subtitleLanguages": []
+    },
+    {
+      "id": "official-viu-free",
+      "name": "Viu — Konten Gratis",
+      "description": "Layanan streaming resmi untuk drama dan film Asia.",
+      "websiteUrl": "https://www.viu.com/ott/id/",
+      "subtitleLanguages": [
+        "Indonesia"
+      ],
+      "contentTypes": [
+        "Film",
+        "Drama Asia"
+      ],
+      "freeNote": "Sebagian judul dapat ditonton gratis dengan iklan; judul dan subtitle berbeda-beda."
+    },
+    {
+      "id": "official-iqiyi-free",
+      "name": "iQIYI — Konten Gratis",
+      "description": "Layanan resmi film, drama Asia, dan anime.",
+      "websiteUrl": "https://www.iq.com/",
+      "subtitleLanguages": [
+        "Indonesia"
+      ],
+      "contentTypes": [
+        "Film",
+        "Drama",
+        "Anime"
+      ],
+      "freeNote": "Sebagian konten gratis; judul VIP memerlukan langganan. Periksa label gratis pada tiap judul."
+    },
+    {
+      "id": "official-wetv-free",
+      "name": "WeTV — Konten Gratis",
+      "description": "Layanan resmi untuk film dan serial Asia.",
+      "websiteUrl": "https://wetv.vip/id",
+      "subtitleLanguages": [
+        "Indonesia"
+      ],
+      "contentTypes": [
+        "Film",
+        "Serial Asia"
+      ],
+      "freeNote": "Sebagian judul atau episode gratis; konten VIP tetap berbayar."
+    },
+    {
+      "id": "official-vidio-free",
+      "name": "Vidio — Film Gratis",
+      "description": "Platform streaming resmi dengan pilihan film dan tayangan Indonesia.",
+      "websiteUrl": "https://www.vidio.com/",
+      "subtitleLanguages": [],
+      "contentTypes": [
+        "Film Indonesia",
+        "Serial",
+        "TV"
+      ],
+      "freeNote": "Pilih konten berlabel gratis; subtitle bergantung pada judul."
+    },
+    {
+      "id": "official-catchplay-free",
+      "name": "CATCHPLAY+ — FREE",
+      "description": "Layanan resmi dengan bagian katalog film FREE.",
+      "websiteUrl": "https://www.catchplay.com/id/tab/FREE",
+      "subtitleLanguages": [
+        "Indonesia"
+      ],
+      "contentTypes": [
+        "Film Internasional",
+        "Film Asia"
+      ],
+      "freeNote": "Gunakan kategori FREE; ketersediaan dan batas tayangan dapat berubah."
+    },
+    {
+      "id": "official-trueid-free",
+      "name": "TrueID — Konten Gratis",
+      "description": "Platform resmi dengan pilihan film dan serial Indonesia serta Asia.",
+      "websiteUrl": "https://trueid.id/",
+      "subtitleLanguages": [
+        "Indonesia"
+      ],
+      "contentTypes": [
+        "Film Indonesia",
+        "Film Asia",
+        "Serial"
+      ],
+      "freeNote": "Sebagian katalog tersedia gratis; bahasa subtitle berbeda pada tiap judul."
     }
   ]
 }
