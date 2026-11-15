@@ -108,9 +108,16 @@ private val Green = Color(0xFF8B5CF6)
 private val Muted = Color(0xFFACB7C5)
 
 
-private class PlaybackStartedBridge(private val onPlayback: (String, String) -> Unit) {
+private class PlaybackStartedBridge(
+    private val onPlayback: (String, String) -> Unit,
+    private val onVideoAvailable: (String, String, String) -> Unit
+) {
     @JavascriptInterface
     fun onVideoPlay(title: String, pageUrl: String) { onPlayback(title, pageUrl) }
+    @JavascriptInterface
+    fun onVideoAvailable(title: String, pageUrl: String, videoUrl: String) {
+        onVideoAvailable(title, pageUrl, videoUrl)
+    }
 }
 
 private data class StreamOption(val quality: String, val videoUrl: String)
@@ -413,8 +420,17 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
     }
     fun startDownload(movie: FeedMovie) {
         if (!movie.downloadAllowed || movie.downloadUrl.isBlank()) return
-        if (downloads.any { movieKey(it.movie) == movieKey(movie) }) return
+        if (downloads.any { it.movie.downloadUrl == movie.downloadUrl }) return
         val uri = Uri.parse(movie.downloadUrl)
+        if (uri.scheme !in listOf("http", "https") || uri.host.isNullOrBlank()) return
+        val path = uri.path.orEmpty().lowercase()
+        if (path.endsWith(".m3u8") || path.endsWith(".mpd")) return
+        val extension = when {
+            path.endsWith(".webm") -> "webm"
+            path.endsWith(".mov") -> "mov"
+            path.endsWith(".mkv") -> "mkv"
+            else -> "mp4"
+        }
         val request = DownloadManager.Request(uri)
             .setTitle(movie.title)
             .setDescription("Mengunduh ke GENJUR STREAM")
@@ -422,10 +438,32 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
             .setAllowedOverMetered(true)
             .setAllowedOverRoaming(false)
             .setDestinationInExternalFilesDir(activity, Environment.DIRECTORY_MOVIES,
-                "genjur_${System.currentTimeMillis()}.mp4")
+                "genjur_${System.currentTimeMillis()}.$extension")
+        runCatching { android.webkit.CookieManager.getInstance().getCookie(movie.downloadUrl) }
+            .getOrNull()?.takeIf { it.isNotBlank() }?.let { request.addRequestHeader("Cookie", it) }
+        if (movie.termsUrl.startsWith("http")) request.addRequestHeader("Referer", movie.termsUrl)
+        request.addRequestHeader("User-Agent", WebView(activity).settings.userAgentString)
         val id = downloadManager.enqueue(request)
         downloads = listOf(DownloadEntry(id, movie)) + downloads
         persistDownloads(downloads)
+    }
+    fun startWebVideoDownload(title: String, pageUrl: String, mediaUrl: String) {
+        val uri = Uri.parse(mediaUrl)
+        val path = uri.path.orEmpty().lowercase()
+        val directFile = listOf(".mp4", ".webm", ".mov", ".mkv").any { path.endsWith(it) }
+        if (!directFile || uri.scheme !in listOf("http", "https") || uri.host.isNullOrBlank()) return
+        val safeTitle = title.ifBlank { "Video dari situs" }
+        startDownload(FeedMovie(
+            title = safeTitle,
+            description = "Video langsung terdeteksi dari halaman sumber.",
+            category = "Sumber Web",
+            videoUrl = mediaUrl,
+            licenseId = "User-provided website",
+            termsUrl = pageUrl,
+            attribution = "Situs sumber: ${Uri.parse(pageUrl).host.orEmpty()}",
+            downloadUrl = mediaUrl,
+            downloadAllowed = true
+        ))
     }
     fun persistMovies(key: String, movies: List<FeedMovie>) {
         libraryPrefs.edit().putString(key, JSONArray().apply {
@@ -886,20 +924,27 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                                 // Ini mencegah callback loading dari situs sebelumnya
                                 // menimpa status loading situs yang baru dibuka.
                                 key(browserInitialUrl) {
-                                    SourceBrowser(initialUrl = browserInitialUrl, fullScreen = true, onPlaybackStarted = { pageTitle, pageUrl ->
-                                        val safeTitle = pageTitle.trim().takeIf { it.isNotBlank() }
-                                            ?: Uri.parse(pageUrl).host.orEmpty().ifBlank { "Video dari situs" }
-                                        activity.showWebPlaybackNotification(safeTitle, pageUrl)
-                                        recordWatch(FeedMovie(
-                                            title = safeTitle,
-                                            description = "Tontonan yang mulai diputar melalui Browser Sumber.",
-                                            category = "Sumber Web",
-                                            videoUrl = pageUrl,
-                                            licenseId = "User-provided website",
-                                            termsUrl = pageUrl,
-                                            attribution = "Situs sumber: ${Uri.parse(pageUrl).host.orEmpty()}"
-                                        ))
-                                    })
+                                    SourceBrowser(
+                                        initialUrl = browserInitialUrl,
+                                        fullScreen = true,
+                                        onPlaybackStarted = { pageTitle, pageUrl ->
+                                            val safeTitle = pageTitle.trim().takeIf { it.isNotBlank() }
+                                                ?: Uri.parse(pageUrl).host.orEmpty().ifBlank { "Video dari situs" }
+                                            activity.showWebPlaybackNotification(safeTitle, pageUrl)
+                                            recordWatch(FeedMovie(
+                                                title = safeTitle,
+                                                description = "Tontonan yang mulai diputar melalui Browser Sumber.",
+                                                category = "Sumber Web",
+                                                videoUrl = pageUrl,
+                                                licenseId = "User-provided website",
+                                                termsUrl = pageUrl,
+                                                attribution = "Situs sumber: ${Uri.parse(pageUrl).host.orEmpty()}"
+                                            ))
+                                        },
+                                        onDownloadCandidate = { title, pageUrl, mediaUrl ->
+                                            startWebVideoDownload(title, pageUrl, mediaUrl)
+                                        }
+                                    )
                                 }
                             }
                             "Kategori" -> {
@@ -1605,10 +1650,18 @@ private inline fun <T> List<T>.anyIndexed(predicate: (Int, T) -> Boolean): Boole
     return false
 }
 @Composable
-private fun SourceBrowser(initialUrl: String, fullScreen: Boolean = false, onPlaybackStarted: (String, String) -> Unit) {
+private fun SourceBrowser(
+    initialUrl: String,
+    fullScreen: Boolean = false,
+    onPlaybackStarted: (String, String) -> Unit,
+    onDownloadCandidate: (String, String, String) -> Unit
+) {
     var address by remember(initialUrl) { mutableStateOf(initialUrl) }
     var currentUrl by remember(initialUrl) { mutableStateOf(initialUrl) }
     var pageTitle by remember { mutableStateOf("Masukkan alamat situs sumber video.") }
+    var detectedVideoTitle by remember { mutableStateOf("") }
+    var detectedVideoPage by remember { mutableStateOf("") }
+    var detectedVideoUrl by remember { mutableStateOf("") }
     var isLoading by remember(initialUrl) { mutableStateOf(initialUrl.isNotBlank()) }
     var webView by remember { mutableStateOf<WebView?>(null) }
     val loadingFallback = remember { Runnable { isLoading = false } }
@@ -1639,6 +1692,25 @@ private fun SourceBrowser(initialUrl: String, fullScreen: Boolean = false, onPla
             }
             Text(pageTitle, color = Muted, fontSize = 11.sp, maxLines = 2)
         }
+        if (detectedVideoUrl.isNotBlank()) {
+            Card(colors = CardDefaults.cardColors(containerColor = Panel)) {
+                Row(Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 7.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween) {
+                    Column(Modifier.weight(1f)) {
+                        Text("Video langsung terdeteksi", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                        Text("Siap dicoba diunduh: ${detectedVideoTitle.ifBlank { "Video dari situs" }}",
+                            color = Muted, fontSize = 10.sp, maxLines = 2)
+                    }
+                    Button(onClick = { onDownloadCandidate(detectedVideoTitle, detectedVideoPage, detectedVideoUrl) },
+                        colors = ButtonDefaults.buttonColors(containerColor = Green, contentColor = Color.White)) {
+                        Icon(Icons.Filled.Download, contentDescription = null)
+                        Spacer(Modifier.width(4.dp))
+                        Text("Download")
+                    }
+                }
+            }
+        }
         Box(
             modifier = if (fullScreen) Modifier.fillMaxWidth().weight(1f) else Modifier.fillMaxWidth().height(420.dp),
             contentAlignment = Alignment.Center
@@ -1660,9 +1732,21 @@ private fun SourceBrowser(initialUrl: String, fullScreen: Boolean = false, onPla
                     // Jangan gunakan progress WebView untuk indikator buffering.
                     // Iklan/iframe dapat mengubah progres setelah halaman utama selesai.
                     webChromeClient = WebChromeClient()
-                    addJavascriptInterface(PlaybackStartedBridge { title, pageUrl ->
-                        post { onPlaybackStarted(title, pageUrl) }
-                    }, "GenjurPlayback")
+                    addJavascriptInterface(PlaybackStartedBridge(
+                        onPlayback = { title, pageUrl -> post { onPlaybackStarted(title, pageUrl) } },
+                        onVideoAvailable = { title, pageUrl, videoUrl ->
+                            post {
+                                val uri = Uri.parse(videoUrl)
+                                val path = uri.path.orEmpty().lowercase()
+                                val directFile = listOf(".mp4", ".webm", ".mov", ".mkv").any { path.endsWith(it) }
+                                if (directFile && uri.scheme in listOf("http", "https") && !uri.host.isNullOrBlank()) {
+                                    detectedVideoTitle = title
+                                    detectedVideoPage = pageUrl
+                                    detectedVideoUrl = videoUrl
+                                }
+                            }
+                        }
+                    ), "GenjurPlayback")
                     webViewClient = object : WebViewClient() {
                         override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): android.webkit.WebResourceResponse? {
                             if (!request.isForMainFrame && isGenjurAdHost(request.url.host)) {
@@ -1696,7 +1780,12 @@ private fun SourceBrowser(initialUrl: String, fullScreen: Boolean = false, onPla
                                         if (v.__genjurPlaybackHooked) return;
                                         v.__genjurPlaybackHooked = true;
                                         v.addEventListener('play', function() {
-                                            try { GenjurPlayback.onVideoPlay(document.title || 'Video dari situs', location.href); } catch(e) {}
+                                            try {
+                                                var title = document.title || 'Video dari situs';
+                                                GenjurPlayback.onVideoPlay(title, location.href);
+                                                var media = v.currentSrc || v.src || '';
+                                                if (media) GenjurPlayback.onVideoAvailable(title, location.href, media);
+                                            } catch(e) {}
                                         }, { once: true });
                                     }
                                     document.querySelectorAll('video').forEach(hookVideo);
