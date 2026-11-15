@@ -318,13 +318,6 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
     var search by remember { mutableStateOf("") }
     var category by remember { mutableStateOf("Semua") }
     var selectedTab by remember { mutableStateOf("Beranda") }
-    BackHandler(enabled = selectedMovie != null || playingMovie != null || selectedTab != "Beranda") {
-        when {
-            playingMovie != null -> playingMovie = null
-            selectedMovie != null -> selectedMovie = null
-            selectedTab != "Beranda" -> selectedTab = "Beranda"
-        }
-    }
     var savedSourceMenu by remember { mutableStateOf(emptyList<SavedSourceLink>()) }
     var selectedSearchSourceUrl by remember { mutableStateOf<String?>(null) }
     var searchSourceDropdownExpanded by remember { mutableStateOf(false) }
@@ -353,6 +346,13 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
     var feedMessage by remember { mutableStateOf("Tambahkan sumber feed JSON, lalu muat katalog.") }
     var selectedMovie by remember { mutableStateOf<FeedMovie?>(null) }
     var playingMovie by remember { mutableStateOf<FeedMovie?>(null) }
+    BackHandler(enabled = selectedMovie != null || playingMovie != null || selectedTab != "Beranda") {
+        when {
+            playingMovie != null -> playingMovie = null
+            selectedMovie != null -> selectedMovie = null
+            selectedTab != "Beranda" -> selectedTab = "Beranda"
+        }
+    }
     var favoriteMovies by remember { mutableStateOf(readSavedMovies(activity, "favorites")) }
     var watchHistory by remember { mutableStateOf(readSavedMovies(activity, "history")) }
     var downloads by remember { mutableStateOf(readDownloads(activity)) }
