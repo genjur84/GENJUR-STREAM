@@ -1797,7 +1797,7 @@ private fun SourceBrowser(
                             post {
                                 val uri = Uri.parse(videoUrl)
                                 val path = uri.path.orEmpty().lowercase()
-                                val playableMedia = listOf(".mp4", ".webm", ".mov", ".mkv", ".m3u8", ".mpd").any { path.endsWith(it) }
+                                val playableMedia = Regex("""\\.(m3u8|mpd|mp4|m4v|webm|mov|mkv)(?:$|[?#&])""").containsMatchIn(videoUrl.lowercase())
                                 if (playableMedia && uri.scheme in listOf("http", "https") && !uri.host.isNullOrBlank()) {
                                     detectedVideoTitle = title
                                     detectedVideoPage = pageUrl
@@ -1823,17 +1823,17 @@ private fun SourceBrowser(
                         override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): android.webkit.WebResourceResponse? {
                             val requestedUri = request.url
                             val mediaPath = requestedUri.path.orEmpty().lowercase()
-                            val mediaExtensions = listOf(".m3u8", ".mpd", ".mp4", ".webm", ".mov", ".mkv")
+                            val mediaUrlLower = requestedUri.toString().lowercase()
+                            val mediaMatch = Regex("""\\.(m3u8|mpd|mp4|m4v|webm|mov|mkv)(?:$|[?#&])""").containsMatchIn(mediaUrlLower)
                             if (requestedUri.scheme in listOf("http", "https") &&
-                                !requestedUri.host.isNullOrBlank() &&
-                                mediaExtensions.any { mediaPath.endsWith(it) }) {
+                                !requestedUri.host.isNullOrBlank() && mediaMatch) {
                                 val label = when {
-                                    mediaPath.endsWith(".m3u8") -> "Streaming HLS"
-                                    mediaPath.endsWith(".mpd") -> "Streaming DASH"
-                                    mediaPath.contains("2160") || mediaPath.contains("4k") -> "4K"
-                                    mediaPath.contains("1080") -> "Full HD 1080p"
-                                    mediaPath.contains("720") -> "HD 720p"
-                                    mediaPath.contains("480") -> "SD 480p"
+                                    mediaUrlLower.contains(".m3u8") -> "Streaming HLS"
+                                    mediaUrlLower.contains(".mpd") -> "Streaming DASH"
+                                    mediaUrlLower.contains("2160") || mediaUrlLower.contains("4k") -> "4K"
+                                    mediaUrlLower.contains("1080") -> "Full HD 1080p"
+                                    mediaUrlLower.contains("720") -> "HD 720p"
+                                    mediaUrlLower.contains("480") -> "SD 480p"
                                     else -> "Video terdeteksi dari jaringan"
                                 }
                                 view.post {
@@ -1874,7 +1874,7 @@ private fun SourceBrowser(
                                     window.__genjurPlaybackHooked = true;
                                     function reportMedia(title, url, quality) {
                                         try {
-                                            if (!url || !/\.(mp4|webm|mov|mkv)(?:$|[?#])/i.test(url)) return;
+                                            if (!url || !/\.(m3u8|mpd|mp4|m4v|webm|mov|mkv)(?:$|[?#&])/i.test(url)) return;
                                             var entry = performance.getEntriesByName(url).slice(-1)[0];
                                             var size = entry ? (entry.encodedBodySize || entry.transferSize || 0) : 0;
                                             GenjurPlayback.onVideoAvailable(title || document.title || 'Video dari situs', location.href, url, quality || 'Kualitas tersedia', size);
@@ -1909,20 +1909,44 @@ private fun SourceBrowser(
                                             } catch(e) {}
                                         }, { once: true });
                                     }
-                                    document.querySelectorAll('video').forEach(hookVideo);
-                                    document.querySelectorAll('a[href]').forEach(reportLink);
+                                    function scanPage() {
+                                        try {
+                                            document.querySelectorAll('video').forEach(hookVideo);
+                                            document.querySelectorAll('a[href]').forEach(reportLink);
+                                            document.querySelectorAll('source[src],iframe[src],[data-src],[data-video],[data-url]').forEach(function(el) {
+                                                ['src','data-src','data-video','data-url'].forEach(function(attr) {
+                                                    var candidate = el.getAttribute(attr);
+                                                    if (candidate) reportMedia(document.title, new URL(candidate, location.href).href, 'Sumber video ditemukan');
+                                                });
+                                            });
+                                        } catch(e) {}
+                                    }
+                                    scanPage();
+                                    var scanTimer = null;
                                     new MutationObserver(function(records) {
+                                        var needsScan = false;
                                         records.forEach(function(record) {
                                             record.addedNodes.forEach(function(node) {
-                                                if (node.tagName === 'VIDEO') hookVideo(node);
-                                                if (node.tagName === 'A') reportLink(node);
+                                                if (node.nodeType !== 1) return;
+                                                if (node.matches && node.matches('video')) hookVideo(node);
+                                                if (node.matches && node.matches('a[href]')) reportLink(node);
                                                 if (node.querySelectorAll) {
                                                     node.querySelectorAll('video').forEach(hookVideo);
                                                     node.querySelectorAll('a[href]').forEach(reportLink);
                                                 }
+                                                needsScan = true;
                                             });
+                                            if (record.type === 'attributes') needsScan = true;
                                         });
-                                    }).observe(document.documentElement, { childList: true, subtree: true });
+                                        if (needsScan) {
+                                            clearTimeout(scanTimer);
+                                            scanTimer = setTimeout(scanPage, 120);
+                                        }
+                                    }).observe(document.documentElement, {
+                                        childList: true, subtree: true, attributes: true,
+                                        attributeFilter: ['src','data-src','data-video','data-url']
+                                    });
+                                    setTimeout(scanPage, 300);
                                 })();""",
                                 null
                             )
