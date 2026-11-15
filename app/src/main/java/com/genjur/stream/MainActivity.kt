@@ -427,21 +427,31 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
     var favoriteMovies by remember { mutableStateOf(readSavedMovies(activity, "favorites")) }
     var watchHistory by remember { mutableStateOf(readSavedMovies(activity, "history")) }
     var downloads by remember { mutableStateOf(readDownloads(activity)) }
+    var downloadMessage by remember { mutableStateOf<String?>(null) }
     var downloadStates by remember { mutableStateOf<Map<Long, Pair<Int, String>>>(emptyMap()) }
     val libraryPrefs = remember { activity.getSharedPreferences("genjur_stream_library", 0) }
     val downloadManager = remember { activity.getSystemService(DownloadManager::class.java) }
     fun persistDownloads(items: List<DownloadEntry>) {
         libraryPrefs.edit().putString("downloads", JSONArray().apply {
-            items.forEach { put(JSONObject().put("id", it.id).put("movie", encodeMovie(it.movie))) }
-        }.toString()).apply()
-    }
-    fun startDownload(movie: FeedMovie) {
-        if (!movie.downloadAllowed || movie.downloadUrl.isBlank()) return
-        if (downloads.any { it.movie.downloadUrl == movie.downloadUrl }) return
+            items.forEach { put(JSONObject().put("id", it.id).put("    fun startDownload(movie: FeedMovie) {
+        if (!movie.downloadAllowed || movie.downloadUrl.isBlank()) {
+            downloadMessage = "Sumber ini belum memberikan tautan unduhan langsung."
+            return
+        }
+        if (downloads.any { it.movie.downloadUrl == movie.downloadUrl }) {
+            downloadMessage = "Tautan ini sudah ada di daftar Unduhan."
+            return
+        }
         val uri = Uri.parse(movie.downloadUrl)
-        if (uri.scheme !in listOf("http", "https") || uri.host.isNullOrBlank()) return
+        if (uri.scheme !in listOf("http", "https") || uri.host.isNullOrBlank()) {
+            downloadMessage = "Alamat unduhan tidak valid."
+            return
+        }
         val path = uri.path.orEmpty().lowercase()
-        if (path.endsWith(".m3u8") || path.endsWith(".mpd")) return
+        if (path.endsWith(".m3u8") || path.endsWith(".mpd")) {
+            downloadMessage = "Format streaming adaptif belum didukung oleh pengunduh ini."
+            return
+        }
         val extension = when {
             path.endsWith(".webm") -> "webm"
             path.endsWith(".mov") -> "mov"
@@ -456,18 +466,37 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
             .setAllowedOverRoaming(false)
             .setDestinationInExternalFilesDir(activity, Environment.DIRECTORY_MOVIES,
                 "genjur_${System.currentTimeMillis()}.$extension")
-        runCatching { android.webkit.CookieManager.getInstance().getCookie(movie.downloadUrl) }
-            .getOrNull()?.takeIf { it.isNotBlank() }?.let { request.addRequestHeader("Cookie", it) }
-        if (movie.termsUrl.startsWith("http")) request.addRequestHeader("Referer", movie.termsUrl)
-        val id = downloadManager.enqueue(request)
-        downloads = listOf(DownloadEntry(id, movie)) + downloads
-        persistDownloads(downloads)
+        val pageUri = Uri.parse(movie.termsUrl)
+        request.addRequestHeader("User-Agent", "Mozilla/5.0 (Linux; Android 11) AppleWebKit/537.36 Chrome/120.0.0.0 Mobile Safari/537.36")
+        request.addRequestHeader("Accept", "video/*,application/octet-stream,*/*;q=0.8")
+        request.addRequestHeader("Accept-Language", "id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7")
+        if (movie.termsUrl.startsWith("http")) {
+            request.addRequestHeader("Referer", movie.termsUrl)
+            if (!pageUri.host.isNullOrBlank()) request.addRequestHeader("Origin", "${pageUri.scheme}://${pageUri.host}")
+        }
+        val cookieManager = android.webkit.CookieManager.getInstance()
+        val cookies = sequenceOf(movie.downloadUrl, movie.termsUrl)
+            .mapNotNull { url -> runCatching { cookieManager.getCookie(url) }.getOrNull() }
+            .firstOrNull { it.isNotBlank() }
+        cookies?.let { request.addRequestHeader("Cookie", it) }
+        runCatching { downloadManager.enqueue(request) }
+            .onSuccess { id ->
+                downloads = listOf(DownloadEntry(id, movie)) + downloads
+                persistDownloads(downloads)
+                downloadMessage = "Download dimulai. Pantau progresnya di menu Unduhan."
+            }
+            .onFailure { error ->
+                downloadMessage = "Gagal memulai download: ${error.message ?: "kesalahan sistem"}"
+            }
     }
     fun startWebVideoDownload(title: String, pageUrl: String, mediaUrl: String) {
         val uri = Uri.parse(mediaUrl)
         val path = uri.path.orEmpty().lowercase()
-        val directFile = listOf(".mp4", ".webm", ".mov", ".mkv").any { path.endsWith(it) }
-        if (!directFile || uri.scheme !in listOf("http", "https") || uri.host.isNullOrBlank()) return
+        val directFile = listOf(".mp4", ".m4v", ".webm", ".mov", ".mkv").any { path.endsWith(it) }
+        if (!directFile || uri.scheme !in listOf("http", "https") || uri.host.isNullOrBlank()) {
+            downloadMessage = "GENJUR belum menemukan URL file video langsung yang bisa diunduh."
+            return
+        }
         val safeTitle = title.ifBlank { "Video dari situs" }
         startDownload(FeedMovie(
             title = safeTitle,
@@ -478,6 +507,10 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
             termsUrl = pageUrl,
             attribution = "Situs sumber: ${Uri.parse(pageUrl).host.orEmpty()}",
             downloadUrl = mediaUrl,
+            downloadAllowed = true
+        ))
+    }
+adUrl = mediaUrl,
             downloadAllowed = true
         ))
     }
@@ -982,6 +1015,7 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                                 }
                             }
                             "Unduhan" -> {
+                                downloadMessage?.let { Text(it, color = if (it.startsWith("Gagal") || it.contains("belum")) MaterialTheme.colorScheme.error else Green, fontSize = 12.sp) }
                                 if (downloads.isEmpty()) {
                                     Text("Belum ada video yang diunduh.", color = Muted)
                                 } else {
