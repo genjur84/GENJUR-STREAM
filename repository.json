@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "name": "GENJUR STREAM — Repositori Penyedia Legal",
-  "description": "Katalog penyedia film legal, domain publik, dan layanan resmi.",
+  "name": "GENJUR STREAM — Film Gratis & Legal",
+  "description": "Katalog film gratis dengan lisensi terbuka atau domain publik. Tidak memuat layanan berlangganan.",
   "extensions": [
     {
       "id": "wikimedia-public-domain",
@@ -16,83 +16,6 @@
       "feedUrl": "https://raw.githubusercontent.com/genjur84/GENJUR-STREAM/main/feeds/wikimedia-public-domain.json",
       "websiteUrl": "",
       "freeNote": "Periksa lisensi dan atribusi pada halaman setiap berkas."
-    },
-    {
-      "id": "internet-archive",
-      "name": "Internet Archive — Koleksi Film",
-      "description": "Buka koleksi film di Internet Archive. Hak penggunaan berbeda untuk tiap judul; periksa keterangan dan ketentuan item sebelum menonton atau mengunduh.",
-      "language": "Beragam",
-      "contentTypes": [
-        "Film",
-        "Dokumenter",
-        "Arsip"
-      ],
-      "subtitleLanguages": [],
-      "feedUrl": "",
-      "websiteUrl": "https://archive.org/details/movies",
-      "freeNote": "Tautan membuka situs resmi; belum menjadi katalog internal GENJUR."
-    },
-    {
-      "id": "viu-indonesia",
-      "name": "Viu Indonesia",
-      "description": "Layanan streaming drama Asia, film, dan acara hiburan melalui situs resmi Viu.",
-      "language": "Beragam",
-      "contentTypes": [
-        "Drama Asia",
-        "Film",
-        "Acara TV"
-      ],
-      "subtitleLanguages": [],
-      "feedUrl": "",
-      "websiteUrl": "https://www.viu.com/ott/id/",
-      "freeNote": "Periksa ikon/pilihan subtitle pada setiap judul. Subtitle Indonesia bergantung pada judul dan wilayah."
-    },
-    {
-      "id": "iqiyi-indonesia",
-      "name": "iQIYI",
-      "description": "Layanan streaming drama Asia, film, anime, dan variety show melalui situs resmi iQIYI.",
-      "language": "Beragam",
-      "contentTypes": [
-        "Drama Asia",
-        "Film",
-        "Anime",
-        "Variety Show"
-      ],
-      "subtitleLanguages": [],
-      "feedUrl": "",
-      "websiteUrl": "https://www.iq.com/",
-      "freeNote": "Periksa pilihan subtitle pada halaman setiap judul; ketersediaan bahasa Indonesia dapat berbeda."
-    },
-    {
-      "id": "netflix-indonesia",
-      "name": "Netflix Indonesia",
-      "description": "Layanan streaming film, serial, anime, dan dokumenter melalui situs resmi Netflix.",
-      "language": "Beragam",
-      "contentTypes": [
-        "Film",
-        "Serial",
-        "Anime",
-        "Dokumenter"
-      ],
-      "subtitleLanguages": [],
-      "feedUrl": "",
-      "websiteUrl": "https://www.netflix.com/id/",
-      "freeNote": "Bahasa subtitle berbeda menurut judul, wilayah, dan pengaturan akun. Periksa menu Audio & Subtitles."
-    },
-    {
-      "id": "disney-plus-indonesia",
-      "name": "Disney+ (Hotstar)",
-      "description": "Layanan streaming Disney+ untuk film dan serial internasional serta konten lokal.",
-      "language": "Beragam",
-      "contentTypes": [
-        "Film",
-        "Serial",
-        "Dokumenter"
-      ],
-      "subtitleLanguages": [],
-      "feedUrl": "",
-      "websiteUrl": "https://www.disneyplus.com/",
-      "freeNote": "Periksa pilihan subtitle Indonesia pada setiap judul; katalog dan bahasa mengikuti wilayah serta akun."
     }
   ]
 }
