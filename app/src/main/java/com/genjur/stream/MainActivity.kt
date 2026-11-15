@@ -1412,11 +1412,9 @@ private fun SourceBrowser(initialUrl: String, fullScreen: Boolean = false, onPla
                     settings.domStorageEnabled = true
                     settings.loadsImagesAutomatically = true
                     settings.mediaPlaybackRequiresUserGesture = true
-                    webChromeClient = object : WebChromeClient() {
-                        override fun onProgressChanged(view: WebView, newProgress: Int) {
-                            isLoading = newProgress < 100
-                        }
-                    }
+                    // Jangan gunakan progress WebView untuk indikator buffering.
+                    // Iklan/iframe dapat mengubah progres setelah halaman utama selesai.
+                    webChromeClient = WebChromeClient()
                     addJavascriptInterface(PlaybackStartedBridge { title, pageUrl ->
                         post { onPlaybackStarted(title, pageUrl) }
                     }, "GenjurPlayback")
@@ -1467,6 +1465,7 @@ private fun SourceBrowser(initialUrl: String, fullScreen: Boolean = false, onPla
                 webView = view
                 if (currentUrl.isNotBlank() && view.tag != currentUrl) {
                     view.tag = currentUrl
+                    isLoading = true
                     view.loadUrl(currentUrl)
                 }
             },
