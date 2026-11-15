@@ -761,9 +761,15 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                                 Spacer(Modifier.height(10.dp))
                                 OutlinedButton(
                                     onClick = {
-                                        val host = selectedSource?.url?.let { Uri.parse(it).host }
+                                        val sourceUrl = selectedSource?.url
+                                        val host = sourceUrl?.let { Uri.parse(it).host?.lowercase()?.removePrefix("www.") }
                                         if (host != null && search.isNotBlank()) {
-                                            browserInitialUrl = "https://www.google.com/search?q=" + Uri.encode("site:$host ${search.trim()}")
+                                            val query = Uri.encode(search.trim())
+                                            browserInitialUrl = if (host == "youtube.com" || host.endsWith(".youtube.com") || host == "youtu.be") {
+                                                "https://www.youtube.com/results?search_query=$query"
+                                            } else {
+                                                sourceUrl
+                                            }
                                             selectedTab = "Browser Sumber"
                                         }
                                     },
