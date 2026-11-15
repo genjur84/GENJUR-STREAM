@@ -27,6 +27,8 @@ import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -1387,20 +1389,32 @@ private fun SourceLinksScreen(activity: MainActivity, onOpenLink: (String) -> Un
                     colors = CardDefaults.cardColors(containerColor = Panel),
                     shape = RoundedCornerShape(14.dp)
                 ) {
-                    Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text(item.name, color = Color.White, fontWeight = FontWeight.Bold)
-                        Text(item.url, color = Color(0xFFCBD2E0), fontSize = 12.sp, maxLines = 2)
-                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            TextButton(onClick = { onOpenLink(item.url) }) { Text("Buka", color = Green) }
-                            TextButton(onClick = {
-                                name = item.name; url = item.url; editingIndex = index; message = null
-                            }) { Text("Edit", color = Muted) }
-                            TextButton(onClick = {
-                                links = links.filterIndexed { i, _ -> i != index }
-                                persist(links)
-                                if (editingIndex == index) { name = ""; url = ""; editingIndex = null }
-                                message = "Link dihapus."
-                            }) { Text("Hapus", color = Muted) }
+                    Row(
+                        modifier = Modifier.fillMaxWidth().clickable { onOpenLink(item.url) }.padding(start = 14.dp, end = 6.dp, top = 4.dp, bottom = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            item.name,
+                            modifier = Modifier.weight(1f).padding(vertical = 10.dp),
+                            color = Color.White,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1
+                        )
+                        IconButton(onClick = {
+                            name = item.name
+                            url = item.url
+                            editingIndex = index
+                            message = null
+                        }) {
+                            Icon(Icons.Filled.Edit, contentDescription = "Edit sumber", tint = Green)
+                        }
+                        IconButton(onClick = {
+                            links = links.filterIndexed { i, _ -> i != index }
+                            persist(links)
+                            if (editingIndex == index) { name = ""; url = ""; editingIndex = null }
+                            message = "Link dihapus."
+                        }) {
+                            Icon(Icons.Filled.Delete, contentDescription = "Hapus sumber", tint = Muted)
                         }
                     }
                 }
