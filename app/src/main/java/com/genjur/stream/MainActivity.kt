@@ -106,7 +106,10 @@ fun GenjurStreamHome(activity: MainActivity) {
     LaunchedEffect(Unit) {
         val result = withContext(Dispatchers.IO) {
             runCatching {
-                val connection = URL(UPDATE_INFO_URL).openConnection()
+                val connection = URL("$UPDATE_INFO_URL?nocache=${System.currentTimeMillis()}").openConnection()
+                connection.useCaches = false
+                connection.setRequestProperty("Cache-Control", "no-cache, no-store")
+                connection.setRequestProperty("Pragma", "no-cache")
                 connection.connectTimeout = 10000
                 connection.readTimeout = 10000
                 val json = connection.getInputStream().bufferedReader().use { it.readText() }
