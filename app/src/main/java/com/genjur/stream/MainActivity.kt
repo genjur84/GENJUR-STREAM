@@ -688,9 +688,9 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                     val elapsed = previous?.let { ((sampleTime - it.second).coerceAtLeast(1L)) / 1000.0 } ?: 1.0
                     val speed = previous?.let { ((currentBytes - it.first).coerceAtLeast(0L) / elapsed).toDouble() } ?: 0.0
                     states[entry.id] = when {
-                        file.exists() && currentBytes > 0L -> 100 to "Selesai"
-                        downloadStates[entry.id]?.second == "Gagal" -> downloadStates[entry.id]!!
                         adaptiveSessions.containsKey(entry.id) -> downloadStates[entry.id] ?: (0 to "Mengunduh")
+                        downloadStates[entry.id]?.second == "Gagal" -> downloadStates[entry.id]!!
+                        file.exists() && currentBytes > 0L -> 100 to "Selesai"
                         else -> 0 to "Terhenti — mulai ulang unduhan"
                     }
                     metrics[entry.id] = DownloadMetrics(currentBytes, 0L, speed)
