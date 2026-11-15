@@ -1284,6 +1284,8 @@ private fun SourceLinksScreen(activity: MainActivity, onOpenLink: (String) -> Un
     var editingIndex by remember { mutableStateOf<Int?>(null) }
     var message by remember { mutableStateOf<String?>(null) }
     var sourceSearch by remember { mutableStateOf("") }
+    var savedSourcesDropdownExpanded by remember { mutableStateOf(false) }
+    var selectedSavedSourceIndex by remember { mutableStateOf<Int?>(null) }
     var searchResults by remember { mutableStateOf<List<SourceSearchResult>>(emptyList()) }
     var searching by remember { mutableStateOf(false) }
     var searchError by remember { mutableStateOf<String?>(null) }
@@ -1420,19 +1422,52 @@ private fun SourceLinksScreen(activity: MainActivity, onOpenLink: (String) -> Un
         if (links.isEmpty()) {
             Text("Belum ada link tersimpan.", color = Color(0xFFCBD2E0), fontSize = 12.sp)
         } else {
-            links.forEachIndexed { index, item ->
+            val selectedIndex = selectedSavedSourceIndex?.takeIf { it in links.indices }
+            Box {
+                OutlinedButton(
+                    onClick = { savedSourcesDropdownExpanded = true },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
+                    border = BorderStroke(1.dp, Color(0xFF77718A))
+                ) {
+                    Text(
+                        selectedIndex?.let { links[it].name } ?: "Pilih sumber (${links.size})",
+                        modifier = Modifier.weight(1f),
+                        textAlign = TextAlign.Start,
+                        maxLines = 1
+                    )
+                    Icon(Icons.Filled.ArrowDropDown, contentDescription = "Tampilkan daftar sumber")
+                }
+                DropdownMenu(
+                    expanded = savedSourcesDropdownExpanded,
+                    onDismissRequest = { savedSourcesDropdownExpanded = false },
+                    modifier = Modifier.background(Panel)
+                ) {
+                    links.forEachIndexed { index, item ->
+                        DropdownMenuItem(
+                            text = { Text(item.name, color = Color.White, maxLines = 1) },
+                            onClick = {
+                                selectedSavedSourceIndex = index
+                                savedSourcesDropdownExpanded = false
+                            }
+                        )
+                    }
+                }
+            }
+            selectedIndex?.let { index ->
+                val item = links[index]
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(containerColor = Panel),
                     shape = RoundedCornerShape(14.dp)
                 ) {
                     Row(
-                        modifier = Modifier.fillMaxWidth().clickable { onOpenLink(item.url) }.padding(start = 14.dp, end = 6.dp, top = 4.dp, bottom = 4.dp),
+                        modifier = Modifier.fillMaxWidth().padding(start = 14.dp, end = 6.dp, top = 4.dp, bottom = 4.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
                             item.name,
-                            modifier = Modifier.weight(1f).padding(vertical = 10.dp),
+                            modifier = Modifier.weight(1f).clickable { onOpenLink(item.url) }.padding(vertical = 10.dp),
                             color = Color.White,
                             fontWeight = FontWeight.SemiBold,
                             maxLines = 1
@@ -1448,6 +1483,7 @@ private fun SourceLinksScreen(activity: MainActivity, onOpenLink: (String) -> Un
                         IconButton(onClick = {
                             links = links.filterIndexed { i, _ -> i != index }
                             persist(links)
+                            selectedSavedSourceIndex = null
                             if (editingIndex == index) { name = ""; url = ""; editingIndex = null }
                             message = "Link dihapus."
                         }) {
@@ -1455,10 +1491,9 @@ private fun SourceLinksScreen(activity: MainActivity, onOpenLink: (String) -> Un
                         }
                     }
                 }
+                Text("Tekan nama sumber untuk membukanya.", color = Muted, fontSize = 11.sp)
             }
         }
-        Text("Gunakan hanya situs yang kamu berhak akses. GENJUR STREAM tidak melewati login atau DRM.",
-            color = Muted, fontSize = 10.sp)
     }
 }
 
