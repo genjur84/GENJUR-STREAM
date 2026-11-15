@@ -1701,6 +1701,7 @@ private fun SourceBrowser(
     var detectedVideoPage by remember { mutableStateOf("") }
     var detectedVideoOptions by remember { mutableStateOf<List<StreamOption>>(emptyList()) }
     var showDownloadChoices by remember { mutableStateOf(false) }
+    var selectedDownloadOption by remember { mutableStateOf<StreamOption?>(null) }
     var isLoading by remember(initialUrl) { mutableStateOf(initialUrl.isNotBlank()) }
     var webView by remember { mutableStateOf<WebView?>(null) }
     val loadingFallback = remember { Runnable { isLoading = false } }
@@ -1750,7 +1751,10 @@ private fun SourceBrowser(
                             Spacer(Modifier.width(4.dp))
                             Text("Putar")
                         }
-                        TextButton(onClick = { showDownloadChoices = true }) {
+                        TextButton(onClick = {
+            selectedDownloadOption = detectedVideoOptions.firstOrNull()
+            showDownloadChoices = true
+        }) {
                             Icon(Icons.Filled.Download, contentDescription = null, tint = Green)
                             Text("Unduh", color = Green)
                         }
@@ -1764,25 +1768,51 @@ private fun SourceBrowser(
                 title = { Text("Pilih resolusi / ukuran") },
                 text = {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("Pilih kualitas yang tersedia dari situs, lalu tekan Download.", color = Muted, fontSize = 12.sp)
                         detectedVideoOptions.forEach { option ->
+                            val isSelected = selectedDownloadOption?.videoUrl == option.videoUrl
                             OutlinedButton(
                                 modifier = Modifier.fillMaxWidth(),
-                                onClick = {
-                                    showDownloadChoices = false
-                                    onDownloadCandidate(detectedVideoTitle, detectedVideoPage, option.videoUrl)
-                                }
+                                onClick = { selectedDownloadOption = option },
+                                border = BorderStroke(1.dp, if (isSelected) Green else Color(0xFF514B5C)),
+                                colors = ButtonDefaults.outlinedButtonColors(
+                                    containerColor = if (isSelected) Green.copy(alpha = 0.14f) else Color.Transparent
+                                )
                             ) {
-                                Column(Modifier.fillMaxWidth()) {
-                                    Text(option.quality, color = Color.White, fontWeight = FontWeight.SemiBold)
-                                    Text(if (option.sizeBytes > 0) "Ukuran sekitar ${formatVideoSize(option.sizeBytes)}"
-                                        else "Ukuran file belum tersedia dari situs",
-                                        color = Muted, fontSize = 11.sp)
+                                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                                    RadioButton(
+                                        selected = isSelected,
+                                        onClick = { selectedDownloadOption = option },
+                                        colors = RadioButtonDefaults.colors(selectedColor = Green)
+                                    )
+                                    Spacer(Modifier.width(6.dp))
+                                    Column(Modifier.weight(1f)) {
+                                        Text(option.quality, color = Color.White, fontWeight = FontWeight.SemiBold)
+                                        Text(if (option.sizeBytes > 0) "Ukuran sekitar ${formatVideoSize(option.sizeBytes)}"
+                                            else "Ukuran file belum tersedia dari situs",
+                                            color = Muted, fontSize = 11.sp)
+                                    }
                                 }
                             }
                         }
                     }
                 },
-                confirmButton = { TextButton(onClick = { showDownloadChoices = false }) { Text("Batal") } },
+                confirmButton = {
+                    Button(
+                        enabled = selectedDownloadOption != null,
+                        onClick = {
+                            val option = selectedDownloadOption
+                            if (option != null) {
+                                showDownloadChoices = false
+                                onDownloadCandidate(detectedVideoTitle, detectedVideoPage, option.videoUrl)
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Green, contentColor = Color.White)
+                    ) { Text("Download") }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showDownloadChoices = false }) { Text("Batal") }
+                },
                 containerColor = Panel,
                 titleContentColor = Color.White,
                 textContentColor = Color.White
