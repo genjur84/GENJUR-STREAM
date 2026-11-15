@@ -5,6 +5,10 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.os.Environment
+import android.webkit.WebChromeClient
+import android.webkit.WebResourceRequest
+import android.webkit.WebView
+import android.webkit.WebViewClient
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
@@ -228,6 +232,7 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
     var search by remember { mutableStateOf("") }
     var category by remember { mutableStateOf("Semua") }
     var selectedTab by remember { mutableStateOf("Beranda") }
+    var browserVideoUrl by remember { mutableStateOf<String?>(null) }
     var updateVersion by remember { mutableStateOf<String?>(null) }
     var updateUrl by remember { mutableStateOf<String?>(null) }
     var checking by remember { mutableStateOf(true) }
@@ -692,6 +697,31 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                                         unfocusedTextColor = Color.White, focusedBorderColor = Green,
                                         unfocusedBorderColor = Color(0xFF393344), cursorColor = Green))
                             }
+                            "Browser Sumber" -> {
+                                SourceBrowser(onVideoDetected = { detected -> browserVideoUrl = detected })
+                                browserVideoUrl?.let { videoUrl ->
+                                    Spacer(Modifier.height(12.dp))
+                                    Card(colors = CardDefaults.cardColors(containerColor = Panel)) {
+                                        Column(Modifier.fillMaxWidth().padding(12.dp)) {
+                                            Text("Tautan video terdeteksi", color = Color.White, fontWeight = FontWeight.Bold)
+                                            Text(videoUrl, color = Muted, fontSize = 10.sp, maxLines = 2)
+                                            Button(onClick = {
+                                                playingMovie = FeedMovie(
+                                                    title = "Video dari Browser Sumber",
+                                                    description = "Video dibuka dari situs yang dikunjungi pengguna.",
+                                                    category = "Sumber Web",
+                                                    videoUrl = videoUrl,
+                                                    licenseId = "User-provided source",
+                                                    termsUrl = "https://www.google.com/",
+                                                    attribution = "Sumber situs yang dibuka pengguna"
+                                                )
+                                            }, colors = ButtonDefaults.buttonColors(containerColor = Green)) {
+                                                Text("Putar di GENJUR Player", color = Color.White)
+                                            }
+                                        }
+                                    }
+                                }
+                            }
                             "Kategori" -> {
                                 categories.forEach { item ->
                                     FilterChip(selected = category == item, onClick = { category = item },
@@ -824,7 +854,7 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     // Pencarian tetap berada di ikon kaca pembesar bagian atas.
-                    listOf("Beranda" to "⌂", "Kategori" to "▦", "Unduhan" to "⇩", "Favorit" to "♡", "Riwayat" to "◷", "Pengaturan" to "⚙").forEach { (tab, glyph) ->
+                    listOf("Beranda" to "⌂", "Browser Sumber" to "◎", "Kategori" to "▦", "Unduhan" to "⇩", "Favorit" to "♡", "Riwayat" to "◷", "Pengaturan" to "⚙").forEach { (tab, glyph) ->
                         Column(
                             modifier = Modifier.weight(1f).clickable {
                                 if (tab == "Pengaturan") onOpenSources() else selectedTab = tab
@@ -996,6 +1026,73 @@ private fun MovieDetailDialog(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun SourceBrowser(onVideoDetected: (String) -> Unit) {
+    var address by remember { mutableStateOf("") }
+    var currentUrl by remember { mutableStateOf("") }
+    var pageTitle by remember { mutableStateOf("Masukkan alamat situs sumber video.") }
+    var webView by remember { mutableStateOf<WebView?>(null) }
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text("Buka situs sumber video di dalam GENJUR STREAM. Gunakan hanya situs dan video yang boleh kamu akses.", color = Muted, fontSize = 12.sp)
+        OutlinedTextField(value = address, onValueChange = { address = it },
+            modifier = Modifier.fillMaxWidth(), singleLine = true,
+            placeholder = { Text("https://contoh.com", color = Muted) },
+            colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White,
+                unfocusedTextColor = Color.White, focusedBorderColor = Green,
+                unfocusedBorderColor = Color(0xFF393344), cursorColor = Green))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(onClick = {
+                val entered = address.trim()
+                val normalized = if (entered.startsWith("https://", true) || entered.startsWith("http://", true)) entered else "https://" + entered
+                val uri = Uri.parse(normalized)
+                if ((uri.scheme == "https" || uri.scheme == "http") && !uri.host.isNullOrBlank()) {
+                    currentUrl = normalized
+                    webView?.loadUrl(normalized)
+                } else pageTitle = "Alamat situs tidak valid."
+            }, colors = ButtonDefaults.buttonColors(containerColor = Green)) { Text("Buka situs") }
+            TextButton(onClick = { webView?.goBack() }, enabled = webView?.canGoBack() == true) { Text("Kembali", color = Green) }
+            TextButton(onClick = { webView?.reload() }, enabled = currentUrl.isNotBlank()) { Text("Muat ulang", color = Green) }
+        }
+        Text(pageTitle, color = Muted, fontSize = 11.sp, maxLines = 2)
+        AndroidView(
+            factory = { context ->
+                WebView(context).apply {
+                    settings.javaScriptEnabled = true
+                    settings.domStorageEnabled = true
+                    settings.loadsImagesAutomatically = true
+                    settings.mediaPlaybackRequiresUserGesture = true
+                    webChromeClient = WebChromeClient()
+                    webViewClient = object : WebViewClient() {
+                        override fun onPageFinished(view: WebView, url: String) {
+                            pageTitle = view.title?.takeIf { it.isNotBlank() } ?: url
+                            address = url
+                        }
+                        override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
+                            val scheme = request.url.scheme
+                            return scheme != "https" && scheme != "http"
+                        }
+                        override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): android.webkit.WebResourceResponse? {
+                            val candidate = request.url.toString()
+                            val path = request.url.path.orEmpty().lowercase()
+                            val cleanPath = path.substringBefore("?")
+                            val looksLikeVideo = listOf(".mp4", ".m3u8", ".mpd", ".webm", ".m4v").any { cleanPath.endsWith(it) }
+                            if (looksLikeVideo && candidate.startsWith("https://")) {
+                                view.post { onVideoDetected(candidate) }
+                            }
+                            return super.shouldInterceptRequest(view, request)
+                        }
+                    }
+                    webView = this
+                    if (currentUrl.isNotBlank()) loadUrl(currentUrl)
+                }
+            },
+            update = { view -> webView = view },
+            modifier = Modifier.fillMaxWidth().height(420.dp)
+        )
+        Text("Situs dengan DRM, login khusus, atau pemutar tanpa tautan video langsung mungkin tidak dapat dialihkan ke GENJUR Player.", color = Muted, fontSize = 10.sp)
     }
 }
 
