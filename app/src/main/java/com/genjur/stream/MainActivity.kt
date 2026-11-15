@@ -2138,7 +2138,7 @@ private fun SourceBrowser(
                     setDownloadListener(DownloadListener { url, _, _, _, _ ->
                         if (url.isNotBlank()) {
                             onDownloadCandidate(
-                                title.ifBlank { "Video dari situs" },
+                                this.title?.takeIf { it.isNotBlank() } ?: "Video dari situs",
                                 this.url?.takeIf { it.startsWith("http") } ?: currentUrl,
                                 url
                             )
