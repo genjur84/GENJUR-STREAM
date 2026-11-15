@@ -714,13 +714,6 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                                 }
                             }
                             "Browser Sumber" -> {
-                                Row(
-                                    Modifier.fillMaxWidth().background(Color(0xFF15141B)).padding(horizontal = 8.dp, vertical = 2.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    TextButton(onClick = { selectedTab = "Beranda" }) { Text("✕ Tutup", color = Green) }
-                                    Text(selectedSourceName, color = Color.White, fontWeight = FontWeight.Bold, maxLines = 1)
-                                }
                                 SourceBrowser(initialUrl = browserInitialUrl, fullScreen = true, onPlaybackStarted = { pageTitle, pageUrl ->
                                     val safeTitle = pageTitle.trim().takeIf { it.isNotBlank() }
                                         ?: Uri.parse(pageUrl).host.orEmpty().ifBlank { "Video dari situs" }
