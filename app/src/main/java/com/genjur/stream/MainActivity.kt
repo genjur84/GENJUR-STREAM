@@ -201,22 +201,23 @@ private fun readSavedMovies(activity: MainActivity, key: String): List<FeedMovie
 }.getOrDefault(emptyList())
 
 private fun savedFeedUrls(activity: MainActivity): List<String> = runCatching {
+    // Hanya baca feed yang ditambahkan sebagai sumber katalog lama.
+    // Ekstensi dari repositori sudah tidak digunakan oleh GENJUR STREAM.
     val prefs = activity.getSharedPreferences("genjur_stream_sources", 0)
     val legacy = JSONArray(prefs.getString("items", "[]"))
-    val installed = JSONArray(prefs.getString("installed_extensions", "[]"))
-    val urls = mutableListOf<String>()
-    for (i in 0 until legacy.length()) {
-        legacy.optJSONObject(i)?.optString("url")?.takeIf { it.isNotBlank() }?.let(urls::add)
-    }
-    for (i in 0 until installed.length()) {
-        installed.optJSONObject(i)?.optString("feedUrl")?.takeIf { it.isNotBlank() }?.let(urls::add)
-    }
-    urls.distinct()
+    (0 until legacy.length()).mapNotNull { index ->
+        legacy.optJSONObject(index)?.optString("url")?.takeIf { it.isNotBlank() }
+    }.distinct()
 }.getOrDefault(emptyList())
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Bersihkan data repositori/ekstensi lama agar katalog repositori tidak muncul lagi.
+        getSharedPreferences("genjur_stream_sources", 0).edit()
+            .remove("repositories")
+            .remove("installed_extensions")
+            .apply()
         scheduleBackgroundCatalogChecks()
         setContent { MaterialTheme { GenjurStreamApp(this) } }
     }
