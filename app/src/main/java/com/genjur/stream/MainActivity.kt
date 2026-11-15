@@ -110,13 +110,13 @@ private val Muted = Color(0xFFACB7C5)
 
 private class PlaybackStartedBridge(
     private val onPlayback: (String, String) -> Unit,
-    private val onVideoDetected: (String, String, String) -> Unit
+    private val onVideoDetected: (String, String, String, String, Long) -> Unit
 ) {
     @JavascriptInterface
     fun onVideoPlay(title: String, pageUrl: String) { onPlayback(title, pageUrl) }
     @JavascriptInterface
-    fun onVideoAvailable(title: String, pageUrl: String, videoUrl: String) {
-        onVideoDetected(title, pageUrl, videoUrl)
+    fun onVideoAvailable(title: String, pageUrl: String, videoUrl: String, quality: String, sizeBytes: Long) {
+        onVideoDetected(title, pageUrl, videoUrl, quality, sizeBytes)
     }
 }
 
@@ -1770,7 +1770,7 @@ private fun SourceBrowser(
                     webChromeClient = WebChromeClient()
                     addJavascriptInterface(PlaybackStartedBridge(
                         onPlayback = { title, pageUrl -> post { onPlaybackStarted(title, pageUrl) } },
-                        onVideoAvailable = { title, pageUrl, videoUrl ->
+                        onVideoAvailable = { title, pageUrl, videoUrl, quality, sizeBytes ->
                             post {
                                 val uri = Uri.parse(videoUrl)
                                 val path = uri.path.orEmpty().lowercase()
@@ -1778,15 +1778,17 @@ private fun SourceBrowser(
                                 if (directFile && uri.scheme in listOf("http", "https") && !uri.host.isNullOrBlank()) {
                                     detectedVideoTitle = title
                                     detectedVideoPage = pageUrl
-                                    val label = when {
-                                        path.contains("2160") || path.contains("4k") -> "4K"
-                                        path.contains("1080") -> "Full HD 1080p"
-                                        path.contains("720") -> "HD 720p"
-                                        path.contains("480") -> "SD 480p"
-                                        path.contains("360") -> "SD 360p"
-                                        else -> "Otomatis / kualitas terdeteksi"
+                                    val label = quality.ifBlank {
+                                        when {
+                                            path.contains("2160") || path.contains("4k") -> "4K"
+                                            path.contains("1080") -> "Full HD 1080p"
+                                            path.contains("720") -> "HD 720p"
+                                            path.contains("480") -> "SD 480p"
+                                            path.contains("360") -> "SD 360p"
+                                            else -> "Kualitas terdeteksi"
+                                        }
                                     }
-                                    val item = StreamOption(label, videoUrl)
+                                    val item = StreamOption(label, videoUrl, sizeBytes)
                                     detectedVideoOptions = (detectedVideoOptions.filterNot { it.videoUrl == videoUrl } + item)
                                 }
                             }
@@ -1824,7 +1826,9 @@ private fun SourceBrowser(
                                     function reportMedia(title, url, quality) {
                                         try {
                                             if (!url || !/\.(mp4|webm|mov|mkv)(?:$|[?#])/i.test(url)) return;
-                                            GenjurPlayback.onVideoAvailable(title || document.title || 'Video dari situs', location.href, url);
+                                            var entry = performance.getEntriesByName(url).slice(-1)[0];
+                                            var size = entry ? (entry.encodedBodySize || entry.transferSize || 0) : 0;
+                                            GenjurPlayback.onVideoAvailable(title || document.title || 'Video dari situs', location.href, url, quality || 'Kualitas tersedia', size);
                                         } catch(e) {}
                                     }
                                     function reportLink(a) {
@@ -1839,12 +1843,12 @@ private fun SourceBrowser(
                                             sources.forEach(function(source) {
                                                 var label = source.getAttribute('label') || source.getAttribute('data-quality') ||
                                                     source.getAttribute('size') || (v.videoHeight ? (v.videoHeight + 'p') : 'Kualitas tersedia');
-                                                reportMedia(title + ' - ' + label, source.src, label);
+                                                reportMedia(title, source.src, label);
                                             });
                                             var media = v.currentSrc || v.src || '';
                                             if (media) {
                                                 var quality = v.videoHeight ? (v.videoHeight + 'p') : 'Kualitas otomatis';
-                                                reportMedia(title + ' - ' + quality, media, quality);
+                                                reportMedia(title, media, quality);
                                             }
                                         }
                                         v.addEventListener('loadedmetadata', scanSources);
