@@ -886,6 +886,14 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                         onDismissRequest = { sourceMenuExpanded = false },
                         modifier = Modifier.heightIn(max = 320.dp).background(Panel)
                     ) {
+                        DropdownMenuItem(
+                            text = { Text("None", color = Color.White, maxLines = 1) },
+                            onClick = {
+                                selectedTab = "Beranda"
+                                selectedSourceName = "Sumber Link"
+                                sourceMenuExpanded = false
+                            }
+                        )
                         savedSourceMenu.forEach { source ->
                             DropdownMenuItem(
                                 text = { Text(source.name, color = Color.White, maxLines = 1) },
