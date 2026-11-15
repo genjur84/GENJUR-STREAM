@@ -1,8 +1,10 @@
 package com.genjur.stream
 
+import android.app.DownloadManager
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.os.Environment
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
@@ -30,6 +32,7 @@ import androidx.core.content.FileProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.delay
 import org.json.JSONObject
 import org.json.JSONArray
 import java.io.File
@@ -53,7 +56,9 @@ private data class FeedMovie(
     val posterUrl: String = "",
     val releaseYear: String = "",
     val genres: List<String> = emptyList(),
-    val duration: String = ""
+    val duration: String = "",
+    val downloadUrl: String = "",
+    val downloadAllowed: Boolean = false
 )
 private fun movieKey(movie: FeedMovie): String =
     "${movie.title.trim().lowercase()}|${movie.videoUrl.trim()}|${movie.licenseId}"
@@ -63,6 +68,7 @@ private fun encodeMovie(movie: FeedMovie): JSONObject = JSONObject().apply {
     put("videoUrl", movie.videoUrl); put("licenseId", movie.licenseId); put("termsUrl", movie.termsUrl)
     put("attribution", movie.attribution); put("posterUrl", movie.posterUrl)
     put("releaseYear", movie.releaseYear); put("genres", JSONArray(movie.genres)); put("duration", movie.duration)
+    put("downloadUrl", movie.downloadUrl); put("downloadAllowed", movie.downloadAllowed)
 }
 
 private fun decodeMovie(json: JSONObject): FeedMovie {
@@ -75,9 +81,22 @@ private fun decodeMovie(json: JSONObject): FeedMovie {
         releaseYear = json.optString("releaseYear"),
         genres = if (genres == null) emptyList() else
             (0 until genres.length()).map { genres.optString(it) }.filter { it.isNotBlank() },
-        duration = json.optString("duration")
+        duration = json.optString("duration"),
+        downloadUrl = json.optString("downloadUrl"),
+        downloadAllowed = json.optBoolean("downloadAllowed", false)
     )
 }
+
+private data class DownloadEntry(val id: Long, val movie: FeedMovie)
+
+private fun readDownloads(activity: MainActivity): List<DownloadEntry> = runCatching {
+    val array = JSONArray(activity.getSharedPreferences("genjur_stream_library", 0).getString("downloads", "[]"))
+    (0 until array.length()).mapNotNull { i ->
+        val item = array.optJSONObject(i) ?: return@mapNotNull null
+        val movie = item.optJSONObject("movie") ?: return@mapNotNull null
+        DownloadEntry(item.optLong("id"), decodeMovie(movie))
+    }
+}.getOrDefault(emptyList())
 
 private fun readSavedMovies(activity: MainActivity, key: String): List<FeedMovie> = runCatching {
     val array = JSONArray(activity.getSharedPreferences("genjur_stream_library", 0).getString(key, "[]"))
@@ -122,7 +141,31 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
     var playingMovie by remember { mutableStateOf<FeedMovie?>(null) }
     var favoriteMovies by remember { mutableStateOf(readSavedMovies(activity, "favorites")) }
     var watchHistory by remember { mutableStateOf(readSavedMovies(activity, "history")) }
+    var downloads by remember { mutableStateOf(readDownloads(activity)) }
+    var downloadStates by remember { mutableStateOf<Map<Long, Pair<Int, String>>>(emptyMap()) }
     val libraryPrefs = remember { activity.getSharedPreferences("genjur_stream_library", 0) }
+    val downloadManager = remember { activity.getSystemService(DownloadManager::class.java) }
+    fun persistDownloads(items: List<DownloadEntry>) {
+        libraryPrefs.edit().putString("downloads", JSONArray().apply {
+            items.forEach { put(JSONObject().put("id", it.id).put("movie", encodeMovie(it.movie))) }
+        }.toString()).apply()
+    }
+    fun startDownload(movie: FeedMovie) {
+        if (!movie.downloadAllowed || movie.downloadUrl.isBlank()) return
+        if (downloads.any { movieKey(it.movie) == movieKey(movie) }) return
+        val uri = Uri.parse(movie.downloadUrl)
+        val request = DownloadManager.Request(uri)
+            .setTitle(movie.title)
+            .setDescription("Mengunduh ke GENJUR STREAM")
+            .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+            .setAllowedOverMetered(true)
+            .setAllowedOverRoaming(false)
+            .setDestinationInExternalFilesDir(activity, Environment.DIRECTORY_MOVIES,
+                "genjur_${System.currentTimeMillis()}.mp4")
+        val id = downloadManager.enqueue(request)
+        downloads = listOf(DownloadEntry(id, movie)) + downloads
+        persistDownloads(downloads)
+    }
     fun persistMovies(key: String, movies: List<FeedMovie>) {
         libraryPrefs.edit().putString(key, JSONArray().apply {
             movies.forEach { put(encodeMovie(it)) }
@@ -139,6 +182,34 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
         persistMovies("history", watchHistory)
     }
     val scope = rememberCoroutineScope()
+
+    LaunchedEffect(downloads, selectedTab) {
+        while (true) {
+            val states = mutableMapOf<Long, Pair<Int, String>>()
+            downloads.forEach { entry ->
+                val query = DownloadManager.Query().setFilterById(entry.id)
+                val cursor = downloadManager.query(query)
+                cursor?.use {
+                    if (it.moveToFirst()) {
+                        val status = it.getInt(it.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS))
+                        val soFar = it.getLong(it.getColumnIndexOrThrow(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR))
+                        val total = it.getLong(it.getColumnIndexOrThrow(DownloadManager.COLUMN_TOTAL_SIZE_BYTES))
+                        val percent = if (total > 0) ((soFar * 100) / total).toInt() else 0
+                        val label = when (status) {
+                            DownloadManager.STATUS_SUCCESSFUL -> "Selesai"
+                            DownloadManager.STATUS_FAILED -> "Gagal"
+                            DownloadManager.STATUS_PAUSED -> "Dijeda"
+                            DownloadManager.STATUS_PENDING -> "Menunggu"
+                            else -> "Mengunduh"
+                        }
+                        states[entry.id] = percent to label
+                    } else states[entry.id] = 0 to "Tidak ditemukan"
+                }
+            }
+            downloadStates = states
+            delay(1000)
+        }
+    }
 
     fun refreshCatalog() {
         scope.launch {
@@ -210,8 +281,18 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                                         posterUrl = posterUrl,
                                         releaseYear = item.optString("releaseYear").trim(),
                                         genres = genres,
-                                        duration = item.optString("duration").trim()
+                                        duration = item.optString("duration").trim(),
+                                        downloadUrl = item.optString("downloadUrl").trim(),
+                                        downloadAllowed = item.optBoolean("downloadAllowed", false)
                                     ))
+                                    val downloadLink = item.optString("downloadUrl").trim()
+                                    if (downloadLink.isNotBlank()) {
+                                        val downloadUri = Uri.parse(downloadLink)
+                                        require(downloadUri.scheme == "https" && !downloadUri.host.isNullOrBlank() &&
+                                            downloadUri.path.orEmpty().lowercase().endsWith(".mp4")) {
+                                            "URL unduhan harus berupa file MP4 HTTPS langsung"
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -459,7 +540,56 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                                         label = { Text(item) })
                                 }
                             }
-                            "Unduhan" -> Text("Daftar unduhan akan tampil di sini setelah fitur unduhan diaktifkan.", color = Muted)
+                            "Unduhan" -> {
+                                if (downloads.isEmpty()) {
+                                    Text("Belum ada video yang diunduh.", color = Muted)
+                                } else {
+                                    downloads.forEach { entry ->
+                                        val state = downloadStates[entry.id] ?: (0 to "Menyiapkan")
+                                        val query = DownloadManager.Query().setFilterById(entry.id)
+                                        var completedUri: Uri? = null
+                                        downloadManager.query(query)?.use { cursor ->
+                                            if (cursor.moveToFirst() &&
+                                                cursor.getInt(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS)) == DownloadManager.STATUS_SUCCESSFUL) {
+                                                completedUri = downloadManager.getUriForDownloadedFile(entry.id)
+                                            }
+                                        }
+                                        Card(
+                                            Modifier.fillMaxWidth().padding(bottom = 10.dp),
+                                            colors = CardDefaults.cardColors(containerColor = Panel),
+                                            shape = RoundedCornerShape(14.dp)
+                                        ) {
+                                            Column(Modifier.fillMaxWidth().padding(12.dp)) {
+                                                Text(entry.movie.title, color = Color.White, fontWeight = FontWeight.Bold)
+                                                Text(state.second, color = Muted, fontSize = 11.sp)
+                                                if (state.second == "Mengunduh" || state.second == "Menunggu") {
+                                                    Spacer(Modifier.height(7.dp))
+                                                    LinearProgressIndicator(
+                                                        progress = { state.first / 100f },
+                                                        modifier = Modifier.fillMaxWidth(),
+                                                        color = Green
+                                                    )
+                                                    Text("${state.first}%", color = Muted, fontSize = 10.sp)
+                                                }
+                                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                                    if (completedUri != null) {
+                                                        TextButton(onClick = {
+                                                            val offlineMovie = entry.movie.copy(videoUrl = completedUri.toString())
+                                                            recordWatch(offlineMovie)
+                                                            playingMovie = offlineMovie
+                                                        }) { Text("Putar offline", color = Green) }
+                                                    }
+                                                    TextButton(onClick = {
+                                                        downloadManager.remove(entry.id)
+                                                        downloads = downloads.filterNot { it.id == entry.id }
+                                                        persistDownloads(downloads)
+                                                    }) { Text("Hapus", color = Muted) }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
                             "Favorit", "Riwayat" -> {
                                 val savedList = if (selectedTab == "Favorit") favoriteMovies else watchHistory
                                 if (savedList.isEmpty()) {
@@ -555,6 +685,8 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
             movie = movie,
             isFavorite = favoriteMovies.any { movieKey(it) == movieKey(movie) },
             onToggleFavorite = { toggleFavorite(movie) },
+            isDownloaded = downloads.any { movieKey(it.movie) == movieKey(movie) },
+            onDownload = { startDownload(movie) },
             onClose = { selectedMovie = null },
             onPlay = {
                 if (movie.videoUrl.isNotBlank()) {
@@ -611,6 +743,8 @@ private fun MovieDetailDialog(
     movie: FeedMovie,
     isFavorite: Boolean,
     onToggleFavorite: () -> Unit,
+    isDownloaded: Boolean,
+    onDownload: () -> Unit,
     onClose: () -> Unit,
     onPlay: () -> Unit
 ) {
@@ -660,7 +794,18 @@ private fun MovieDetailDialog(
                     Text("INFORMASI SUMBER", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                     Spacer(Modifier.height(6.dp))
                     Text(movie.attribution, color = Muted, fontSize = 12.sp)
-                    Spacer(Modifier.height(20.dp))
+                    if (movie.downloadAllowed && movie.downloadUrl.isNotBlank()) {
+                        OutlinedButton(
+                            onClick = onDownload,
+                            enabled = !isDownloaded,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(if (isDownloaded) "✓  Ada di Unduhan" else "⇩  Unduh untuk Offline")
+                        }
+                    } else {
+                        Text("Unduhan tidak diizinkan oleh sumber ini.", color = Muted, fontSize = 11.sp)
+                    }
+                    Spacer(Modifier.height(12.dp))
                     Button(onClick = onPlay, enabled = movie.videoUrl.isNotBlank(), modifier = Modifier.fillMaxWidth(),
                         colors = ButtonDefaults.buttonColors(containerColor = Green, contentColor = Color.White,
                             disabledContainerColor = Color(0xFF393344), disabledContentColor = Muted)) {
