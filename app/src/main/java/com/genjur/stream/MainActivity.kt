@@ -1,10 +1,15 @@
 package com.genjur.stream
 
 import android.app.DownloadManager
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
 import android.content.Intent
 import android.content.pm.ActivityInfo
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Bundle
+import android.os.Build
 import android.os.Environment
 import android.webkit.WebChromeClient
 import android.webkit.JavascriptInterface
@@ -55,7 +60,10 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
+import androidx.media3.ui.PlayerNotificationManager
+import androidx.media3.common.Player
 import androidx.core.content.FileProvider
+import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -77,6 +85,8 @@ import java.net.URL
 import org.jsoup.Jsoup
 
 private const val UPDATE_INFO_URL = "https://raw.githubusercontent.com/genjur84/GENJUR-STREAM/main/latest.json"
+private const val PLAYBACK_NOTIFICATION_CHANNEL = "genjur_playback"
+private const val PLAYBACK_NOTIFICATION_ID = 8401
 
 /** Domain iklan dan pelacak umum untuk pemblokiran dasar di WebView. */
 private val GENJUR_AD_HOSTS = setOf(
@@ -289,6 +299,17 @@ private fun loadGenericHtmlCatalog(sourceUrl: String, html: String): List<FeedMo
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                PLAYBACK_NOTIFICATION_CHANNEL,
+                "Pemutaran GENJUR STREAM",
+                NotificationManager.IMPORTANCE_LOW
+            ).apply {
+                description = "Kontrol film yang sedang diputar"
+                setShowBadge(false)
+            }
+            getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
+        }
         // Bersihkan data repositori/ekstensi lama agar katalog repositori tidak muncul lagi.
         getSharedPreferences("genjur_stream_sources", 0).edit()
             .remove("repositories")
@@ -1747,7 +1768,13 @@ private fun InAppVideoPlayer(activity: MainActivity, movie: FeedMovie, onClose: 
     var isFullscreen by remember { mutableStateOf(false) }
     val player = remember(movie.videoUrl) {
         ExoPlayer.Builder(activity).build().apply {
-            val mediaItem = MediaItem.Builder().setUri(movie.videoUrl).apply {
+            val mediaItem = MediaItem.Builder().setUri(movie.videoUrl)
+                .setMediaMetadata(
+                    androidx.media3.common.MediaMetadata.Builder()
+                        .setTitle(movie.title)
+                        .setArtist("GENJUR STREAM")
+                        .build()
+                ).apply {
                 if (movie.subtitleUrl.isNotBlank()) {
                     val subtitleUri = Uri.parse(movie.subtitleUrl)
                     val mimeType = if (subtitleUri.path.orEmpty().lowercase().endsWith(".vtt"))
@@ -1767,7 +1794,38 @@ private fun InAppVideoPlayer(activity: MainActivity, movie: FeedMovie, onClose: 
         }
     }
     DisposableEffect(player) {
+        if (Build.VERSION.SDK_INT >= 33 &&
+            ContextCompat.checkSelfPermission(activity, android.Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        ) {
+            activity.requestPermissions(
+                arrayOf(android.Manifest.permission.POST_NOTIFICATIONS),
+                8402
+            )
+        }
+        val playbackNotification = PlayerNotificationManager.Builder(
+            activity,
+            PLAYBACK_NOTIFICATION_ID,
+            PLAYBACK_NOTIFICATION_CHANNEL
+        )
+            .setSmallIconResourceId(android.R.drawable.ic_media_play)
+            .setMediaDescriptionAdapter(object : PlayerNotificationManager.MediaDescriptionAdapter {
+                override fun getCurrentContentTitle(player: Player): CharSequence = movie.title
+                override fun createCurrentContentIntent(player: Player): PendingIntent? = null
+                override fun getCurrentContentText(player: Player): CharSequence = "Sedang diputar di GENJUR STREAM"
+                override fun getCurrentLargeIcon(
+                    player: Player,
+                    callback: PlayerNotificationManager.BitmapCallback
+                ): android.graphics.Bitmap? = null
+            })
+            .build().apply {
+                setUseNextAction(false)
+                setUsePreviousAction(false)
+                setUsePlayPauseActions(true)
+                setUseStopAction(true)
+                setPlayer(player)
+            }
         onDispose {
+            playbackNotification.setPlayer(null)
             player.release()
             activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
             WindowInsetsControllerCompat(activity.window, activity.window.decorView)
