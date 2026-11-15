@@ -1452,54 +1452,48 @@ private fun SourceLinksScreen(activity: MainActivity, onOpenLink: (String) -> Un
                 ) {
                     links.forEachIndexed { index, item ->
                         DropdownMenuItem(
-                            text = { Text(item.name, color = Color.White, maxLines = 1) },
+                            text = {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(
+                                        item.name,
+                                        modifier = Modifier.weight(1f).clickable {
+                                            selectedSavedSourceIndex = index
+                                            savedSourcesDropdownExpanded = false
+                                            onOpenLink(item.url)
+                                        },
+                                        color = Color.White,
+                                        maxLines = 1
+                                    )
+                                    IconButton(onClick = {
+                                        name = item.name
+                                        url = item.url
+                                        editingIndex = index
+                                        message = null
+                                        savedSourcesDropdownExpanded = false
+                                    }) {
+                                        Icon(Icons.Filled.Edit, contentDescription = "Edit sumber", tint = Green)
+                                    }
+                                    IconButton(onClick = {
+                                        links = links.filterIndexed { i, _ -> i != index }
+                                        persist(links)
+                                        selectedSavedSourceIndex = null
+                                        if (editingIndex == index) { name = ""; url = ""; editingIndex = null }
+                                        message = "Link dihapus."
+                                    }) {
+                                        Icon(Icons.Filled.Delete, contentDescription = "Hapus sumber", tint = Muted)
+                                    }
+                                }
+                            },
                             onClick = {
                                 selectedSavedSourceIndex = index
                                 savedSourcesDropdownExpanded = false
+                                onOpenLink(item.url)
                             }
                         )
                     }
                 }
             }
-            selectedIndex?.let { index ->
-                val item = links[index]
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = Panel),
-                    shape = RoundedCornerShape(14.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(start = 14.dp, end = 6.dp, top = 4.dp, bottom = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            item.name,
-                            modifier = Modifier.weight(1f).clickable { onOpenLink(item.url) }.padding(vertical = 10.dp),
-                            color = Color.White,
-                            fontWeight = FontWeight.SemiBold,
-                            maxLines = 1
-                        )
-                        IconButton(onClick = {
-                            name = item.name
-                            url = item.url
-                            editingIndex = index
-                            message = null
-                        }) {
-                            Icon(Icons.Filled.Edit, contentDescription = "Edit sumber", tint = Green)
-                        }
-                        IconButton(onClick = {
-                            links = links.filterIndexed { i, _ -> i != index }
-                            persist(links)
-                            selectedSavedSourceIndex = null
-                            if (editingIndex == index) { name = ""; url = ""; editingIndex = null }
-                            message = "Link dihapus."
-                        }) {
-                            Icon(Icons.Filled.Delete, contentDescription = "Hapus sumber", tint = Muted)
-                        }
-                    }
-                }
-                Text("Tekan nama sumber untuk membukanya.", color = Muted, fontSize = 11.sp)
-            }
+            Text("Pilih nama untuk membuka situs, atau gunakan ikon pensil dan sampah untuk mengelola sumber.", color = Muted, fontSize = 11.sp)
         }
     }
 }
