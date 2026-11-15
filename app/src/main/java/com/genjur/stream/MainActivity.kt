@@ -337,17 +337,11 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                                         Card(Modifier.weight(1f).padding(bottom = 8.dp), shape = RoundedCornerShape(16.dp),
                                             colors = CardDefaults.cardColors(containerColor = Panel)) {
                                             Column(Modifier.padding(12.dp)) {
-                                                if (movie.posterUrl.isNotBlank()) {
-                                                    AsyncImage(model = movie.posterUrl, contentDescription = "Poster ${movie.title}",
-                                                        contentScale = ContentScale.Crop,
-                                                        modifier = Modifier.fillMaxWidth().height(if (tvLayout) 210.dp else 170.dp))
-                                                } else {
-                                                    Box(Modifier.fillMaxWidth().height(if (tvLayout) 210.dp else 170.dp)
-                                                        .background(Color(0xFF302541), RoundedCornerShape(10.dp)),
-                                                        contentAlignment = Alignment.Center) {
-                                                        Text("GENJUR", color = Color(0xFFC4A7FF), fontSize = 24.sp, fontWeight = FontWeight.Black)
-                                                    }
-                                                }
+                                                MoviePoster(
+                                                    url = movie.posterUrl,
+                                                    title = movie.title,
+                                                    height = if (tvLayout) 210.dp else 170.dp
+                                                )
                                                 Spacer(Modifier.height(8.dp))
                                                 Text(movie.title, color = Color.White, fontWeight = FontWeight.Bold, maxLines = 2)
                                                 Text(movie.category, color = Green, fontSize = 11.sp)
@@ -462,20 +456,40 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
 
 
 @Composable
+private fun MoviePoster(url: String, title: String, height: androidx.compose.ui.unit.Dp) {
+    var failed by remember(url) { mutableStateOf(false) }
+    if (url.isBlank() || failed) {
+        Box(
+            Modifier.fillMaxWidth().height(height)
+                .background(Color(0xFF302541), RoundedCornerShape(10.dp)),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text("GENJUR STREAM", color = Color(0xFFC4A7FF), fontSize = 19.sp, fontWeight = FontWeight.Black)
+                if (url.isNotBlank() && failed) {
+                    Spacer(Modifier.height(5.dp))
+                    Text("Poster gagal dimuat", color = Muted, fontSize = 10.sp)
+                }
+            }
+        }
+    } else {
+        AsyncImage(
+            model = url,
+            contentDescription = "Poster $title",
+            contentScale = ContentScale.Crop,
+            modifier = Modifier.fillMaxWidth().height(height),
+            onError = { failed = true }
+        )
+    }
+}
+
+@Composable
 private fun MovieDetailDialog(movie: FeedMovie, onClose: () -> Unit, onPlay: () -> Unit) {
     Dialog(onDismissRequest = onClose, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Surface(Modifier.fillMaxWidth().fillMaxHeight(0.9f).padding(12.dp),
             shape = RoundedCornerShape(22.dp), color = Panel) {
             Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-                if (movie.posterUrl.isNotBlank()) {
-                    AsyncImage(model = movie.posterUrl, contentDescription = "Poster ${movie.title}",
-                        contentScale = ContentScale.Crop, modifier = Modifier.fillMaxWidth().height(360.dp))
-                } else {
-                    Box(Modifier.fillMaxWidth().height(260.dp).background(Color(0xFF302541)),
-                        contentAlignment = Alignment.Center) {
-                        Text("GENJUR STREAM", color = Color(0xFFC4A7FF), fontSize = 27.sp, fontWeight = FontWeight.Black)
-                    }
-                }
+                MoviePoster(url = movie.posterUrl, title = movie.title, height = 360.dp)
                 Column(Modifier.padding(20.dp)) {
                     Text(movie.title, color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.ExtraBold)
                     Spacer(Modifier.height(7.dp))
