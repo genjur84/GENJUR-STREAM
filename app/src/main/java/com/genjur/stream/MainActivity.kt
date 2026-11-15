@@ -231,7 +231,7 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}, onOpenWebsite: (String) -> Unit = {}) {
+fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
     var search by remember { mutableStateOf("") }
     var category by remember { mutableStateOf("Semua") }
     var selectedTab by remember { mutableStateOf("Beranda") }
@@ -642,7 +642,7 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}, onO
                             Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                                 Column(Modifier.weight(1f)) {
                                     Text("FILM GRATIS & LEGAL", color = Color(0xFFC4A7FF), fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                                    Text("Tanpa biaya langganan • Domain publik & lisensi terbuka", color = Muted, fontSize = 11.sp)
+                                    Text("Film gratis dari penyedia resmi & domain publik", color = Muted, fontSize = 11.sp)
                                 }
                                 Text("Jelajahi  →", color = Green, fontWeight = FontWeight.Bold)
                             }
@@ -1379,11 +1379,9 @@ private fun GenjurStreamApp(activity: MainActivity) {
     var showRepositories by remember { mutableStateOf(false) }
     var providerUrl by remember { mutableStateOf<String?>(null) }
     Box(Modifier.fillMaxSize()) {
-        GenjurStreamHome(activity, onOpenSources = { showRepositories = true }, onOpenWebsite = { url ->
-            showRepositories = false
-            providerUrl = url
-        })
+        GenjurStreamHome(activity) { showRepositories = true }
         if (showRepositories) RepositoryDialog(activity, onOpenWebsite = { url ->
+            showRepositories = false
             providerUrl = url
         }) { showRepositories = false }
         providerUrl?.let { url ->
