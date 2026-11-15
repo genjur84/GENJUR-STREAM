@@ -164,117 +164,63 @@ fun GenjurStreamHome(activity: MainActivity) {
     }
 
     if (updateVersion != null && updateUrl != null) {
-        Dialog(
+        AlertDialog(
             onDismissRequest = { if (!downloading) updateVersion = null },
-            properties = DialogProperties(
-                usePlatformDefaultWidth = false,
-                dismissOnBackPress = !downloading,
-                dismissOnClickOutside = !downloading
-            )
-        ) {
-            Surface(
-                modifier = Modifier.fillMaxWidth(0.92f),
-                shape = RoundedCornerShape(32.dp),
-                color = Color(0xFFF0EAF3),
-                contentColor = Color(0xFF211D24),
-                tonalElevation = 8.dp
-            ) {
-                Column(Modifier.padding(horizontal = 24.dp, vertical = 26.dp)) {
-                    Text(
-                        "Versi terbaru tersedia",
-                        color = Color(0xFF211D24),
-                        fontSize = 25.sp,
-                        lineHeight = 32.sp,
-                        fontWeight = FontWeight.Normal
-                    )
-                    Spacer(Modifier.height(24.dp))
-                    Text(
-                        "GENJUR STREAM versi $updateVersion sudah tersedia. Perbarui aplikasi sekarang?",
-                        color = Color(0xFF514B55),
-                        fontSize = 16.sp,
-                        lineHeight = 24.sp
-                    )
+            title = { Text("Versi terbaru tersedia") },
+            text = {
+                Column {
+                    Text("GENJUR STREAM versi $updateVersion sudah tersedia. Perbarui aplikasi sekarang?")
                     if (downloading) {
-                        Spacer(Modifier.height(16.dp))
-                        LinearProgressIndicator(
-                            modifier = Modifier.fillMaxWidth(),
-                            color = Color(0xFF42CFA5),
-                            trackColor = Color(0xFFE2D8EA)
-                        )
-                        Spacer(Modifier.height(5.dp))
-                        Text(
-                            "Sedang mengunduh pembaruan...",
-                            color = Color(0xFFAAAEBB),
-                            fontSize = 14.sp
-                        )
+                        Spacer(Modifier.height(12.dp))
+                        LinearProgressIndicator(Modifier.fillMaxWidth(), color = Green)
+                        Text("Sedang mengunduh pembaruan...", color = Muted)
                     }
-                    updateError?.let {
-                        Spacer(Modifier.height(10.dp))
-                        Text(it, color = Color(0xFFB3261E), fontSize = 13.sp)
-                    }
-                    Spacer(Modifier.height(28.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.End,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        TextButton(
-                            enabled = !downloading,
-                            onClick = { updateVersion = null }
-                        ) {
-                            Text("Nanti", color = Color(0xFF625B66), fontSize = 14.sp)
-                        }
-                        Spacer(Modifier.width(8.dp))
-                        TextButton(
-                            enabled = !downloading,
-                            onClick = {
-                                val apkLink = updateUrl!!
-                                scope.launch {
-                                    downloading = true
-                                    updateError = null
-                                    val downloaded = withContext(Dispatchers.IO) {
-                                        runCatching {
-                                            val connection = URL(apkLink).openConnection()
-                                            connection.connectTimeout = 15000
-                                            connection.readTimeout = 30000
-                                            val file = File(activity.cacheDir, "genjur-stream-update.apk")
-                                            connection.getInputStream().use { input ->
-                                                file.outputStream().use { output -> input.copyTo(output) }
-                                            }
-                                            file
-                                        }
-                                    }
-                                    downloading = false
-                                    downloaded.onSuccess { file ->
-                                        try {
-                                            val uri: Uri = FileProvider.getUriForFile(
-                                                activity, "${activity.packageName}.fileprovider", file
-                                            )
-                                            val installIntent = Intent(Intent.ACTION_VIEW).apply {
-                                                setDataAndType(uri, "application/vnd.android.package-archive")
-                                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                                            }
-                                            activity.startActivity(installIntent)
-                                            updateVersion = null
-                                        } catch (_: Exception) {
-                                            updateError = "Tidak dapat membuka pemasang. Periksa izin instalasi aplikasi."
-                                        }
-                                    }.onFailure {
-                                        updateError = "Unduhan gagal. Periksa koneksi internet lalu coba lagi."
-                                    }
-                                }
-                            }
-                        ) {
-                            Text(
-                                if (downloading) "Mengunduh..." else "Unduh sekarang",
-                                color = Color(0xFF625B66),
-                                fontSize = 14.sp
-                            )
-                        }
-                    }
+                    updateError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
                 }
+            },
+            confirmButton = {
+                TextButton(enabled = !downloading, onClick = {
+                    val apkLink = updateUrl!!
+                    scope.launch {
+                        downloading = true
+                        updateError = null
+                        val downloaded = withContext(Dispatchers.IO) {
+                            runCatching {
+                                val connection = URL(apkLink).openConnection()
+                                connection.connectTimeout = 15000
+                                connection.readTimeout = 30000
+                                val file = File(activity.cacheDir, "genjur-stream-update.apk")
+                                connection.getInputStream().use { input ->
+                                    file.outputStream().use { output -> input.copyTo(output) }
+                                }
+                                file
+                            }
+                        }
+                        downloading = false
+                        downloaded.onSuccess { file ->
+                            try {
+                                val uri: Uri = FileProvider.getUriForFile(
+                                    activity, "${activity.packageName}.fileprovider", file
+                                )
+                                val installIntent = Intent(Intent.ACTION_VIEW).apply {
+                                    setDataAndType(uri, "application/vnd.android.package-archive")
+                                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                }
+                                activity.startActivity(installIntent)
+                                updateVersion = null
+                            } catch (_: Exception) {
+                                updateError = "Tidak dapat membuka pemasang. Periksa izin instalasi aplikasi."
+                            }
+                        }.onFailure {
+                            updateError = "Unduhan gagal. Periksa koneksi internet lalu coba lagi."
+                        }
+                    }
+                }) { Text(if (downloading) "Mengunduh..." else "Perbarui sekarang") }
+            },
+            dismissButton = {
+                TextButton(enabled = !downloading, onClick = { updateVersion = null }) { Text("Nanti") }
             }
-        }
+        )
     }
 
     Surface(Modifier.fillMaxSize(), color = Bg) {
