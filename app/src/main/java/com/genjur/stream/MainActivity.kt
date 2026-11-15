@@ -13,7 +13,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.focus.focusGroup
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -329,9 +328,10 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                         categories.drop(1).chunked(if (tvLayout) 4 else 2).forEach { items ->
                             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                                 items.forEach { item ->
-                                    Card(Modifier.weight(1f).padding(bottom = 8.dp), onClick = {
+                                    Card(onClick = {
                                         category = item; selectedTab = "Kategori"
-                                    }, shape = RoundedCornerShape(16.dp),
+                                    }, modifier = Modifier.weight(1f).padding(bottom = 8.dp),
+                                        shape = RoundedCornerShape(16.dp),
                                         colors = CardDefaults.cardColors(containerColor = Color(0xFF24202E))) {
                                         Column(Modifier.fillMaxWidth().padding(vertical = 18.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                                             Text(when(item) { "Film" -> "▣"; "Serial" -> "▤"; "Animasi" -> "✧"; else -> "◉" },
