@@ -751,6 +751,22 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                                         }
                                     }
                                 }
+                                val selectedSource = savedSourceMenu.firstOrNull { it.url == selectedSearchSourceUrl }
+                                Spacer(Modifier.height(10.dp))
+                                OutlinedButton(
+                                    onClick = {
+                                        val host = selectedSource?.url?.let { Uri.parse(it).host }
+                                        if (host != null && search.isNotBlank()) {
+                                            browserInitialUrl = "https://www.google.com/search?q=" + Uri.encode("site:$host ${search.trim()}")
+                                            selectedTab = "Browser Sumber"
+                                        }
+                                    },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    enabled = selectedSource != null && search.isNotBlank(),
+                                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Green)
+                                ) {
+                                    Text(if (selectedSource != null) "Cari di sumber ${selectedSource.name}" else "Pilih sumber untuk mencari")
+                                }
                             }
                             "Sumber Link" -> {
                                 SourceLinksScreen(activity = activity, onOpenLink = { link ->
