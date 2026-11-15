@@ -29,6 +29,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.platform.LocalContext
+import coil.request.ImageRequest
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.media3.common.MediaItem
@@ -929,6 +931,7 @@ private fun MoviePoster(
     width: androidx.compose.ui.unit.Dp? = null
 ) {
     var failed by remember(url) { mutableStateOf(false) }
+    val context = LocalContext.current
     val posterModifier = if (width == null) Modifier.fillMaxWidth().height(height)
         else Modifier.width(width).height(height)
     if (url.isBlank() || failed) {
@@ -939,15 +942,23 @@ private fun MoviePoster(
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text("GENJUR STREAM", color = Color(0xFFC4A7FF), fontSize = 19.sp, fontWeight = FontWeight.Black)
-                if (url.isNotBlank() && failed) {
-                    Spacer(Modifier.height(5.dp))
-                    Text("Poster gagal dimuat", color = Muted, fontSize = 10.sp)
-                }
+                Spacer(Modifier.height(5.dp))
+                Text(
+                    if (url.isBlank()) "Poster belum tersedia" else "Poster tidak dapat dimuat",
+                    color = Muted, fontSize = 10.sp
+                )
             }
         }
     } else {
+        val imageRequest = remember(url) {
+            ImageRequest.Builder(context)
+                .data(url)
+                .addHeader("User-Agent", "GENJUR-STREAM/1.0 (Android app; Wikimedia Commons media viewer)")
+                .crossfade(true)
+                .build()
+        }
         AsyncImage(
-            model = url,
+            model = imageRequest,
             contentDescription = "Poster $title",
             contentScale = ContentScale.Crop,
             modifier = posterModifier,
