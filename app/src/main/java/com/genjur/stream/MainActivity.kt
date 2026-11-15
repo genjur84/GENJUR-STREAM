@@ -1676,6 +1676,15 @@ private fun SourceBrowser(
     onPlayCandidate: (String, String, String) -> Unit,
     onDownloadCandidate: (String, String, String) -> Unit
 ) {
+    val context = LocalContext.current
+    val hostActivity = context as? ComponentActivity
+    LaunchedEffect(hostActivity) {
+        if (Build.VERSION.SDK_INT >= 33 && hostActivity != null &&
+            ContextCompat.checkSelfPermission(context, android.Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+            hostActivity.requestPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), 8402)
+        }
+    }
+    var playbackNotificationSent by remember(initialUrl) { mutableStateOf(false) }
     var address by remember(initialUrl) { mutableStateOf(initialUrl) }
     var currentUrl by remember(initialUrl) { mutableStateOf(initialUrl) }
     var pageTitle by remember { mutableStateOf("Masukkan alamat situs sumber video.") }
@@ -1792,7 +1801,12 @@ private fun SourceBrowser(
                     // Iklan/iframe dapat mengubah progres setelah halaman utama selesai.
                     webChromeClient = WebChromeClient()
                     addJavascriptInterface(PlaybackStartedBridge(
-                        onPlayback = { title, pageUrl -> post { onPlaybackStarted(title, pageUrl) } },
+                        onPlayback = { title, pageUrl -> post {
+                            if (!playbackNotificationSent) {
+                                playbackNotificationSent = true
+                                onPlaybackStarted(title, pageUrl)
+                            }
+                        } },
                         onVideoDetected = { title, pageUrl, videoUrl, quality, sizeBytes ->
                             post {
                                 val uri = Uri.parse(videoUrl)
@@ -1838,6 +1852,10 @@ private fun SourceBrowser(
                                 }
                                 view.post {
                                     val mediaUrl = requestedUri.toString()
+                                    if (!playbackNotificationSent) {
+                                        playbackNotificationSent = true
+                                        onPlaybackStarted(view.title?.takeIf { it.isNotBlank() } ?: "Video dari situs", view.url ?: currentUrl)
+                                    }
                                     if (detectedVideoOptions.none { it.videoUrl == mediaUrl }) {
                                         detectedVideoTitle = view.title?.takeIf { it.isNotBlank() } ?: "Video dari situs"
                                         detectedVideoPage = view.url ?: currentUrl
@@ -1853,6 +1871,7 @@ private fun SourceBrowser(
                             return super.shouldInterceptRequest(view, request)
                         }
                         override fun onPageStarted(view: WebView, url: String, favicon: android.graphics.Bitmap?) {
+                            playbackNotificationSent = false
                             isLoading = true
                             view.removeCallbacks(loadingFallback)
                             // Pengaman: jangan biarkan overlay menutupi situs tanpa batas waktu.
