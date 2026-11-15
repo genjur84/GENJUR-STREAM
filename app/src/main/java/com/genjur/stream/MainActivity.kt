@@ -1173,6 +1173,26 @@ private fun SourceLinksScreen(activity: MainActivity, onOpenLink: (String) -> Un
     var url by remember { mutableStateOf("") }
     var editingIndex by remember { mutableStateOf<Int?>(null) }
     var message by remember { mutableStateOf<String?>(null) }
+    var sourceSearch by remember { mutableStateOf("") }
+
+    // Direktori terbatas ke domain resmi penyedia yang dikenal.
+    val officialSources = listOf(
+        SavedSourceLink("YouTube", "https://www.youtube.com"),
+        SavedSourceLink("Internet Archive", "https://archive.org"),
+        SavedSourceLink("Viu", "https://www.viu.com"),
+        SavedSourceLink("iQIYI", "https://www.iq.com"),
+        SavedSourceLink("Netflix", "https://www.netflix.com"),
+        SavedSourceLink("Prime Video", "https://www.primevideo.com"),
+        SavedSourceLink("Disney+ Hotstar", "https://www.hotstar.com"),
+        SavedSourceLink("Vidio", "https://www.vidio.com")
+    )
+    val matchingSources = remember(sourceSearch) {
+        if (sourceSearch.isBlank()) emptyList()
+        else officialSources.filter {
+            it.name.contains(sourceSearch.trim(), ignoreCase = true) ||
+                Uri.parse(it.url).host.orEmpty().contains(sourceSearch.trim(), ignoreCase = true)
+        }
+    }
 
     fun persist(items: List<SavedSourceLink>) {
         val array = JSONArray()
@@ -1181,8 +1201,49 @@ private fun SourceLinksScreen(activity: MainActivity, onOpenLink: (String) -> Un
     }
 
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Text("Simpan alamat situs yang ingin dibuka langsung dari GENJUR STREAM.",
+        Text("Cari penyedia resmi yang sudah masuk direktori GENJUR STREAM.",
             color = Muted, fontSize = 12.sp)
+        OutlinedTextField(
+            value = sourceSearch, onValueChange = { sourceSearch = it },
+            modifier = Modifier.fillMaxWidth(), singleLine = true,
+            label = { Text("Cari nama penyedia") },
+            placeholder = { Text("Contoh: Viu, iQIYI, YouTube") }
+        )
+        if (sourceSearch.isNotBlank()) {
+            if (matchingSources.isEmpty()) {
+                Text("Tidak ditemukan di direktori resmi. Alamat yang tidak terverifikasi tidak disarankan.",
+                    color = Muted, fontSize = 11.sp)
+            } else {
+                matchingSources.forEach { candidate ->
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = Panel),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(10.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(Modifier.weight(1f)) {
+                                Text(candidate.name, color = Color.White, fontWeight = FontWeight.Bold)
+                                Text(candidate.url, color = Muted, fontSize = 10.sp)
+                                Text("Domain resmi dalam direktori", color = Green, fontSize = 10.sp)
+                            }
+                            TextButton(onClick = {
+                                name = candidate.name
+                                url = candidate.url
+                                editingIndex = null
+                                message = "Alamat dipilih. Periksa lalu tekan Simpan link."
+                            }) { Text("Pilih", color = Green) }
+                        }
+                    }
+                }
+            }
+        }
+        Divider(color = Muted.copy(alpha = 0.25f))
+        Text("Tambah alamat situs secara manual",
+            color = Color.White, fontWeight = FontWeight.Bold)
         OutlinedTextField(
             value = name, onValueChange = { name = it },
             modifier = Modifier.fillMaxWidth(), singleLine = true,
