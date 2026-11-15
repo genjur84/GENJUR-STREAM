@@ -15,6 +15,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import coil.compose.AsyncImage
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -47,7 +49,8 @@ private data class FeedMovie(
     val videoUrl: String,
     val licenseId: String,
     val termsUrl: String,
-    val attribution: String
+    val attribution: String,
+    val posterUrl: String = ""
 )
 private fun savedFeedUrls(activity: MainActivity): List<String> = runCatching {
     val prefs = activity.getSharedPreferences("genjur_stream_sources", 0)
@@ -84,6 +87,7 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
     var feedLoading by remember { mutableStateOf(false) }
     var feedMessage by remember { mutableStateOf("Tambahkan sumber feed JSON, lalu muat katalog.") }
     var selectedMovie by remember { mutableStateOf<FeedMovie?>(null) }
+    var playingMovie by remember { mutableStateOf<FeedMovie?>(null) }
     val scope = rememberCoroutineScope()
 
     fun refreshCatalog() {
@@ -132,14 +136,14 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                                     ) {
                                         "URL video harus menggunakan HTTPS yang valid"
                                     }
+                                    val posterUrl = item.optString("posterUrl").trim()
+                                    val posterUri = Uri.parse(posterUrl)
+                                    require(posterUrl.isBlank() || (posterUri.scheme == "https" && !posterUri.host.isNullOrBlank())) {
+                                        "URL poster harus menggunakan HTTPS yang valid"
+                                    }
                                     movies.add(FeedMovie(
-                                        title,
-                                        item.optString("description", "Sinopsis belum tersedia."),
-                                        item.optString("category", "Film"),
-                                        videoUrl,
-                                        licenseId,
-                                        termsUrl,
-                                        attribution
+                                        title, item.optString("description", "Sinopsis belum tersedia."),
+                                        item.optString("category", "Film"), videoUrl, licenseId, termsUrl, attribution, posterUrl
                                     ))
                                 }
                             }
@@ -333,15 +337,21 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                                         Card(Modifier.weight(1f).padding(bottom = 8.dp), shape = RoundedCornerShape(16.dp),
                                             colors = CardDefaults.cardColors(containerColor = Panel)) {
                                             Column(Modifier.padding(12.dp)) {
-                                                Box(Modifier.fillMaxWidth().height(if (tvLayout) 125.dp else 92.dp)
-                                                    .background(Color(0xFF302541), RoundedCornerShape(10.dp)),
-                                                    contentAlignment = Alignment.Center) {
-                                                    Text("▶", color = Color(0xFFC4A7FF), fontSize = 30.sp)
+                                                if (movie.posterUrl.isNotBlank()) {
+                                                    AsyncImage(model = movie.posterUrl, contentDescription = "Poster ${movie.title}",
+                                                        contentScale = ContentScale.Crop,
+                                                        modifier = Modifier.fillMaxWidth().height(if (tvLayout) 210.dp else 170.dp))
+                                                } else {
+                                                    Box(Modifier.fillMaxWidth().height(if (tvLayout) 210.dp else 170.dp)
+                                                        .background(Color(0xFF302541), RoundedCornerShape(10.dp)),
+                                                        contentAlignment = Alignment.Center) {
+                                                        Text("GENJUR", color = Color(0xFFC4A7FF), fontSize = 24.sp, fontWeight = FontWeight.Black)
+                                                    }
                                                 }
                                                 Spacer(Modifier.height(8.dp))
                                                 Text(movie.title, color = Color.White, fontWeight = FontWeight.Bold, maxLines = 2)
                                                 Text(movie.category, color = Green, fontSize = 11.sp)
-                                                TextButton(onClick = { selectedMovie = movie }) { Text("Putar", color = Green) }
+                                                TextButton(onClick = { selectedMovie = movie }) { Text("Lihat detail", color = Green) }
                                             }
                                         }
                                     }
@@ -402,7 +412,7 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                                             Text(movie.title, color = Color.White, fontWeight = FontWeight.Bold)
                                             Text(movie.category, color = Green, fontSize = 11.sp)
                                         }
-                                        TextButton(onClick = { selectedMovie = movie }) { Text("Putar", color = Green) }
+                                        TextButton(onClick = { selectedMovie = movie }) { Text("Detail", color = Green) }
                                     }
                                 }
                             }
@@ -441,10 +451,53 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
     }
 
     selectedMovie?.let { movie ->
-        InAppVideoPlayer(activity, movie, onClose = { selectedMovie = null })
+        MovieDetailDialog(movie, onClose = { selectedMovie = null }, onPlay = {
+            if (movie.videoUrl.isNotBlank()) { selectedMovie = null; playingMovie = movie }
+        })
+    }
+    playingMovie?.let { movie ->
+        InAppVideoPlayer(activity, movie, onClose = { playingMovie = null })
     }
 }
 
+
+@Composable
+private fun MovieDetailDialog(movie: FeedMovie, onClose: () -> Unit, onPlay: () -> Unit) {
+    Dialog(onDismissRequest = onClose, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Surface(Modifier.fillMaxWidth().fillMaxHeight(0.9f).padding(12.dp),
+            shape = RoundedCornerShape(22.dp), color = Panel) {
+            Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+                if (movie.posterUrl.isNotBlank()) {
+                    AsyncImage(model = movie.posterUrl, contentDescription = "Poster ${movie.title}",
+                        contentScale = ContentScale.Crop, modifier = Modifier.fillMaxWidth().height(360.dp))
+                } else {
+                    Box(Modifier.fillMaxWidth().height(260.dp).background(Color(0xFF302541)),
+                        contentAlignment = Alignment.Center) {
+                        Text("GENJUR STREAM", color = Color(0xFFC4A7FF), fontSize = 27.sp, fontWeight = FontWeight.Black)
+                    }
+                }
+                Column(Modifier.padding(20.dp)) {
+                    Text(movie.title, color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.ExtraBold)
+                    Spacer(Modifier.height(7.dp))
+                    Text(movie.category, color = Green, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                    Spacer(Modifier.height(16.dp))
+                    Text("Sinopsis", color = Color.White, fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.height(6.dp))
+                    Text(movie.description.ifBlank { "Sinopsis belum tersedia." }, color = Muted, fontSize = 14.sp, lineHeight = 21.sp)
+                    Spacer(Modifier.height(14.dp))
+                    Text("Sumber: ${movie.attribution}", color = Muted, fontSize = 10.sp)
+                    Spacer(Modifier.height(20.dp))
+                    Button(onClick = onPlay, enabled = movie.videoUrl.isNotBlank(), modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(containerColor = Green, contentColor = Color.White,
+                            disabledContainerColor = Color(0xFF393344), disabledContentColor = Muted)) {
+                        Text(if (movie.videoUrl.isBlank()) "Video belum tersedia" else "▶  Putar sekarang")
+                    }
+                    TextButton(onClick = onClose, modifier = Modifier.fillMaxWidth()) { Text("Kembali", color = Green) }
+                }
+            }
+        }
+    }
+}
 
 @Composable
 private fun InAppVideoPlayer(activity: MainActivity, movie: FeedMovie, onClose: () -> Unit) {
