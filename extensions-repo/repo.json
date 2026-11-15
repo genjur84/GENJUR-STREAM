@@ -1,13 +1,17 @@
 {
   "schemaVersion": 1,
-  "name": "GENJUR MOVIE PROVIDERS",
-  "description": "Daftar penyedia situs/katalog film yang kompatibel dengan GENJUR STREAM.",
+  "name": "GENJUR STREAM - Penyedia Film Gratis",
+  "description": "Direktori penyedia katalog film gratis yang dapat diakses dan diputar sesuai izin sumber.",
   "extensions": [
     {
       "id": "genjur-public-domain-catalog",
       "name": "Arsip Film Domain Publik",
-      "description": "Penyedia katalog film dan video yang status hak pemutaran serta distribusinya dapat diverifikasi.",
-      "feedUrl": "https://raw.githubusercontent.com/genjur84/GENJUR-STREAM/main/extensions-repo/feeds/public-domain.json"
+      "description": "Katalog film klasik gratis dengan status domain publik yang didokumentasikan. Subtitle Indonesia ditampilkan jika tersedia pada item.",
+      "feedUrl": "https://raw.githubusercontent.com/genjur84/GENJUR-STREAM/main/extensions-repo/feeds/public-domain.json",
+      "contentTypes": [
+        "Film Klasik"
+      ],
+      "subtitleLanguages": []
     }
   ]
 }
