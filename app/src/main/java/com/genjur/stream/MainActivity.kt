@@ -123,6 +123,14 @@ private class PlaybackStartedBridge(
 
 private data class StreamOption(val quality: String, val videoUrl: String, val sizeBytes: Long = 0L)
 
+private fun detectedQualityLabel(label: String, videoUrl: String): String {
+    val source = "$label $videoUrl"
+    val match = Regex("""(?i)(2160|1440|1080|720|480|360)\\s*p?""").find(source)
+    if (match != null) return "${match.groupValues[1]}p"
+    if (source.contains("4k", ignoreCase = true)) return "2160p"
+    return "Kualitas asli (resolusi tidak terdeteksi)"
+}
+
 private data class FeedMovie(
     val title: String,
     val description: String,
@@ -1815,20 +1823,11 @@ private fun SourceBrowser(
                                 if (playableMedia && uri.scheme in listOf("http", "https") && !uri.host.isNullOrBlank()) {
                                     detectedVideoTitle = title
                                     detectedVideoPage = pageUrl
-                                    val label = quality.ifBlank {
-                                        when {
-                                            path.contains("2160") || path.contains("4k") -> "4K"
-                                            path.contains("1080") -> "Full HD 1080p"
-                                            path.contains("720") -> "HD 720p"
-                                            path.contains("480") -> "SD 480p"
-                                            path.contains("360") -> "SD 360p"
-                                            path.endsWith(".m3u8") -> "Streaming HLS"
-                                            path.endsWith(".mpd") -> "Streaming DASH"
-                                            else -> "Kualitas terdeteksi"
-                                        }
-                                    }
+                                    val label = detectedQualityLabel(quality, videoUrl)
                                     val item = StreamOption(label, videoUrl, sizeBytes)
-                                    detectedVideoOptions = (detectedVideoOptions.filterNot { it.videoUrl == videoUrl } + item)
+                                    detectedVideoOptions = (detectedVideoOptions.filterNot {
+                                        it.quality == label || it.videoUrl == videoUrl
+                                    } + item)
                                 }
                             }
                         }
@@ -1841,15 +1840,7 @@ private fun SourceBrowser(
                             val mediaMatch = Regex("""\.(m3u8|mpd|mp4|m4v|webm|mov|mkv)(?:$|[?#&])""").containsMatchIn(mediaUrlLower)
                             if (requestedUri.scheme in listOf("http", "https") &&
                                 !requestedUri.host.isNullOrBlank() && mediaMatch) {
-                                val label = when {
-                                    mediaUrlLower.contains(".m3u8") -> "Streaming HLS"
-                                    mediaUrlLower.contains(".mpd") -> "Streaming DASH"
-                                    mediaUrlLower.contains("2160") || mediaUrlLower.contains("4k") -> "4K"
-                                    mediaUrlLower.contains("1080") -> "Full HD 1080p"
-                                    mediaUrlLower.contains("720") -> "HD 720p"
-                                    mediaUrlLower.contains("480") -> "SD 480p"
-                                    else -> "Video terdeteksi dari jaringan"
-                                }
+                                val label = detectedQualityLabel("", mediaUrlLower)
                                 view.post {
                                     val mediaUrl = requestedUri.toString()
                                     if (!playbackNotificationSent) {
@@ -1859,7 +1850,9 @@ private fun SourceBrowser(
                                     if (detectedVideoOptions.none { it.videoUrl == mediaUrl }) {
                                         detectedVideoTitle = view.title?.takeIf { it.isNotBlank() } ?: "Video dari situs"
                                         detectedVideoPage = view.url ?: currentUrl
-                                        detectedVideoOptions = detectedVideoOptions + StreamOption(label, mediaUrl)
+                                        detectedVideoOptions = (detectedVideoOptions.filterNot {
+                                            it.quality == label || it.videoUrl == mediaUrl
+                                        } + StreamOption(label, mediaUrl))
                                     }
                                 }
                             }
