@@ -13,6 +13,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.focus.focusGroup
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -40,7 +41,14 @@ private val Green = Color(0xFF42D6A4)
 private val Muted = Color(0xFFACB7C5)
 
 
-private data class FeedMovie(val title: String, val description: String, val category: String, val videoUrl: String)
+private data class FeedMovie(
+    val title: String,
+    val description: String,
+    val category: String,
+    val videoUrl: String,
+    val licenseId: String,
+    val attribution: String
+)
 private fun savedFeedUrls(activity: MainActivity): List<String> = runCatching {
     val a = JSONArray(activity.getSharedPreferences("genjur_stream_sources", 0).getString("items", "[]"))
     (0 until a.length()).mapNotNull { a.optJSONObject(it)?.optString("url")?.takeIf { u -> u.isNotBlank() } }
@@ -81,14 +89,38 @@ fun GenjurStreamHome(activity: MainActivity) {
                         connection.connectTimeout = 12000
                         connection.readTimeout = 20000
                         val root = JSONObject(connection.getInputStream().bufferedReader().use { it.readText() })
+                        val rights = root.optJSONObject("rights")
+                            ?: error("Sumber ditolak: metadata hak distribusi tidak tersedia.")
+                        val redistributionAllowed = rights.optBoolean("redistributionAllowed", false)
+                        val licenseId = rights.optString("licenseId").trim()
+                        val termsUrl = rights.optString("termsUrl").trim()
+                        val attribution = rights.optString("attribution").trim()
+                        require(
+                            redistributionAllowed &&
+                                licenseId.isNotBlank() &&
+                                termsUrl.startsWith("https://") &&
+                                attribution.isNotBlank()
+                        ) {
+                            "Sumber ditolak: izin distribusi, lisensi, tautan ketentuan, atau atribusi belum lengkap."
+                        }
                         val items = root.optJSONArray("items") ?: error("Feed tidak memiliki array items.")
                         for (i in 0 until items.length()) {
                             val item = items.optJSONObject(i) ?: continue
                             val title = item.optString("title").trim()
-                            if (title.isNotEmpty()) movies.add(FeedMovie(
-                                title, item.optString("description", "Sinopsis belum tersedia."),
-                                item.optString("category", "Film"), item.optString("videoUrl")
-                            ))
+                            val videoUrl = item.optString("videoUrl").trim()
+                            if (title.isNotEmpty()) {
+                                require(videoUrl.isBlank() || videoUrl.startsWith("https://")) {
+                                    "Sumber ditolak: URL video harus menggunakan HTTPS."
+                                }
+                                movies.add(FeedMovie(
+                                    title,
+                                    item.optString("description", "Sinopsis belum tersedia."),
+                                    item.optString("category", "Film"),
+                                    videoUrl,
+                                    licenseId,
+                                    attribution
+                                ))
+                            }
                         }
                     }
                     movies
@@ -184,10 +216,24 @@ fun GenjurStreamHome(activity: MainActivity) {
     }
 
     Surface(Modifier.fillMaxSize(), color = Bg) {
-        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp)) {
+        BoxWithConstraints(Modifier.fillMaxSize()) {
+            val tvLayout = maxWidth >= 720.dp
+            Column(
+                Modifier
+                    .widthIn(max = 1200.dp)
+                    .fillMaxWidth()
+                    .fillMaxHeight()
+                    .align(Alignment.TopCenter)
+                    .verticalScroll(rememberScrollState())
+                    .padding(
+                        horizontal = if (tvLayout) 36.dp else 20.dp,
+                        vertical = if (tvLayout) 28.dp else 20.dp
+                    )
+                    .focusGroup()
+            ) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Column {
-                    Text("GENJUR STREAM", color = Green, fontSize = 25.sp, fontWeight = FontWeight.ExtraBold)
+                    Text("GENJUR STREAM", color = Green, fontSize = if (tvLayout) 34.sp else 25.sp, fontWeight = FontWeight.ExtraBold)
                     Text("Temukan hiburan favoritmu", color = Muted, fontSize = 13.sp)
                 }
                 Text("GS", color = Bg, fontSize = 17.sp, fontWeight = FontWeight.Bold,
@@ -209,7 +255,7 @@ fun GenjurStreamHome(activity: MainActivity) {
                 Column(Modifier.padding(22.dp)) {
                     Text("SELAMAT DATANG", color = Green, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                     Spacer(Modifier.height(10.dp))
-                    Text("Semua hiburan\ndalam satu tempat.", color = Color.White, fontSize = 27.sp,
+                    Text("Semua hiburan\ndalam satu tempat.", color = Color.White, fontSize = if (tvLayout) 38.sp else 27.sp,
                         lineHeight = 33.sp, fontWeight = FontWeight.Bold)
                     Spacer(Modifier.height(9.dp))
                     Text("Jelajahi pilihan tontonan dari sumber resmi dan berizin.",
@@ -223,7 +269,7 @@ fun GenjurStreamHome(activity: MainActivity) {
             Spacer(Modifier.height(25.dp))
             Text("Jelajahi kategori", color = Color.White, fontSize = 19.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(10.dp))
-            categories.chunked(3).forEach { group ->
+            categories.chunked(if (tvLayout) 5 else 3).forEach { group ->
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     group.forEach { item ->
                         FilterChip(selected = category == item, onClick = { category = item }, label = { Text(item) })
@@ -250,6 +296,8 @@ fun GenjurStreamHome(activity: MainActivity) {
                         Text(movie.title, color = Color.White, fontWeight = FontWeight.Bold)
                         Text(movie.category, color = Green, fontSize = 11.sp)
                         Text(movie.description, color = Muted, fontSize = 13.sp)
+                        Text("Lisensi: ${movie.licenseId}", color = Muted, fontSize = 10.sp)
+                        Text(movie.attribution, color = Muted, fontSize = 10.sp)
                         if (movie.videoUrl.startsWith("https://")) {
                             TextButton(onClick = { selectedMovie = movie }) {
                                 Text("Putar di GENJUR STREAM")
@@ -261,6 +309,7 @@ fun GenjurStreamHome(activity: MainActivity) {
             Spacer(Modifier.height(26.dp))
             Text("GENJUR STREAM  •  Versi ${BuildConfig.VERSION_NAME}", color = Color(0xFF718096),
                 fontSize = 11.sp, modifier = Modifier.padding(bottom = 10.dp))
+            }
         }
     }
 
