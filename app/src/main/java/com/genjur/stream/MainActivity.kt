@@ -110,13 +110,13 @@ private val Muted = Color(0xFFACB7C5)
 
 private class PlaybackStartedBridge(
     private val onPlayback: (String, String) -> Unit,
-    private val onVideoAvailable: (String, String, String) -> Unit
+    private val onVideoDetected: (String, String, String) -> Unit
 ) {
     @JavascriptInterface
     fun onVideoPlay(title: String, pageUrl: String) { onPlayback(title, pageUrl) }
     @JavascriptInterface
     fun onVideoAvailable(title: String, pageUrl: String, videoUrl: String) {
-        onVideoAvailable(title, pageUrl, videoUrl)
+        onVideoDetected(title, pageUrl, videoUrl)
     }
 }
 
@@ -442,7 +442,6 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
         runCatching { android.webkit.CookieManager.getInstance().getCookie(movie.downloadUrl) }
             .getOrNull()?.takeIf { it.isNotBlank() }?.let { request.addRequestHeader("Cookie", it) }
         if (movie.termsUrl.startsWith("http")) request.addRequestHeader("Referer", movie.termsUrl)
-        request.addRequestHeader("User-Agent", WebView(activity).settings.userAgentString)
         val id = downloadManager.enqueue(request)
         downloads = listOf(DownloadEntry(id, movie)) + downloads
         persistDownloads(downloads)
