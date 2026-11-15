@@ -47,6 +47,7 @@ private data class FeedMovie(
     val category: String,
     val videoUrl: String,
     val licenseId: String,
+    val termsUrl: String,
     val attribution: String
 )
 private fun savedFeedUrls(activity: MainActivity): List<String> = runCatching {
@@ -95,10 +96,12 @@ fun GenjurStreamHome(activity: MainActivity) {
                         val licenseId = rights.optString("licenseId").trim()
                         val termsUrl = rights.optString("termsUrl").trim()
                         val attribution = rights.optString("attribution").trim()
+                        val termsUri = Uri.parse(termsUrl)
                         require(
                             redistributionAllowed &&
                                 licenseId.isNotBlank() &&
-                                termsUrl.startsWith("https://") &&
+                                termsUri.scheme == "https" &&
+                                !termsUri.host.isNullOrBlank() &&
                                 attribution.isNotBlank()
                         ) {
                             "Sumber ditolak: izin distribusi, lisensi, tautan ketentuan, atau atribusi belum lengkap."
@@ -109,8 +112,12 @@ fun GenjurStreamHome(activity: MainActivity) {
                             val title = item.optString("title").trim()
                             val videoUrl = item.optString("videoUrl").trim()
                             if (title.isNotEmpty()) {
-                                require(videoUrl.isBlank() || videoUrl.startsWith("https://")) {
-                                    "Sumber ditolak: URL video harus menggunakan HTTPS."
+                                val videoUri = Uri.parse(videoUrl)
+                                require(
+                                    videoUrl.isBlank() ||
+                                        (videoUri.scheme == "https" && !videoUri.host.isNullOrBlank())
+                                ) {
+                                    "Sumber ditolak: URL video harus menggunakan HTTPS yang valid."
                                 }
                                 movies.add(FeedMovie(
                                     title,
@@ -118,6 +125,7 @@ fun GenjurStreamHome(activity: MainActivity) {
                                     item.optString("category", "Film"),
                                     videoUrl,
                                     licenseId,
+                                    termsUrl,
                                     attribution
                                 ))
                             }
@@ -256,7 +264,7 @@ fun GenjurStreamHome(activity: MainActivity) {
                     Text("SELAMAT DATANG", color = Green, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                     Spacer(Modifier.height(10.dp))
                     Text("Semua hiburan\ndalam satu tempat.", color = Color.White, fontSize = if (tvLayout) 38.sp else 27.sp,
-                        lineHeight = 33.sp, fontWeight = FontWeight.Bold)
+                        lineHeight = if (tvLayout) 44.sp else 33.sp, fontWeight = FontWeight.Bold)
                     Spacer(Modifier.height(9.dp))
                     Text("Jelajahi pilihan tontonan dari sumber resmi dan berizin.",
                         color = Muted, fontSize = 14.sp, lineHeight = 20.sp)
@@ -297,6 +305,7 @@ fun GenjurStreamHome(activity: MainActivity) {
                         Text(movie.category, color = Green, fontSize = 11.sp)
                         Text(movie.description, color = Muted, fontSize = 13.sp)
                         Text("Lisensi: ${movie.licenseId}", color = Muted, fontSize = 10.sp)
+                        Text("Ketentuan: ${movie.termsUrl}", color = Muted, fontSize = 10.sp)
                         Text(movie.attribution, color = Muted, fontSize = 10.sp)
                         if (movie.videoUrl.startsWith("https://")) {
                             TextButton(onClick = { selectedMovie = movie }) {
