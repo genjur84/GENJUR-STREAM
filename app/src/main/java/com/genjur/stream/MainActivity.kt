@@ -659,36 +659,6 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                     Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = horizontal)
                 ) {
                     if (selectedTab == "Beranda") {
-                        Card(
-                            Modifier.fillMaxWidth().height(if (tvLayout) 340.dp else 300.dp),
-                            shape = RoundedCornerShape(26.dp),
-                            colors = CardDefaults.cardColors(containerColor = Color(0xFF29203B))
-                        ) {
-                            Box(Modifier.fillMaxSize().background(Color(0xFF21172F))) {
-                                Column(Modifier.align(Alignment.CenterEnd).padding(end = 18.dp)) {
-                                    Text("✦", color = Color(0xFFB69AFF), fontSize = if (tvLayout) 130.sp else 105.sp)
-                                    Text("GENJUR", color = Color(0xFF4B356A), fontSize = 28.sp, fontWeight = FontWeight.Black)
-                                }
-                                Column(
-                                    Modifier.align(Alignment.CenterStart).fillMaxWidth(0.78f).padding(20.dp),
-                                    verticalArrangement = Arrangement.Center
-                                ) {
-                                    Text("PILIHAN HARI INI", color = Color(0xFFC4A7FF), fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                    Spacer(Modifier.height(12.dp))
-                                    Text("Cerita hebat.\nPengalaman seru.", color = Color.White,
-                                        fontSize = if (tvLayout) 38.sp else 29.sp, lineHeight = if (tvLayout) 43.sp else 34.sp,
-                                        fontWeight = FontWeight.ExtraBold)
-                                    Spacer(Modifier.height(8.dp))
-                                    Text("Temukan tontonan dari katalog sumber resmi dan berizin.",
-                                        color = Color(0xFFD4CEDD), fontSize = 13.sp, lineHeight = 18.sp)
-                                    Spacer(Modifier.height(16.dp))
-                                    Button(onClick = { selectedTab = "Kategori" },
-                                        colors = ButtonDefaults.buttonColors(containerColor = Green, contentColor = Color.White),
-                                        shape = RoundedCornerShape(12.dp)) { Text("Jelajahi") }
-                                }
-                            }
-                        }
-                        Spacer(Modifier.height(18.dp))
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                             Text("Lanjutkan Menonton", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
                             TextButton(onClick = { selectedTab = "Riwayat" }) { Text("Lihat semua  →", color = Green) }
