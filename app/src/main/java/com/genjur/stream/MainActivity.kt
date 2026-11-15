@@ -120,7 +120,7 @@ private class PlaybackStartedBridge(
     }
 }
 
-private data class StreamOption(val quality: String, val videoUrl: String)
+private data class StreamOption(val quality: String, val videoUrl: String, val sizeBytes: Long = 0L)
 
 private data class FeedMovie(
     val title: String,
@@ -176,6 +176,13 @@ private fun decodeMovie(json: JSONObject): FeedMovie {
     )
 }
 
+
+private fun formatVideoSize(bytes: Long): String {
+    if (bytes <= 0L) return "Tidak diketahui"
+    val mb = bytes / (1024.0 * 1024.0)
+    return if (mb >= 1024.0) String.format(java.util.Locale.US, "%.2f GB", mb / 1024.0)
+        else String.format(java.util.Locale.US, "%.1f MB", mb)
+}
 
 private fun cleanCommonsText(value: String): String =
     value.replace(Regex("<[^>]+>"), " ").replace(Regex("\\s+"), " ").trim()
@@ -1660,7 +1667,8 @@ private fun SourceBrowser(
     var pageTitle by remember { mutableStateOf("Masukkan alamat situs sumber video.") }
     var detectedVideoTitle by remember { mutableStateOf("") }
     var detectedVideoPage by remember { mutableStateOf("") }
-    var detectedVideoUrl by remember { mutableStateOf("") }
+    var detectedVideoOptions by remember { mutableStateOf<List<StreamOption>>(emptyList()) }
+    var showDownloadChoices by remember { mutableStateOf(false) }
     var isLoading by remember(initialUrl) { mutableStateOf(initialUrl.isNotBlank()) }
     var webView by remember { mutableStateOf<WebView?>(null) }
     val loadingFallback = remember { Runnable { isLoading = false } }
@@ -1691,24 +1699,53 @@ private fun SourceBrowser(
             }
             Text(pageTitle, color = Muted, fontSize = 11.sp, maxLines = 2)
         }
-        if (detectedVideoUrl.isNotBlank()) {
+        if (detectedVideoOptions.isNotEmpty()) {
             Card(colors = CardDefaults.cardColors(containerColor = Panel)) {
                 Row(Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 7.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween) {
                     Column(Modifier.weight(1f)) {
-                        Text("Video langsung terdeteksi", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                        Text("Siap dicoba diunduh: ${detectedVideoTitle.ifBlank { "Video dari situs" }}",
-                            color = Muted, fontSize = 10.sp, maxLines = 2)
+                        Text("Pilihan kualitas download tersedia", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                        Text(detectedVideoTitle.ifBlank { "Video dari situs" }, color = Muted, fontSize = 10.sp, maxLines = 2)
                     }
-                    Button(onClick = { onDownloadCandidate(detectedVideoTitle, detectedVideoPage, detectedVideoUrl) },
+                    Button(onClick = { showDownloadChoices = true },
                         colors = ButtonDefaults.buttonColors(containerColor = Green, contentColor = Color.White)) {
                         Icon(Icons.Filled.Download, contentDescription = null)
                         Spacer(Modifier.width(4.dp))
-                        Text("Download")
+                        Text("Pilih")
                     }
                 }
             }
+        }
+        if (showDownloadChoices) {
+            AlertDialog(
+                onDismissRequest = { showDownloadChoices = false },
+                title = { Text("Pilih resolusi / ukuran") },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        detectedVideoOptions.forEach { option ->
+                            OutlinedButton(
+                                modifier = Modifier.fillMaxWidth(),
+                                onClick = {
+                                    showDownloadChoices = false
+                                    onDownloadCandidate(detectedVideoTitle, detectedVideoPage, option.videoUrl)
+                                }
+                            ) {
+                                Column(Modifier.fillMaxWidth()) {
+                                    Text(option.quality, color = Color.White, fontWeight = FontWeight.SemiBold)
+                                    Text(if (option.sizeBytes > 0) "Ukuran sekitar ${formatVideoSize(option.sizeBytes)}"
+                                        else "Ukuran file belum tersedia dari situs",
+                                        color = Muted, fontSize = 11.sp)
+                                }
+                            }
+                        }
+                    }
+                },
+                confirmButton = { TextButton(onClick = { showDownloadChoices = false }) { Text("Batal") } },
+                containerColor = Panel,
+                titleContentColor = Color.White,
+                textContentColor = Color.White
+            )
         }
         Box(
             modifier = if (fullScreen) Modifier.fillMaxWidth().weight(1f) else Modifier.fillMaxWidth().height(420.dp),
@@ -1741,7 +1778,16 @@ private fun SourceBrowser(
                                 if (directFile && uri.scheme in listOf("http", "https") && !uri.host.isNullOrBlank()) {
                                     detectedVideoTitle = title
                                     detectedVideoPage = pageUrl
-                                    detectedVideoUrl = videoUrl
+                                    val label = when {
+                                        path.contains("2160") || path.contains("4k") -> "4K"
+                                        path.contains("1080") -> "Full HD 1080p"
+                                        path.contains("720") -> "HD 720p"
+                                        path.contains("480") -> "SD 480p"
+                                        path.contains("360") -> "SD 360p"
+                                        else -> "Otomatis / kualitas terdeteksi"
+                                    }
+                                    val item = StreamOption(label, videoUrl)
+                                    detectedVideoOptions = (detectedVideoOptions.filterNot { it.videoUrl == videoUrl } + item)
                                 }
                             }
                         }
@@ -1775,23 +1821,38 @@ private fun SourceBrowser(
                                 """(function(){
                                     if (window.__genjurPlaybackHooked) return;
                                     window.__genjurPlaybackHooked = true;
-                                    function reportLink(a) {
+                                    function reportMedia(title, url, quality) {
                                         try {
-                                            var href = a.href || '';
-                                            if (/\.(mp4|webm|mov|mkv)(?:$|[?#])/i.test(href)) {
-                                                GenjurPlayback.onVideoAvailable(a.textContent || document.title || 'Video dari situs', location.href, href);
-                                            }
+                                            if (!url || !/\.(mp4|webm|mov|mkv)(?:$|[?#])/i.test(url)) return;
+                                            GenjurPlayback.onVideoAvailable(title || document.title || 'Video dari situs', location.href, url);
                                         } catch(e) {}
+                                    }
+                                    function reportLink(a) {
+                                        try { reportMedia(a.textContent, a.href, a.getAttribute('data-quality') || 'Link video langsung'); } catch(e) {}
                                     }
                                     function hookVideo(v) {
                                         if (v.__genjurPlaybackHooked) return;
                                         v.__genjurPlaybackHooked = true;
+                                        function scanSources() {
+                                            var title = document.title || 'Video dari situs';
+                                            var sources = v.querySelectorAll('source[src]');
+                                            sources.forEach(function(source) {
+                                                var label = source.getAttribute('label') || source.getAttribute('data-quality') ||
+                                                    source.getAttribute('size') || (v.videoHeight ? (v.videoHeight + 'p') : 'Kualitas tersedia');
+                                                reportMedia(title + ' - ' + label, source.src, label);
+                                            });
+                                            var media = v.currentSrc || v.src || '';
+                                            if (media) {
+                                                var quality = v.videoHeight ? (v.videoHeight + 'p') : 'Kualitas otomatis';
+                                                reportMedia(title + ' - ' + quality, media, quality);
+                                            }
+                                        }
+                                        v.addEventListener('loadedmetadata', scanSources);
                                         v.addEventListener('play', function() {
                                             try {
                                                 var title = document.title || 'Video dari situs';
                                                 GenjurPlayback.onVideoPlay(title, location.href);
-                                                var media = v.currentSrc || v.src || '';
-                                                if (media) GenjurPlayback.onVideoAvailable(title, location.href, media);
+                                                scanSources();
                                             } catch(e) {}
                                         }, { once: true });
                                     }
