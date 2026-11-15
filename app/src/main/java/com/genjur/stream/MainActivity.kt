@@ -577,26 +577,23 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
             }
             if (!cookies.isNullOrBlank()) append("Cookie: $cookies\r\n")
         }
-        val probeArgs = mutableListOf("-v", "error", "-show_entries", "format=duration", "-of", "json")
-        probeArgs.addAll(listOf("-headers", headers, mediaUrl))
-        FFprobeKit.executeWithArgumentsAsync(probeArgs.toTypedArray()) { probeSession ->
-            val durationMs = runCatching {
-                val seconds = JSONObject(probeSession.output.orEmpty())
-                    .optJSONObject("format")?.optString("duration")?.toDoubleOrNull() ?: 0.0
-                (seconds * 1000.0).toLong().coerceAtLeast(0L)
-            }.getOrDefault(0L)
-            setAdaptiveState(id, 0, "Mengunduh")
-            val args = mutableListOf(
-                "-y", "-hide_banner", "-loglevel", "warning",
-                "-headers", headers,
-                "-i", mediaUrl,
-                "-map", "0:v:0",
-                "-map", "0:a:0?",
-                "-c", "copy",
-                "-movflags", "+faststart",
-                "-f", "mp4",
-                outputFile.absolutePath
-            )
+        // Mulai FFmpeg langsung. FFprobe sebelumnya berjalan lebih dulu dan dapat
+        // membuat proses native berhenti pada sebagian perangkat; durasi tidak wajib
+        // untuk mengukur byte dan Mbps karena ukuran file dipantau dari output MP4.
+        val args = mutableListOf(
+            "-y", "-hide_banner", "-loglevel", "warning",
+            "-headers", headers,
+            "-i", mediaUrl,
+            "-map", "0:v:0",
+            "-map", "0:a:0?",
+            "-c", "copy",
+            "-movflags", "+faststart",
+            "-f", "mp4",
+            outputFile.absolutePath
+        )
+        downloadStates = downloadStates + (id to (0 to "Mengunduh"))
+        downloadMessage = "Unduhan dimulai. Ukuran dan Mbps diperbarui di menu Unduhan."
+        try {
             FFmpegKit.executeWithArgumentsAsync(
                 args.toTypedArray(),
                 { session ->
@@ -615,13 +612,13 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                     }
                 },
                 null,
-                { statistics ->
-                    val percent = if (durationMs > 0L) {
-                        ((statistics.time.toLong() * 100L) / durationMs).toInt().coerceIn(0, 99)
-                    } else 0
-                    setAdaptiveState(id, percent, "Mengunduh")
-                }
+                { _ -> setAdaptiveState(id, 0, "Mengunduh") }
             ).also { session -> adaptiveSessions[id] = session.sessionId }
+        } catch (error: Exception) {
+            adaptiveSessions.remove(id)
+            downloadStates = downloadStates + (id to (0 to "Gagal"))
+            downloadMessage = "Gagal memulai mesin unduhan: ${error.message ?: error.javaClass.simpleName}"
+            android.util.Log.e("GENJUR_DOWNLOAD", "FFmpeg gagal dijalankan", error)
         }
     }
     fun startWebVideoDownload(title: String, pageUrl: String, mediaUrl: String) {
@@ -693,7 +690,8 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                     states[entry.id] = when {
                         file.exists() && currentBytes > 0L -> 100 to "Selesai"
                         downloadStates[entry.id]?.second == "Gagal" -> downloadStates[entry.id]!!
-                        else -> downloadStates[entry.id] ?: (0 to "Menyiapkan")
+                        adaptiveSessions.containsKey(entry.id) -> downloadStates[entry.id] ?: (0 to "Mengunduh")
+                        else -> 0 to "Terhenti — mulai ulang unduhan"
                     }
                     metrics[entry.id] = DownloadMetrics(currentBytes, 0L, speed)
                 } else {
