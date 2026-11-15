@@ -12,6 +12,7 @@ import android.os.Bundle
 import android.os.Build
 import android.os.Environment
 import android.webkit.WebChromeClient
+import android.webkit.DownloadListener
 import android.webkit.JavascriptInterface
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
@@ -530,15 +531,23 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
             downloadStates = downloadStates + (id to (percent.coerceIn(0, 100) to label))
         }
     }
-    fun startAdaptiveDownload(title: String, pageUrl: String, mediaUrl: String) {
+    fun startAdaptiveDownload(title: String, pageUrl: String, mediaUrl: String, retryId: Long? = null) {
         val uri = Uri.parse(mediaUrl)
         if (uri.scheme !in listOf("http", "https") || uri.host.isNullOrBlank()) {
             downloadMessage = "Alamat streaming tidak valid."
             return
         }
-        if (downloads.any { it.movie.downloadUrl == mediaUrl }) {
+        if (downloads.any { it.id != retryId && it.movie.downloadUrl == mediaUrl }) {
             downloadMessage = "Streaming ini sudah ada di daftar Unduhan."
             return
+        }
+        if (retryId != null) {
+            adaptiveSessions[retryId]?.let { FFmpegKit.cancel(it) }
+            val oldEntry = downloads.firstOrNull { it.id == retryId }
+            oldEntry?.let { File(Uri.parse(it.movie.videoUrl).path.orEmpty()).delete() }
+            downloads = downloads.filterNot { it.id == retryId }
+            downloadStates = downloadStates - retryId
+            persistDownloads(downloads)
         }
         val id = -System.currentTimeMillis().coerceAtLeast(1L)
         val outputDir = activity.getExternalFilesDir(Environment.DIRECTORY_MOVIES)
@@ -1212,6 +1221,11 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                                                             recordWatch(offlineMovie)
                                                             playingMovie = offlineMovie
                                                         }) { Text("Putar offline", color = Green) }
+                                                    }
+                                                    if (entry.id < 0L && (state.second.startsWith("Terhenti") || state.second == "Gagal")) {
+                                                        TextButton(onClick = {
+                                                            startAdaptiveDownload(entry.movie.title, entry.movie.termsUrl, entry.movie.downloadUrl, entry.id)
+                                                        }) { Text("Mulai ulang", color = Green) }
                                                     }
                                                     TextButton(onClick = {
                                                         if (entry.id < 0L) {
@@ -2119,6 +2133,17 @@ private fun SourceBrowser(
                     // Jangan gunakan progress WebView untuk indikator buffering.
                     // Iklan/iframe dapat mengubah progres setelah halaman utama selesai.
                     webChromeClient = WebChromeClient()
+                    // Tangkap unduhan dari situs di dalam aplikasi, bukan melemparkannya
+                    // ke browser atau aplikasi unduhan eksternal.
+                    setDownloadListener(DownloadListener { url, _, _, _, _ ->
+                        if (url.isNotBlank()) {
+                            onDownloadCandidate(
+                                title.ifBlank { "Video dari situs" },
+                                this.url?.takeIf { it.startsWith("http") } ?: currentUrl,
+                                url
+                            )
+                        }
+                    })
                     addJavascriptInterface(PlaybackStartedBridge(
                         onPlayback = { title, pageUrl -> post {
                             if (!playbackNotificationSent) {
