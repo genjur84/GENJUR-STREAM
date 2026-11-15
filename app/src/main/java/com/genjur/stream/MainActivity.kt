@@ -1775,6 +1775,14 @@ private fun SourceBrowser(
                                 """(function(){
                                     if (window.__genjurPlaybackHooked) return;
                                     window.__genjurPlaybackHooked = true;
+                                    function reportLink(a) {
+                                        try {
+                                            var href = a.href || '';
+                                            if (/\\.(mp4|webm|mov|mkv)(?:$|[?#])/i.test(href)) {
+                                                GenjurPlayback.onVideoAvailable(a.textContent || document.title || 'Video dari situs', location.href, href);
+                                            }
+                                        } catch(e) {}
+                                    }
                                     function hookVideo(v) {
                                         if (v.__genjurPlaybackHooked) return;
                                         v.__genjurPlaybackHooked = true;
@@ -1788,11 +1796,16 @@ private fun SourceBrowser(
                                         }, { once: true });
                                     }
                                     document.querySelectorAll('video').forEach(hookVideo);
+                                    document.querySelectorAll('a[href]').forEach(reportLink);
                                     new MutationObserver(function(records) {
                                         records.forEach(function(record) {
                                             record.addedNodes.forEach(function(node) {
                                                 if (node.tagName === 'VIDEO') hookVideo(node);
-                                                if (node.querySelectorAll) node.querySelectorAll('video').forEach(hookVideo);
+                                                if (node.tagName === 'A') reportLink(node);
+                                                if (node.querySelectorAll) {
+                                                    node.querySelectorAll('video').forEach(hookVideo);
+                                                    node.querySelectorAll('a[href]').forEach(reportLink);
+                                                }
                                             });
                                         });
                                     }).observe(document.documentElement, { childList: true, subtree: true });
