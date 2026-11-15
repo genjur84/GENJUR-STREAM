@@ -2,15 +2,31 @@
   "schemaVersion": 1,
   "provider": {
     "id": "genjur-public-domain-catalog",
-    "name": "Katalog Domain Publik",
-    "version": "1.0.0",
-    "description": "Katalog video yang hak distribusinya telah diperiksa."
+    "name": "Arsip Film Domain Publik",
+    "version": "1.0.1",
+    "description": "Katalog film klasik yang status domain publiknya didokumentasikan per karya."
   },
   "rights": {
     "redistributionAllowed": true,
-    "licenseId": "CC0-1.0",
-    "termsUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
-    "attribution": "Katalog GENJUR; setiap item wajib mencantumkan sumber dan status haknya."
+    "licenseId": "Public Domain Mark 1.0",
+    "termsUrl": "https://creativecommons.org/publicdomain/mark/1.0/",
+    "attribution": "Sumber berkas: Wikimedia Commons. A Trip to the Moon (1902), Georges Méliès; status domain publik ditandai pada halaman berkas Wikimedia Commons."
   },
-  "items": []
+  "items": [
+    {
+      "title": "A Trip to the Moon (Le Voyage dans la Lune)",
+      "description": "Film fiksi ilmiah bisu karya Georges Méliès, dirilis pada 1902. Salinan digital yang digunakan ditandai sebagai domain publik pada Wikimedia Commons. Pemutaran menggunakan berkas WebM; dukungan codec bergantung pada perangkat.",
+      "category": "Film Klasik",
+      "videoUrl": "https://commons.wikimedia.org/wiki/Special:Redirect/file/Le_Voyage_dans_la_Lune_%281902%29.webm",
+      "posterUrl": "https://commons.wikimedia.org/wiki/Special:FilePath/Trip-to-moon-1902.jpg",
+      "releaseYear": "1902",
+      "genres": [
+        "Fiksi ilmiah",
+        "Fantasi",
+        "Film bisu"
+      ],
+      "duration": "12 menit 46 detik",
+      "downloadAllowed": false
+    }
+  ]
 }
