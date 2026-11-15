@@ -2,6 +2,7 @@ package com.genjur.stream
 
 import android.app.DownloadManager
 import android.content.Intent
+import android.content.pm.ActivityInfo
 import android.net.Uri
 import android.os.Bundle
 import android.os.Environment
@@ -31,6 +32,8 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Fullscreen
+import androidx.compose.material.icons.filled.FullscreenExit
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -52,6 +55,9 @@ import androidx.media3.common.MimeTypes
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import androidx.core.content.FileProvider
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -1698,6 +1704,7 @@ private fun ProviderWebDialog(url: String, onClose: () -> Unit) {
 
 @Composable
 private fun InAppVideoPlayer(activity: MainActivity, movie: FeedMovie, onClose: () -> Unit) {
+    var isFullscreen by remember { mutableStateOf(false) }
     val player = remember(movie.videoUrl) {
         ExoPlayer.Builder(activity).build().apply {
             val mediaItem = MediaItem.Builder().setUri(movie.videoUrl).apply {
@@ -1720,43 +1727,95 @@ private fun InAppVideoPlayer(activity: MainActivity, movie: FeedMovie, onClose: 
         }
     }
     DisposableEffect(player) {
-        onDispose { player.release() }
+        onDispose {
+            player.release()
+            activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+            WindowInsetsControllerCompat(activity.window, activity.window.decorView)
+                .show(WindowInsetsCompat.Type.systemBars())
+        }
+    }
+    fun setFullscreen(enabled: Boolean) {
+        isFullscreen = enabled
+        activity.requestedOrientation = if (enabled) {
+            ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+        } else {
+            ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+        }
+        val controller = WindowInsetsControllerCompat(activity.window, activity.window.decorView)
+        if (enabled) {
+            WindowCompat.setDecorFitsSystemWindows(activity.window, false)
+            controller.hide(WindowInsetsCompat.Type.systemBars())
+            controller.systemBarsBehavior =
+                WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        } else {
+            controller.show(WindowInsetsCompat.Type.systemBars())
+            WindowCompat.setDecorFitsSystemWindows(activity.window, true)
+        }
     }
     Dialog(
         onDismissRequest = onClose,
         properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
         Surface(
-            modifier = Modifier.fillMaxWidth().fillMaxHeight(0.88f).padding(12.dp),
-            shape = RoundedCornerShape(20.dp),
-            color = Panel
+            modifier = if (isFullscreen) Modifier.fillMaxSize() else
+                Modifier.fillMaxWidth().fillMaxHeight(0.88f).padding(12.dp),
+            shape = if (isFullscreen) RoundedCornerShape(0.dp) else RoundedCornerShape(20.dp),
+            color = Color.Black
         ) {
-            Column(Modifier.fillMaxSize().padding(12.dp)) {
-                Row(
-                    Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(movie.title, color = Color.White, fontWeight = FontWeight.Bold,
-                        modifier = Modifier.weight(1f))
-                    TextButton(onClick = onClose) { Text("Tutup", color = Green) }
+            if (isFullscreen) {
+                Box(Modifier.fillMaxSize()) {
+                    AndroidView(
+                        factory = { context ->
+                            PlayerView(context).apply {
+                                this.player = player
+                                useController = true
+                                setShowBuffering(PlayerView.SHOW_BUFFERING_WHEN_PLAYING)
+                            }
+                        },
+                        update = { it.player = player },
+                        modifier = Modifier.fillMaxSize()
+                    )
+                    IconButton(
+                        onClick = { setFullscreen(false) },
+                        modifier = Modifier.align(Alignment.TopEnd).padding(12.dp)
+                    ) {
+                        Icon(Icons.Filled.FullscreenExit, contentDescription = "Keluar full screen", tint = Color.White)
+                    }
                 }
-                AndroidView(
-                    factory = { context ->
-                        PlayerView(context).apply {
-                            this.player = player
-                            useController = true
+            } else {
+                Column(Modifier.fillMaxSize().background(Panel).padding(12.dp)) {
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(movie.title, color = Color.White, fontWeight = FontWeight.Bold,
+                            modifier = Modifier.weight(1f), maxLines = 1)
+                        IconButton(onClick = { setFullscreen(true) }) {
+                            Icon(Icons.Filled.Fullscreen, contentDescription = "Full screen", tint = Green)
                         }
-                    },
-                    update = { it.player = player },
-                    modifier = Modifier.fillMaxWidth().weight(1f)
-                )
-                Text(if (movie.subtitleUrl.isNotBlank()) "Subtitle: ${movie.subtitleLanguage.ifBlank { "Indonesia" }} (aktifkan CC di pemutar)" else "Subtitle eksternal belum tersedia untuk judul ini.", color = Muted, fontSize = 11.sp)
+                        TextButton(onClick = onClose) { Text("Tutup", color = Green) }
+                    }
+                    AndroidView(
+                        factory = { context ->
+                            PlayerView(context).apply {
+                                this.player = player
+                                useController = true
+                                setShowBuffering(PlayerView.SHOW_BUFFERING_WHEN_PLAYING)
+                            }
+                        },
+                        update = { it.player = player },
+                        modifier = Modifier.fillMaxWidth().weight(1f)
+                    )
+                    Text(
+                        if (movie.subtitleUrl.isNotBlank()) "Subtitle: ${movie.subtitleLanguage.ifBlank { "Indonesia" }} (aktifkan CC di pemutar)" else "Subtitle eksternal belum tersedia untuk judul ini.",
+                        color = Muted, fontSize = 11.sp
+                    )
+                }
             }
         }
     }
 }
-
 
 private data class SavedRepository(val name: String, val url: String)
 private data class RepositoryExtension(
