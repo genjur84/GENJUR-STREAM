@@ -1,12 +1,12 @@
 {
   "schemaVersion": 1,
   "name": "GENJUR STREAM — Film Gratis & Legal",
-  "description": "Katalog film gratis dengan lisensi terbuka atau domain publik. Tidak memuat layanan berlangganan.",
+  "description": "Direktori layanan resmi dan katalog film gratis berlisensi terbuka. Hanya konten yang memang ditandai gratis yang boleh ditampilkan; layanan berlangganan tidak otomatis berarti semua filmnya gratis.",
   "extensions": [
     {
       "id": "wikimedia-public-domain",
       "name": "Film Domain Publik — Wikimedia Commons",
-      "description": "Katalog video film dengan lisensi domain publik, CC0, atau CC BY yang memenuhi pemeriksaan lisensi aplikasi.",
+      "description": "Katalog video film domain publik, CC0, atau CC BY yang lolos pemeriksaan lisensi aplikasi.",
       "language": "Beragam",
       "contentTypes": [
         "Film",
@@ -15,7 +15,88 @@
       "subtitleLanguages": [],
       "feedUrl": "https://raw.githubusercontent.com/genjur84/GENJUR-STREAM/main/feeds/wikimedia-public-domain.json",
       "websiteUrl": "",
-      "freeNote": "Periksa lisensi dan atribusi pada halaman setiap berkas."
+      "freeNote": "Gratis berdasarkan lisensi yang tercantum pada setiap berkas."
+    },
+    {
+      "id": "prime-video-free",
+      "name": "Prime Video — Konten Gratis",
+      "description": "Buka layanan resmi Prime Video. Hanya judul yang secara eksplisit tersedia gratis di wilayah dan akun pengguna yang boleh dipilih.",
+      "language": "Beragam",
+      "contentTypes": [
+        "Film",
+        "Serial"
+      ],
+      "subtitleLanguages": [
+        "Indonesia"
+      ],
+      "feedUrl": "",
+      "websiteUrl": "https://www.primevideo.com/",
+      "freeNote": "Ketersediaan gratis bergantung wilayah, akun, dan ketentuan Prime Video; judul berbayar tidak termasuk."
+    },
+    {
+      "id": "viu-free",
+      "name": "Viu — Konten Gratis",
+      "description": "Buka layanan resmi Viu untuk menelusuri judul yang ditandai gratis.",
+      "language": "Asia",
+      "contentTypes": [
+        "Film",
+        "Serial"
+      ],
+      "subtitleLanguages": [
+        "Indonesia"
+      ],
+      "feedUrl": "",
+      "websiteUrl": "https://www.viu.com/ott/id/",
+      "freeNote": "Hanya konten gratis resmi; konten Premium tidak dimasukkan."
+    },
+    {
+      "id": "iqiyi-free",
+      "name": "iQIYI — Konten Gratis",
+      "description": "Buka layanan resmi iQIYI untuk menelusuri judul yang ditandai gratis.",
+      "language": "Asia",
+      "contentTypes": [
+        "Film",
+        "Serial",
+        "Animasi"
+      ],
+      "subtitleLanguages": [
+        "Indonesia"
+      ],
+      "feedUrl": "",
+      "websiteUrl": "https://www.iq.com/",
+      "freeNote": "Hanya konten gratis resmi; VIP dan judul berbayar tidak dimasukkan."
+    },
+    {
+      "id": "hotstar-free",
+      "name": "Disney+ Hotstar — Konten Gratis",
+      "description": "Buka layanan resmi Disney+ Hotstar. Katalog gratis hanya tersedia jika penyedia secara resmi menawarkan judul tanpa langganan.",
+      "language": "Beragam",
+      "contentTypes": [
+        "Film",
+        "Serial"
+      ],
+      "subtitleLanguages": [
+        "Indonesia"
+      ],
+      "feedUrl": "",
+      "websiteUrl": "https://www.hotstar.com/id",
+      "freeNote": "Jangan anggap katalog langganan sebagai gratis; ikuti label dan ketentuan resmi yang tampil."
+    },
+    {
+      "id": "netflix-free",
+      "name": "Netflix — Konten Gratis",
+      "description": "Buka layanan resmi Netflix. Tambahkan judul hanya bila Netflix secara resmi menyediakan akses gratis untuk wilayah pengguna.",
+      "language": "Beragam",
+      "contentTypes": [
+        "Film",
+        "Serial"
+      ],
+      "subtitleLanguages": [
+        "Indonesia"
+      ],
+      "feedUrl": "",
+      "websiteUrl": "https://www.netflix.com/id/",
+      "freeNote": "Netflix umumnya memerlukan langganan; jangan masukkan judul yang terkunci di balik paket berbayar."
     }
   ]
 }
