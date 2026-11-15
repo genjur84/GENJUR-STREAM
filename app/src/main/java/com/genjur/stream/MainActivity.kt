@@ -721,19 +721,24 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                                 }
                             }
                             "Browser Sumber" -> {
-                                SourceBrowser(initialUrl = browserInitialUrl, fullScreen = true, onPlaybackStarted = { pageTitle, pageUrl ->
-                                    val safeTitle = pageTitle.trim().takeIf { it.isNotBlank() }
-                                        ?: Uri.parse(pageUrl).host.orEmpty().ifBlank { "Video dari situs" }
-                                    recordWatch(FeedMovie(
-                                        title = safeTitle,
-                                        description = "Tontonan yang mulai diputar melalui Browser Sumber.",
-                                        category = "Sumber Web",
-                                        videoUrl = pageUrl,
-                                        licenseId = "User-provided website",
-                                        termsUrl = pageUrl,
-                                        attribution = "Situs sumber: ${Uri.parse(pageUrl).host.orEmpty()}"
-                                    ))
-                                })
+                                // Buat WebView baru setiap kali alamat sumber berubah.
+                                // Ini mencegah callback loading dari situs sebelumnya
+                                // menimpa status loading situs yang baru dibuka.
+                                key(browserInitialUrl) {
+                                    SourceBrowser(initialUrl = browserInitialUrl, fullScreen = true, onPlaybackStarted = { pageTitle, pageUrl ->
+                                        val safeTitle = pageTitle.trim().takeIf { it.isNotBlank() }
+                                            ?: Uri.parse(pageUrl).host.orEmpty().ifBlank { "Video dari situs" }
+                                        recordWatch(FeedMovie(
+                                            title = safeTitle,
+                                            description = "Tontonan yang mulai diputar melalui Browser Sumber.",
+                                            category = "Sumber Web",
+                                            videoUrl = pageUrl,
+                                            licenseId = "User-provided website",
+                                            termsUrl = pageUrl,
+                                            attribution = "Situs sumber: ${Uri.parse(pageUrl).host.orEmpty()}"
+                                        ))
+                                    })
+                                }
                             }
                             "Kategori" -> {
                                 categories.forEach { item ->
