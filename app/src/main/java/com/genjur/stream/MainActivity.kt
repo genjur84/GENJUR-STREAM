@@ -998,7 +998,7 @@ private fun RepositoryDialog(activity: MainActivity, onClose: () -> Unit) {
                             }
                         }
                     } else {
-                        error("Format repositori tidak dikenal. Mendukung GENJUR schemaVersion 1 dan CloudStream manifestVersion 1.")
+                        error("Format repositori tidak dikenal. Mendukung repositori GENJUR schemaVersion 1 dan daftar metadata CloudStream (plugin .cs3 tidak dijalankan).")
                     }
                     parsed
                 }
@@ -1011,11 +1011,11 @@ private fun RepositoryDialog(activity: MainActivity, onClose: () -> Unit) {
 
     AlertDialog(
         onDismissRequest = onClose,
-        title = { Text("Repositori & Ekstensi") },
+        title = { Text("Repositori Penyedia Film") },
         text = {
             Column(Modifier.heightIn(max = 520.dp).verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(9.dp)) {
-                Text("Tambahkan repositori untuk menemukan ekstensi katalog. GENJUR STREAM hanya membaca metadata JSON/feed HTTPS; ekstensi tidak menjalankan kode dari pihak ketiga.",
+                Text("Tambahkan repositori untuk menemukan penyedia situs film. Setiap penyedia memasok katalog dan tautan pemutaran yang kompatibel. GENJUR STREAM membaca feed JSON HTTPS dan tidak menjalankan kode/plugin pihak ketiga.",
                     color = Muted, fontSize = 12.sp)
                 OutlinedTextField(value = name, onValueChange = { name = it },
                     label = { Text("Nama repositori") }, singleLine = true)
@@ -1030,7 +1030,7 @@ private fun RepositoryDialog(activity: MainActivity, onClose: () -> Unit) {
                                 Text(repo.name, color = Color.White, fontWeight = FontWeight.Bold)
                                 Text(repo.url, color = Muted, fontSize = 10.sp)
                                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    TextButton(onClick = { loadRepository(repo) }) { Text("Periksa ekstensi") }
+                                    TextButton(onClick = { loadRepository(repo) }) { Text("Lihat penyedia") }
                                     TextButton(onClick = {
                                         repositories = repositories.filterNot { it.url == repo.url }
                                         discovered = discovered.filterNot { it.repositoryUrl == repo.url }
@@ -1044,7 +1044,7 @@ private fun RepositoryDialog(activity: MainActivity, onClose: () -> Unit) {
                 }
                 if (loading) LinearProgressIndicator(Modifier.fillMaxWidth(), color = Green)
                 if (discovered.isNotEmpty()) {
-                    Text("Ekstensi ditemukan", color = Color.White, fontWeight = FontWeight.Bold)
+                    Text("Penyedia film ditemukan", color = Color.White, fontWeight = FontWeight.Bold)
                     discovered.forEach { extension ->
                         val isInstalled = installed.any { it.id == extension.id && it.repositoryUrl == extension.repositoryUrl }
                         Card(colors = CardDefaults.cardColors(containerColor = Panel)) {
@@ -1063,7 +1063,7 @@ private fun RepositoryDialog(activity: MainActivity, onClose: () -> Unit) {
                                             it.id == extension.id && it.repositoryUrl == extension.repositoryUrl
                                         } else installed + extension
                                         saveInstalled()
-                                    }) { Text(if (isInstalled) "Hapus ekstensi" else "Pasang ekstensi", color = Green) }
+                                    }) { Text(if (isInstalled) "Hapus ekstensi" else "Pasang penyedia", color = Green) }
                                 }
                             }
                         }
