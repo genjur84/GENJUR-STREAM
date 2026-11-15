@@ -1146,7 +1146,7 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                     }
                 }
 
-                if (selectedTab != "Browser Sumber") Row(
+                Row(
                     Modifier.fillMaxWidth().background(Color(0xFF15141B)).horizontalScroll(rememberScrollState()).padding(horizontal = 4.dp, vertical = 7.dp),
                     horizontalArrangement = Arrangement.spacedBy(2.dp),
                     verticalAlignment = Alignment.CenterVertically
