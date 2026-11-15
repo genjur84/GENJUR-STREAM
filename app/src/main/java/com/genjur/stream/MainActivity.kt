@@ -202,12 +202,12 @@ private fun readSavedMovies(activity: MainActivity, key: String): List<FeedMovie
 }.getOrDefault(emptyList())
 
 private fun savedFeedUrls(activity: MainActivity): List<String> = runCatching {
-    // Hanya baca feed yang ditambahkan sebagai sumber katalog lama.
-    // Ekstensi dari repositori sudah tidak digunakan oleh GENJUR STREAM.
-    val prefs = activity.getSharedPreferences("genjur_stream_sources", 0)
-    val legacy = JSONArray(prefs.getString("items", "[]"))
-    (0 until legacy.length()).mapNotNull { index ->
-        legacy.optJSONObject(index)?.optString("url")?.takeIf { it.isNotBlank() }
+    // Ambil langsung link situs yang disimpan pengguna pada menu Sumber Link.
+    val prefs = activity.getSharedPreferences("genjur_stream_saved_links", 0)
+    val saved = JSONArray(prefs.getString("items", "[]"))
+    (0 until saved.length()).mapNotNull { index ->
+        saved.optJSONObject(index)?.optString("url")?.trim()
+            ?.takeIf { it.startsWith("https://") }
     }.distinct()
 }.getOrDefault(emptyList())
 
@@ -919,11 +919,11 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                     }
                     Spacer(Modifier.height(18.dp))
                     if (selectedTab == "Beranda" || selectedTab == "Cari" || selectedTab == "Kategori") {
-                        Button(onClick = { selectedTab = "Sumber Link" },
+                        Button(onClick = { refreshCatalog() }, enabled = !feedLoading,
                             colors = ButtonDefaults.buttonColors(containerColor = Green, contentColor = Color.White)) {
-                            Text("Buka sumber link tersimpan")
+                            Text(if (feedLoading) "Membaca sumber..." else "Muat katalog dari sumber tersimpan")
                         }
-                        Text("Pilih sumber yang sudah kamu simpan, lalu tekan Buka untuk melihat situsnya di GENJUR STREAM.",
+                        Text(feedMessage.ifBlank { "Katalog akan dicoba dibaca otomatis dari link yang tersimpan." },
                             color = Muted, fontSize = 11.sp)
                     }
                     Text("GENJUR STREAM • Versi ${BuildConfig.VERSION_NAME}", color = Color(0xFF777180),
