@@ -1157,36 +1157,57 @@ private data class SourceSearchResult(val title: String, val url: String, val ho
 
 private fun searchWebSources(query: String): List<SourceSearchResult> {
     val encoded = java.net.URLEncoder.encode(query, "UTF-8")
-    val endpoint = "https://html.duckduckgo.com/html/?q=$encoded"
-    val connection = (URL(endpoint).openConnection() as java.net.HttpURLConnection).apply {
-        connectTimeout = 12000
-        readTimeout = 15000
-        setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 11) AppleWebKit/537.36 Chrome/120 Mobile Safari/537.36")
+    val endpoints = listOf(
+        "https://html.duckduckgo.com/html/?q=$encoded",
+        "https://lite.duckduckgo.com/lite/?q=$encoded"
+    )
+    val blockedHosts = setOf("bit.ly", "tinyurl.com", "t.co", "is.gd", "cutt.ly", "shorturl.at")
+    var lastError: Exception? = null
+
+    for (endpoint in endpoints) {
+        val connection = (URL(endpoint).openConnection() as java.net.HttpURLConnection).apply {
+            connectTimeout = 15000
+            readTimeout = 20000
+            instanceFollowRedirects = true
+            requestMethod = "GET"
+            setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 11) AppleWebKit/537.36 Chrome/120.0.0.0 Mobile Safari/537.36")
+            setRequestProperty("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
+            setRequestProperty("Accept-Language", "id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7")
+        }
+        try {
+            val status = connection.responseCode
+            if (status !in 200..299) {
+                lastError = java.io.IOException("Layanan pencarian merespons HTTP $status")
+                continue
+            }
+            val html = connection.inputStream.bufferedReader().use { it.readText() }
+            val document = Jsoup.parse(html)
+            val anchors = document.select("a.result__a, a.result-link")
+            val results = anchors.mapNotNull { anchor ->
+                val raw = anchor.absUrl("href").ifBlank { anchor.attr("href") }
+                val resolved = runCatching {
+                    val wrapped = Uri.parse(raw)
+                    wrapped.getQueryParameter("uddg") ?: raw
+                }.getOrDefault(raw)
+                val uri = runCatching { Uri.parse(resolved) }.getOrNull() ?: return@mapNotNull null
+                val host = uri.host?.lowercase()?.removePrefix("www.") ?: return@mapNotNull null
+                val suspicious = uri.scheme != "https" || host.isBlank() || !host.contains(".") ||
+                    host.startsWith("xn--") || host.split(".").any { it.startsWith("xn--") } ||
+                    blockedHosts.any { host == it || host.endsWith(".$it") } ||
+                    uri.userInfo != null || host.matches(Regex("\\d{1,3}(\\.\\d{1,3}){3}"))
+                if (suspicious) return@mapNotNull null
+                val title = anchor.text().trim().ifBlank { host }
+                SourceSearchResult(title, uri.toString(), host)
+            }.distinctBy { it.host }.take(12)
+            if (results.isNotEmpty()) return results
+            lastError = java.io.IOException("Layanan pencarian tidak mengirim hasil yang bisa dibaca")
+        } catch (e: Exception) {
+            lastError = e
+        } finally {
+            connection.disconnect()
+        }
     }
-    try {
-        val html = connection.inputStream.bufferedReader().use { it.readText() }
-        val document = Jsoup.parse(html)
-        val blockedHosts = setOf("bit.ly", "tinyurl.com", "t.co", "is.gd", "cutt.ly", "shorturl.at")
-        return document.select(".result").mapNotNull { result ->
-            val anchor = result.selectFirst("a.result__a") ?: return@mapNotNull null
-            val raw = anchor.attr("href")
-            val resolved = runCatching {
-                val wrapped = Uri.parse(raw)
-                wrapped.getQueryParameter("uddg") ?: raw
-            }.getOrDefault(raw)
-            val uri = runCatching { Uri.parse(resolved) }.getOrNull() ?: return@mapNotNull null
-            val host = uri.host?.lowercase()?.removePrefix("www.") ?: return@mapNotNull null
-            val suspicious = uri.scheme != "https" || host.isBlank() || !host.contains(".") ||
-                host.startsWith("xn--") || host.split(".").any { it.startsWith("xn--") } ||
-                blockedHosts.any { host == it || host.endsWith(".$it") } ||
-                uri.userInfo != null || host.matches(Regex("\\d{1,3}(\\.\\d{1,3}){3}"))
-            if (suspicious) return@mapNotNull null
-            val title = anchor.text().trim().ifBlank { host }
-            SourceSearchResult(title, uri.toString(), host)
-        }.distinctBy { it.host }.take(12)
-    } finally {
-        connection.disconnect()
-    }
+    throw java.io.IOException(lastError?.message ?: "Tidak dapat menghubungi layanan pencarian")
 }
 private data class SavedSourceLink(val name: String, val url: String)
 
@@ -1224,7 +1245,7 @@ private fun SourceLinksScreen(activity: MainActivity, onOpenLink: (String) -> Un
             delay(650)
             val result = runCatching { withContext(Dispatchers.IO) { searchWebSources(term) } }
             result.onSuccess { searchResults = it }
-                .onFailure { searchError = "Pencarian gagal. Periksa koneksi atau coba lagi." }
+                .onFailure { error -> searchError = "Pencarian gagal: ${error.message ?: error.javaClass.simpleName}" }
             searching = false
         }
     }
