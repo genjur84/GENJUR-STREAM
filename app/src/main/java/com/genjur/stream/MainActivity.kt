@@ -1157,35 +1157,40 @@ private data class SourceSearchResult(val title: String, val url: String, val ho
 
 private fun searchWebSources(query: String): List<SourceSearchResult> {
     val encoded = java.net.URLEncoder.encode(query, "UTF-8")
+    // Coba beberapa endpoint Google terlebih dahulu; jangan bergantung pada Bing saja.
     val endpoints = listOf(
+        "https://www.google.com/search?gbv=1&q=$encoded",
+        "https://www.google.co.id/search?gbv=1&q=$encoded",
         "https://www.google.com/search?q=$encoded",
         "https://www.bing.com/search?format=rss&q=$encoded",
         "https://www.bing.com/search?q=$encoded"
     )
     val blockedHosts = setOf(
         "bit.ly", "tinyurl.com", "t.co", "is.gd", "cutt.ly", "shorturl.at",
-        "google.com", "www.google.com", "bing.com", "www.bing.com"
+        "google.com", "www.google.com", "google.co.id", "www.google.co.id",
+        "bing.com", "www.bing.com"
     )
-    var lastError: Exception? = null
+    val errors = mutableListOf<String>()
 
     for (endpoint in endpoints) {
-        val connection = (URL(endpoint).openConnection() as java.net.HttpURLConnection).apply {
-            connectTimeout = 15000
-            readTimeout = 20000
-            instanceFollowRedirects = true
-            requestMethod = "GET"
-            setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 11) AppleWebKit/537.36 Chrome/120.0.0.0 Mobile Safari/537.36")
-            setRequestProperty("Accept", "application/rss+xml,application/xml,text/html,application/xhtml+xml;q=0.9,*/*;q=0.8")
-            setRequestProperty("Accept-Language", "id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7")
-        }
+        var connection: java.net.HttpURLConnection? = null
         try {
+            connection = (URL(endpoint).openConnection() as java.net.HttpURLConnection).apply {
+                connectTimeout = 15000
+                readTimeout = 20000
+                instanceFollowRedirects = true
+                requestMethod = "GET"
+                setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 11) AppleWebKit/537.36 Chrome/120.0.0.0 Mobile Safari/537.36")
+                setRequestProperty("Accept", "application/rss+xml,application/xml,text/html,application/xhtml+xml;q=0.9,*/*;q=0.8")
+                setRequestProperty("Accept-Language", "id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7")
+            }
             val status = connection.responseCode
             if (status !in 200..299) {
-                lastError = java.io.IOException("Mesin pencari merespons HTTP $status")
+                errors.add("${URL(endpoint).host}: HTTP $status")
                 continue
             }
-            val html = connection.inputStream.bufferedReader().use { it.readText() }
-            val document = Jsoup.parse(html)
+            val body = connection.inputStream.bufferedReader().use { it.readText() }
+            val document = Jsoup.parse(body)
             val candidates = mutableListOf<Pair<String, String>>()
 
             if (endpoint.contains("format=rss")) {
@@ -1232,14 +1237,17 @@ private fun searchWebSources(query: String): List<SourceSearchResult> {
             }.distinctBy { it.host }.take(12)
 
             if (results.isNotEmpty()) return results
-            lastError = java.io.IOException("Hasil mesin pencari diterima, tetapi tautan situs tidak ditemukan atau tidak lolos filter.")
+            errors.add("${URL(endpoint).host}: halaman terbuka, tetapi tautan hasil tidak ditemukan.")
         } catch (e: Exception) {
-            lastError = e
+            errors.add("${runCatching { URL(endpoint).host }.getOrDefault("server")}: ${e.message ?: e.javaClass.simpleName}")
         } finally {
-            connection.disconnect()
+            connection?.disconnect()
         }
     }
-    throw java.io.IOException(lastError?.message ?: "Tidak dapat menghubungi mesin pencari")
+    throw java.io.IOException(
+        if (errors.isEmpty()) "Tidak dapat menghubungi mesin pencari."
+        else "Semua jalur pencarian gagal. " + errors.take(3).joinToString(" | ")
+    )
 }
 private data class SavedSourceLink(val name: String, val url: String)
 
