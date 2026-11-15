@@ -1236,18 +1236,31 @@ private fun SourceLinksScreen(activity: MainActivity, onOpenLink: (String) -> Un
         prefs.edit().putString("items", array.toString()).apply()
     }
 
+    val readableFieldColors = OutlinedTextFieldDefaults.colors(
+        focusedTextColor = Color.White,
+        unfocusedTextColor = Color.White,
+        focusedLabelColor = Color(0xFFD5DCEC),
+        unfocusedLabelColor = Color(0xFFD5DCEC),
+        focusedPlaceholderColor = Color(0xFFB8C2D4),
+        unfocusedPlaceholderColor = Color(0xFFB8C2D4),
+        focusedBorderColor = Green,
+        unfocusedBorderColor = Color(0xFF77718A),
+        cursorColor = Green
+    )
+
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Text("Cari alamat situs di internet. Hasil disaring dengan pemeriksaan dasar sebelum dipilih.",
-            color = Muted, fontSize = 12.sp)
+            color = Color(0xFFCBD2E0), fontSize = 12.sp)
         OutlinedTextField(
             value = sourceSearch, onValueChange = { sourceSearch = it },
             modifier = Modifier.fillMaxWidth(), singleLine = true,
             label = { Text("Cari situs atau nama domain") },
-            placeholder = { Text("Ketik kata kunci pencarian") }
+            placeholder = { Text("Ketik kata kunci pencarian") },
+            colors = readableFieldColors
         )
         if (searching) {
             LinearProgressIndicator(Modifier.fillMaxWidth(), color = Green)
-            Text("Mencari di internet…", color = Muted, fontSize = 11.sp)
+            Text("Mencari di internet…", color = Color(0xFFCBD2E0), fontSize = 11.sp)
         }
         searchError?.let { Text(it, color = MaterialTheme.colorScheme.error, fontSize = 11.sp) }
         if (!searching && searchError == null && sourceSearch.trim().length >= 2) {
@@ -1268,7 +1281,7 @@ private fun SourceLinksScreen(activity: MainActivity, onOpenLink: (String) -> Un
                         ) {
                             Column(Modifier.weight(1f)) {
                                 Text(candidate.title, color = Color.White, fontWeight = FontWeight.Bold)
-                                Text(candidate.host, color = Muted, fontSize = 10.sp)
+                                Text(candidate.host, color = Color(0xFFCBD2E0), fontSize = 11.sp)
                                 Text("Lolos filter dasar — belum terverifikasi aman", color = Color(0xFFFFC857), fontSize = 10.sp)
                             }
                             TextButton(onClick = {
@@ -1289,13 +1302,15 @@ private fun SourceLinksScreen(activity: MainActivity, onOpenLink: (String) -> Un
             value = name, onValueChange = { name = it },
             modifier = Modifier.fillMaxWidth(), singleLine = true,
             label = { Text("Nama sumber") },
-            placeholder = { Text("Contoh: Situs Film Resmi") }
+            placeholder = { Text("Contoh: Situs Film Resmi") },
+            colors = readableFieldColors
         )
         OutlinedTextField(
             value = url, onValueChange = { url = it },
             modifier = Modifier.fillMaxWidth(), singleLine = true,
             label = { Text("Link situs (HTTPS)") },
-            placeholder = { Text("https://contoh.com") }
+            placeholder = { Text("https://contoh.com") },
+            colors = readableFieldColors
         )
         message?.let { Text(it, color = if (it.startsWith("Tersimpan")) Green else MaterialTheme.colorScheme.error, fontSize = 11.sp) }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -1330,7 +1345,7 @@ private fun SourceLinksScreen(activity: MainActivity, onOpenLink: (String) -> Un
         }
         Text("Daftar sumber (${links.size})", color = Color.White, fontWeight = FontWeight.Bold)
         if (links.isEmpty()) {
-            Text("Belum ada link tersimpan.", color = Muted, fontSize = 12.sp)
+            Text("Belum ada link tersimpan.", color = Color(0xFFCBD2E0), fontSize = 12.sp)
         } else {
             links.forEachIndexed { index, item ->
                 Card(
@@ -1340,7 +1355,7 @@ private fun SourceLinksScreen(activity: MainActivity, onOpenLink: (String) -> Un
                 ) {
                     Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Text(item.name, color = Color.White, fontWeight = FontWeight.Bold)
-                        Text(item.url, color = Muted, fontSize = 10.sp, maxLines = 2)
+                        Text(item.url, color = Color(0xFFCBD2E0), fontSize = 12.sp, maxLines = 2)
                         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                             TextButton(onClick = { onOpenLink(item.url) }) { Text("Buka", color = Green) }
                             TextButton(onClick = {
