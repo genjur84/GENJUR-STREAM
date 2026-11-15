@@ -4,6 +4,11 @@ on:
   push:
     branches:
       - main
+    paths:
+      - "app/**"
+      - "*.gradle.kts"
+      - "gradle.properties"
+      - ".github/workflows/build-apk.yml"
   workflow_dispatch:
 
 permissions:
@@ -28,6 +33,14 @@ jobs:
         with:
           gradle-version: '8.9'
 
+      - name: Generate increasing app version
+        run: |
+          VERSION_CODE=$((100 + GITHUB_RUN_NUMBER))
+          VERSION_NAME="0.5.$((GITHUB_RUN_NUMBER + 2))"
+          echo "GENJUR_VERSION_CODE=$VERSION_CODE" >> "$GITHUB_ENV"
+          echo "GENJUR_VERSION_NAME=$VERSION_NAME" >> "$GITHUB_ENV"
+          echo "Release version: $VERSION_NAME ($VERSION_CODE)"
+
       - name: Decode signing keystore
         env:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
@@ -41,6 +54,17 @@ jobs:
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: gradle assembleDebug
+
+      - name: Update latest.json with the built version
+        run: |
+          printf '{\n  "versionCode": %s,\n  "versionName": "%s",\n  "apkUrl": "https://github.com/genjur84/GENJUR-STREAM/releases/download/latest/app-debug.apk"\n}\n' "$GENJUR_VERSION_CODE" "$GENJUR_VERSION_NAME" > latest.json
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add latest.json
+          if ! git diff --cached --quiet; then
+            git commit -m "Update latest app version [skip ci]"
+            git push
+          fi
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
