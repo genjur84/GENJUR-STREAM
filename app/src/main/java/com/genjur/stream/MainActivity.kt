@@ -35,9 +35,9 @@ import java.io.File
 import java.net.URL
 
 private const val UPDATE_INFO_URL = "https://raw.githubusercontent.com/genjur84/GENJUR-STREAM/main/latest.json"
-private val Bg = Color(0xFF0D1117)
-private val Panel = Color(0xFF171F2B)
-private val Green = Color(0xFF42D6A4)
+private val Bg = Color(0xFF09090D)
+private val Panel = Color(0xFF191821)
+private val Green = Color(0xFF8B5CF6)
 private val Muted = Color(0xFFACB7C5)
 
 
@@ -63,9 +63,10 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun GenjurStreamHome(activity: MainActivity) {
+fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
     var search by remember { mutableStateOf("") }
     var category by remember { mutableStateOf("Semua") }
+    var selectedTab by remember { mutableStateOf("Beranda") }
     var updateVersion by remember { mutableStateOf<String?>(null) }
     var updateUrl by remember { mutableStateOf<String?>(null) }
     var checking by remember { mutableStateOf(true) }
@@ -226,98 +227,188 @@ fun GenjurStreamHome(activity: MainActivity) {
     Surface(Modifier.fillMaxSize(), color = Bg) {
         BoxWithConstraints(Modifier.fillMaxSize()) {
             val tvLayout = maxWidth >= 720.dp
-            Column(
-                Modifier
-                    .widthIn(max = 1200.dp)
-                    .fillMaxWidth()
-                    .fillMaxHeight()
-                    .align(Alignment.TopCenter)
-                    .verticalScroll(rememberScrollState())
-                    .padding(
-                        horizontal = if (tvLayout) 36.dp else 20.dp,
-                        vertical = if (tvLayout) 28.dp else 20.dp
-                    )
-                    .focusGroup()
-            ) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Column {
-                    Text("GENJUR STREAM", color = Green, fontSize = if (tvLayout) 34.sp else 25.sp, fontWeight = FontWeight.ExtraBold)
-                    Text("Temukan hiburan favoritmu", color = Muted, fontSize = 13.sp)
-                }
-                Text("GS", color = Bg, fontSize = 17.sp, fontWeight = FontWeight.Bold,
-                    modifier = Modifier.background(Green, RoundedCornerShape(14.dp)).padding(horizontal = 13.dp, vertical = 9.dp))
-            }
-            Spacer(Modifier.height(22.dp))
-            OutlinedTextField(
-                value = search, onValueChange = { search = it }, modifier = Modifier.fillMaxWidth(),
-                singleLine = true, shape = RoundedCornerShape(16.dp),
-                placeholder = { Text("Cari film atau serial...", color = Muted) },
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedTextColor = Color.White, unfocusedTextColor = Color.White,
-                    focusedBorderColor = Green, unfocusedBorderColor = Color(0xFF344252), cursorColor = Green
-                )
-            )
-            Spacer(Modifier.height(22.dp))
-            Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(24.dp),
-                colors = CardDefaults.cardColors(containerColor = Panel)) {
-                Column(Modifier.padding(22.dp)) {
-                    Text("SELAMAT DATANG", color = Green, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                    Spacer(Modifier.height(10.dp))
-                    Text("Semua hiburan\ndalam satu tempat.", color = Color.White, fontSize = if (tvLayout) 38.sp else 27.sp,
-                        lineHeight = if (tvLayout) 44.sp else 33.sp, fontWeight = FontWeight.Bold)
-                    Spacer(Modifier.height(9.dp))
-                    Text("Jelajahi pilihan tontonan dari sumber resmi dan berizin.",
-                        color = Muted, fontSize = 14.sp, lineHeight = 20.sp)
-                    Spacer(Modifier.height(18.dp))
-                    Button(onClick = { category = "Semua" },
-                        colors = ButtonDefaults.buttonColors(containerColor = Green, contentColor = Bg),
-                        shape = RoundedCornerShape(12.dp)) { Text("Jelajahi sekarang", fontWeight = FontWeight.Bold) }
-                }
-            }
-            Spacer(Modifier.height(25.dp))
-            Text("Jelajahi kategori", color = Color.White, fontSize = 19.sp, fontWeight = FontWeight.Bold)
-            Spacer(Modifier.height(10.dp))
-            categories.chunked(if (tvLayout) 5 else 3).forEach { group ->
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    group.forEach { item ->
-                        FilterChip(selected = category == item, onClick = { category = item }, label = { Text(item) })
+            val horizontal = if (tvLayout) 36.dp else 18.dp
+            Column(Modifier.fillMaxSize().widthIn(max = 1280.dp).align(Alignment.TopCenter)) {
+                Row(
+                    Modifier.fillMaxWidth().padding(horizontal = horizontal, vertical = 16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Text("▶", color = Green, fontSize = 30.sp, fontWeight = FontWeight.Black)
+                        Column {
+                            Text("GENJUR STREAM", color = Color.White, fontSize = if (tvLayout) 25.sp else 19.sp, fontWeight = FontWeight.ExtraBold)
+                            Text("Hiburan pilihanmu", color = Muted, fontSize = 10.sp)
+                        }
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        TextButton(onClick = { selectedTab = "Cari" }) { Text("⌕", color = Color.White, fontSize = 25.sp) }
+                        TextButton(onClick = onOpenSources) { Text("⋮", color = Color.White, fontSize = 25.sp) }
                     }
                 }
-            }
-            Spacer(Modifier.height(22.dp))
-            Text(if (search.isBlank()) "Mulai dari sini" else "Hasil pencarian",
-                color = Color.White, fontSize = 19.sp, fontWeight = FontWeight.Bold)
-            Spacer(Modifier.height(10.dp))
-            Button(onClick = { refreshCatalog() }, enabled = !feedLoading,
-                colors = ButtonDefaults.buttonColors(containerColor = Green, contentColor = Bg)) {
-                Text(if (feedLoading) "Memuat katalog..." else "Muat katalog dari sumber")
-            }
-            Text(feedMessage, color = Muted, fontSize = 12.sp)
-            feedMovies.filter { movie ->
-                (category == "Semua" || movie.category.equals(category, ignoreCase = true)) &&
-                    (search.isBlank() || movie.title.contains(search, ignoreCase = true) ||
-                        movie.description.contains(search, ignoreCase = true))
-            }.forEach { movie ->
-                Card(Modifier.fillMaxWidth().padding(top = 8.dp), shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = Panel)) {
-                    Column(Modifier.padding(16.dp)) {
-                        Text(movie.title, color = Color.White, fontWeight = FontWeight.Bold)
-                        Text(movie.category, color = Green, fontSize = 11.sp)
-                        Text(movie.description, color = Muted, fontSize = 13.sp)
-                        Text("Lisensi: ${movie.licenseId}", color = Muted, fontSize = 10.sp)
-                        Text("Ketentuan: ${movie.termsUrl}", color = Muted, fontSize = 10.sp)
-                        Text(movie.attribution, color = Muted, fontSize = 10.sp)
-                        if (movie.videoUrl.startsWith("https://")) {
-                            TextButton(onClick = { selectedMovie = movie }) {
-                                Text("Putar di GENJUR STREAM")
+
+                Column(
+                    Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = horizontal)
+                ) {
+                    if (selectedTab == "Beranda") {
+                        Card(
+                            Modifier.fillMaxWidth().height(if (tvLayout) 340.dp else 300.dp),
+                            shape = RoundedCornerShape(26.dp),
+                            colors = CardDefaults.cardColors(containerColor = Color(0xFF29203B))
+                        ) {
+                            Box(Modifier.fillMaxSize().background(Color(0xFF21172F))) {
+                                Column(Modifier.align(Alignment.CenterEnd).padding(end = 18.dp)) {
+                                    Text("✦", color = Color(0xFFB69AFF), fontSize = if (tvLayout) 130.sp else 105.sp)
+                                    Text("GENJUR", color = Color(0xFF4B356A), fontSize = 28.sp, fontWeight = FontWeight.Black)
+                                }
+                                Column(
+                                    Modifier.align(Alignment.CenterStart).fillMaxWidth(0.78f).padding(20.dp),
+                                    verticalArrangement = Arrangement.Center
+                                ) {
+                                    Text("PILIHAN HARI INI", color = Color(0xFFC4A7FF), fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                    Spacer(Modifier.height(12.dp))
+                                    Text("Cerita hebat.\nPengalaman seru.", color = Color.White,
+                                        fontSize = if (tvLayout) 38.sp else 29.sp, lineHeight = if (tvLayout) 43.sp else 34.sp,
+                                        fontWeight = FontWeight.ExtraBold)
+                                    Spacer(Modifier.height(8.dp))
+                                    Text("Temukan tontonan dari katalog sumber resmi dan berizin.",
+                                        color = Color(0xFFD4CEDD), fontSize = 13.sp, lineHeight = 18.sp)
+                                    Spacer(Modifier.height(16.dp))
+                                    Row(horizontalArrangement = Arrangement.spacedBy(9.dp)) {
+                                        Button(onClick = { selectedTab = "Kategori" },
+                                            colors = ButtonDefaults.buttonColors(containerColor = Green, contentColor = Color.White),
+                                            shape = RoundedCornerShape(12.dp)) { Text("Jelajahi") }
+                                        OutlinedButton(onClick = onOpenSources, shape = RoundedCornerShape(12.dp)) {
+                                            Text("Sumber", color = Color.White)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        Spacer(Modifier.height(24.dp))
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                            Text("Lanjutkan Menonton", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                            TextButton(onClick = { selectedTab = "Unduhan" }) { Text("Lihat semua  →", color = Green) }
+                        }
+                        if (feedMovies.isEmpty()) {
+                            Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = Panel), shape = RoundedCornerShape(18.dp)) {
+                                Column(Modifier.padding(18.dp)) {
+                                    Text("Belum ada tontonan", color = Color.White, fontWeight = FontWeight.Bold)
+                                    Spacer(Modifier.height(5.dp))
+                                    Text("Tambahkan sumber resmi untuk mulai mengisi katalog GENJUR STREAM.",
+                                        color = Muted, fontSize = 12.sp)
+                                    TextButton(onClick = onOpenSources) { Text("＋ Tambah sumber", color = Green) }
+                                }
+                            }
+                        } else {
+                            feedMovies.take(12).chunked(if (tvLayout) 4 else 2).forEach { rowMovies ->
+                                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                    rowMovies.forEach { movie ->
+                                        Card(Modifier.weight(1f).padding(bottom = 8.dp), shape = RoundedCornerShape(16.dp),
+                                            colors = CardDefaults.cardColors(containerColor = Panel)) {
+                                            Column(Modifier.padding(12.dp)) {
+                                                Box(Modifier.fillMaxWidth().height(if (tvLayout) 125.dp else 92.dp)
+                                                    .background(Color(0xFF302541), RoundedCornerShape(10.dp)),
+                                                    contentAlignment = Alignment.Center) {
+                                                    Text("▶", color = Color(0xFFC4A7FF), fontSize = 30.sp)
+                                                }
+                                                Spacer(Modifier.height(8.dp))
+                                                Text(movie.title, color = Color.White, fontWeight = FontWeight.Bold, maxLines = 2)
+                                                Text(movie.category, color = Green, fontSize = 11.sp)
+                                                TextButton(onClick = { selectedMovie = movie }) { Text("Putar", color = Green) }
+                                            }
+                                        }
+                                    }
+                                    repeat((if (tvLayout) 4 else 2) - rowMovies.size) { Spacer(Modifier.weight(1f)) }
+                                }
+                            }
+                        }
+                        Spacer(Modifier.height(18.dp))
+                        Text("Kategori", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                        Spacer(Modifier.height(10.dp))
+                        categories.drop(1).chunked(if (tvLayout) 4 else 2).forEach { items ->
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                items.forEach { item ->
+                                    Card(Modifier.weight(1f).padding(bottom = 8.dp), onClick = {
+                                        category = item; selectedTab = "Kategori"
+                                    }, shape = RoundedCornerShape(16.dp),
+                                        colors = CardDefaults.cardColors(containerColor = Color(0xFF24202E))) {
+                                        Column(Modifier.fillMaxWidth().padding(vertical = 18.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                                            Text(when(item) { "Film" -> "▣"; "Serial" -> "▤"; "Animasi" -> "✧"; else -> "◉" },
+                                                color = Color(0xFFC4A7FF), fontSize = 28.sp)
+                                            Text(item, color = Color.White, fontWeight = FontWeight.SemiBold)
+                                        }
+                                    }
+                                }
+                                if (items.size < (if (tvLayout) 4 else 2)) Spacer(Modifier.weight(1f))
+                            }
+                        }
+                    } else {
+                        Text(selectedTab, color = Color.White, fontSize = 27.sp, fontWeight = FontWeight.ExtraBold)
+                        Spacer(Modifier.height(14.dp))
+                        when (selectedTab) {
+                            "Cari" -> {
+                                OutlinedTextField(value = search, onValueChange = { search = it },
+                                    modifier = Modifier.fillMaxWidth(), singleLine = true,
+                                    placeholder = { Text("Cari judul tontonan...", color = Muted) },
+                                    colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White,
+                                        unfocusedTextColor = Color.White, focusedBorderColor = Green,
+                                        unfocusedBorderColor = Color(0xFF393344), cursorColor = Green))
+                            }
+                            "Kategori" -> {
+                                categories.forEach { item ->
+                                    FilterChip(selected = category == item, onClick = { category = item },
+                                        label = { Text(item) })
+                                }
+                            }
+                            "Unduhan" -> Text("Daftar unduhan akan tampil di sini setelah fitur unduhan diaktifkan.", color = Muted)
+                        }
+                        if (selectedTab == "Cari" || selectedTab == "Kategori") {
+                            Spacer(Modifier.height(14.dp))
+                            feedMovies.filter { movie ->
+                                (category == "Semua" || selectedTab != "Kategori" || movie.category.equals(category, true)) &&
+                                    (search.isBlank() || movie.title.contains(search, true) || movie.description.contains(search, true))
+                            }.forEach { movie ->
+                                Card(Modifier.fillMaxWidth().padding(bottom = 9.dp), colors = CardDefaults.cardColors(containerColor = Panel)) {
+                                    Row(Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                                        Column(Modifier.weight(1f)) {
+                                            Text(movie.title, color = Color.White, fontWeight = FontWeight.Bold)
+                                            Text(movie.category, color = Green, fontSize = 11.sp)
+                                        }
+                                        TextButton(onClick = { selectedMovie = movie }) { Text("Putar", color = Green) }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    Spacer(Modifier.height(18.dp))
+                    if (selectedTab == "Beranda" || selectedTab == "Cari" || selectedTab == "Kategori") {
+                        Button(onClick = { refreshCatalog() }, enabled = !feedLoading,
+                            colors = ButtonDefaults.buttonColors(containerColor = Green, contentColor = Color.White)) {
+                            Text(if (feedLoading) "Memuat katalog..." else "Muat katalog dari sumber")
+                        }
+                        Text(feedMessage, color = Muted, fontSize = 11.sp)
+                    }
+                    Text("GENJUR STREAM • Versi ${BuildConfig.VERSION_NAME}", color = Color(0xFF777180),
+                        fontSize = 10.sp, modifier = Modifier.padding(vertical = 16.dp))
+                }
+
+                Row(
+                    Modifier.fillMaxWidth().background(Color(0xFF15141B)).padding(horizontal = 5.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    listOf("Beranda" to "⌂", "Kategori" to "▦", "Cari" to "⌕", "Unduhan" to "⇩", "Pengaturan" to "⚙").forEach { (tab, glyph) ->
+                        TextButton(onClick = { if (tab == "Pengaturan") onOpenSources() else selectedTab = tab },
+                            modifier = Modifier.weight(1f)) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text(glyph, color = if (selectedTab == tab) Green else Muted, fontSize = 22.sp)
+                                Text(tab, color = if (selectedTab == tab) Green else Muted, fontSize = if (tvLayout) 12.sp else 9.sp,
+                                    fontWeight = if (selectedTab == tab) FontWeight.Bold else FontWeight.Normal, maxLines = 1)
                             }
                         }
                     }
                 }
-            }
-            Spacer(Modifier.height(26.dp))
-            Text("GENJUR STREAM  •  Versi ${BuildConfig.VERSION_NAME}", color = Color(0xFF718096),
-                fontSize = 11.sp, modifier = Modifier.padding(bottom = 10.dp))
             }
         }
     }
@@ -382,7 +473,7 @@ private data class SavedSource(val name: String, val url: String)
 private fun GenjurStreamApp(activity: MainActivity) {
     var showSources by remember { mutableStateOf(false) }
     Box(Modifier.fillMaxSize()) {
-        GenjurStreamHome(activity)
+        GenjurStreamHome(activity) { showSources = true }
         Button(onClick = { showSources = true },
             modifier = Modifier.align(Alignment.BottomEnd).padding(18.dp),
             colors = ButtonDefaults.buttonColors(containerColor = Green, contentColor = Bg)
