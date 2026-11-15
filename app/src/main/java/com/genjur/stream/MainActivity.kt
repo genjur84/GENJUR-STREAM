@@ -50,8 +50,17 @@ private data class FeedMovie(
     val attribution: String
 )
 private fun savedFeedUrls(activity: MainActivity): List<String> = runCatching {
-    val a = JSONArray(activity.getSharedPreferences("genjur_stream_sources", 0).getString("items", "[]"))
-    (0 until a.length()).mapNotNull { a.optJSONObject(it)?.optString("url")?.takeIf { u -> u.isNotBlank() } }
+    val prefs = activity.getSharedPreferences("genjur_stream_sources", 0)
+    val legacy = JSONArray(prefs.getString("items", "[]"))
+    val installed = JSONArray(prefs.getString("installed_extensions", "[]"))
+    val urls = mutableListOf<String>()
+    for (i in 0 until legacy.length()) {
+        legacy.optJSONObject(i)?.optString("url")?.takeIf { it.isNotBlank() }?.let(urls::add)
+    }
+    for (i in 0 until installed.length()) {
+        installed.optJSONObject(i)?.optString("feedUrl")?.takeIf { it.isNotBlank() }?.let(urls::add)
+    }
+    urls.distinct()
 }.getOrDefault(emptyList())
 
 class MainActivity : ComponentActivity() {
@@ -467,73 +476,179 @@ private fun InAppVideoPlayer(activity: MainActivity, movie: FeedMovie, onClose: 
 }
 
 
-private data class SavedSource(val name: String, val url: String)
+private data class SavedRepository(val name: String, val url: String)
+private data class RepositoryExtension(
+    val id: String,
+    val name: String,
+    val description: String,
+    val feedUrl: String,
+    val repositoryUrl: String
+)
 
 @Composable
 private fun GenjurStreamApp(activity: MainActivity) {
-    var showSources by remember { mutableStateOf(false) }
+    var showRepositories by remember { mutableStateOf(false) }
     Box(Modifier.fillMaxSize()) {
-        GenjurStreamHome(activity) { showSources = true }
-        if (showSources) SourcesDialog(activity) { showSources = false }
+        GenjurStreamHome(activity) { showRepositories = true }
+        if (showRepositories) RepositoryDialog(activity) { showRepositories = false }
     }
 }
 
 @Composable
-private fun SourcesDialog(activity: MainActivity, onClose: () -> Unit) {
+private fun RepositoryDialog(activity: MainActivity, onClose: () -> Unit) {
     val prefs = activity.getSharedPreferences("genjur_stream_sources", 0)
-    fun readSources(): List<SavedSource> = runCatching {
-        val a = JSONArray(prefs.getString("items", "[]"))
+    fun readRepositories(): List<SavedRepository> = runCatching {
+        val a = JSONArray(prefs.getString("repositories", "[]"))
         (0 until a.length()).mapNotNull { i ->
             val o = a.optJSONObject(i) ?: return@mapNotNull null
-            SavedSource(o.optString("name"), o.optString("url"))
+            SavedRepository(o.optString("name"), o.optString("url"))
         }
     }.getOrDefault(emptyList())
-    var sources by remember { mutableStateOf(readSources()) }
+    fun readInstalled(): List<RepositoryExtension> = runCatching {
+        val a = JSONArray(prefs.getString("installed_extensions", "[]"))
+        (0 until a.length()).mapNotNull { i ->
+            val o = a.optJSONObject(i) ?: return@mapNotNull null
+            RepositoryExtension(o.optString("id"), o.optString("name"),
+                o.optString("description"), o.optString("feedUrl"), o.optString("repositoryUrl"))
+        }
+    }.getOrDefault(emptyList())
+
+    var repositories by remember { mutableStateOf(readRepositories()) }
+    var installed by remember { mutableStateOf(readInstalled()) }
+    var discovered by remember { mutableStateOf(emptyList<RepositoryExtension>()) }
     var name by remember { mutableStateOf("") }
     var url by remember { mutableStateOf("") }
+    var loading by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
+
+    fun saveRepositories() {
+        val a = JSONArray()
+        repositories.forEach { a.put(JSONObject().put("name", it.name).put("url", it.url)) }
+        prefs.edit().putString("repositories", a.toString()).apply()
+    }
+    fun saveInstalled() {
+        val a = JSONArray()
+        installed.forEach { a.put(JSONObject().put("id", it.id).put("name", it.name)
+            .put("description", it.description).put("feedUrl", it.feedUrl)
+            .put("repositoryUrl", it.repositoryUrl)) }
+        prefs.edit().putString("installed_extensions", a.toString()).apply()
+    }
+    fun loadRepository(repository: SavedRepository) {
+        scope.launch {
+            loading = true
+            error = null
+            val result = withContext(Dispatchers.IO) {
+                runCatching {
+                    val uri = Uri.parse(repository.url)
+                    require(uri.scheme == "https" && !uri.host.isNullOrBlank()) { "URL repositori harus HTTPS." }
+                    val connection = URL(repository.url).openConnection()
+                    connection.connectTimeout = 12000
+                    connection.readTimeout = 20000
+                    val root = JSONObject(connection.getInputStream().bufferedReader().use { it.readText() })
+                    require(root.optInt("schemaVersion", 0) == 1) { "Format repositori tidak didukung (schemaVersion harus 1)." }
+                    val array = root.optJSONArray("extensions") ?: error("Repositori tidak memiliki daftar extensions.")
+                    val parsed = mutableListOf<RepositoryExtension>()
+                    for (i in 0 until array.length()) {
+                        val item = array.optJSONObject(i) ?: continue
+                        val id = item.optString("id").trim()
+                        val extName = item.optString("name").trim()
+                        val feed = item.optString("feedUrl").trim()
+                        val feedUri = Uri.parse(feed)
+                        require(id.isNotBlank() && extName.isNotBlank() &&
+                            feedUri.scheme == "https" && !feedUri.host.isNullOrBlank()) {
+                            "Ekstensi ditolak: id, nama, atau feedUrl tidak valid."
+                        }
+                        parsed.add(RepositoryExtension(id, extName,
+                            item.optString("description", "Ekstensi katalog resmi."),
+                            feed, repository.url))
+                    }
+                    parsed
+                }
+            }
+            loading = false
+            result.onSuccess { discovered = it }
+                .onFailure { error = it.message ?: "Gagal membaca repositori." }
+        }
+    }
+
     AlertDialog(
         onDismissRequest = onClose,
-        title = { Text("Sumber tontonan") },
+        title = { Text("Repositori & Ekstensi") },
         text = {
-            Column(Modifier.heightIn(max = 440.dp).verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Tambahkan katalog dari sumber yang menyediakan API, RSS, atau feed resmi. URL website biasa belum tentu bisa dibaca otomatis.", color = Muted, fontSize = 12.sp)
-                OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Nama sumber") }, singleLine = true)
-                OutlinedTextField(value = url, onValueChange = { url = it }, label = { Text("URL HTTPS") }, singleLine = true)
-                error?.let { Text(it, color = MaterialTheme.colorScheme.error, fontSize = 12.sp) }
-                Button(onClick = {
-                    val n = name.trim(); val u = url.trim()
+            Column(Modifier.heightIn(max = 520.dp).verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(9.dp)) {
+                Text("Tambahkan repositori untuk menemukan ekstensi katalog. GENJUR STREAM hanya membaca metadata JSON/feed HTTPS; ekstensi tidak menjalankan kode dari pihak ketiga.",
+                    color = Muted, fontSize = 12.sp)
+                OutlinedTextField(value = name, onValueChange = { name = it },
+                    label = { Text("Nama repositori") }, singleLine = true)
+                OutlinedTextField(value = url, onValueChange = { url = it },
+                    label = { Text("URL repositori") }, singleLine = true)
+                Button(enabled = !loading, onClick = {
+                    val n = name.trim()
+                    val u = url.trim()
                     val valid = runCatching { Uri.parse(u).let { it.scheme == "https" && !it.host.isNullOrBlank() } }.getOrDefault(false)
                     when {
-                        n.isBlank() -> error = "Masukkan nama sumber."
-                        !valid -> error = "Masukkan URL HTTPS yang benar."
-                        sources.any { it.url.equals(u, true) } -> error = "Sumber sudah ada."
+                        n.isBlank() -> error = "Masukkan nama repositori."
+                        !valid -> error = "Masukkan URL repositori HTTPS yang benar."
+                        repositories.any { it.url.equals(u, true) } -> error = "Repositori sudah ditambahkan."
                         else -> {
-                            sources = sources + SavedSource(n, u)
-                            val a = JSONArray()
-                            sources.forEach { a.put(JSONObject().put("name", it.name).put("url", it.url)) }
-                            prefs.edit().putString("items", a.toString()).apply()
-                            name = ""; url = ""; error = null
+                            val repo = SavedRepository(n, u)
+                            repositories = repositories + repo
+                            saveRepositories()
+                            name = ""; url = ""
+                            loadRepository(repo)
                         }
                     }
-                }, colors = ButtonDefaults.buttonColors(containerColor = Green, contentColor = Bg)) { Text("Tambah sumber") }
-                if (sources.isEmpty()) Text("Belum ada sumber tersimpan.", color = Muted)
-                sources.forEachIndexed { index, item ->
-                    Card(colors = CardDefaults.cardColors(containerColor = Panel)) {
-                        Row(Modifier.fillMaxWidth().padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Column(Modifier.weight(1f)) {
-                                Text(item.name, color = Color.White, fontWeight = FontWeight.Bold)
-                                Text(item.url, color = Muted, fontSize = 10.sp)
+                }, colors = ButtonDefaults.buttonColors(containerColor = Green, contentColor = Bg)) {
+                    Text(if (loading) "Memuat..." else "Tambah repositori")
+                }
+                error?.let { Text(it, color = MaterialTheme.colorScheme.error, fontSize = 12.sp) }
+                if (repositories.isNotEmpty()) {
+                    Text("Repositori tersimpan", color = Color.White, fontWeight = FontWeight.Bold)
+                    repositories.forEach { repo ->
+                        Card(colors = CardDefaults.cardColors(containerColor = Panel)) {
+                            Column(Modifier.fillMaxWidth().padding(10.dp)) {
+                                Text(repo.name, color = Color.White, fontWeight = FontWeight.Bold)
+                                Text(repo.url, color = Muted, fontSize = 10.sp)
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    TextButton(onClick = { loadRepository(repo) }) { Text("Periksa ekstensi") }
+                                    TextButton(onClick = {
+                                        repositories = repositories.filterNot { it.url == repo.url }
+                                        discovered = discovered.filterNot { it.repositoryUrl == repo.url }
+                                        installed = installed.filterNot { it.repositoryUrl == repo.url }
+                                        saveRepositories(); saveInstalled()
+                                    }) { Text("Hapus") }
+                                }
                             }
-                            TextButton(onClick = {
-                                sources = sources.filterIndexed { i, _ -> i != index }
-                                val a = JSONArray()
-                                sources.forEach { a.put(JSONObject().put("name", it.name).put("url", it.url)) }
-                                prefs.edit().putString("items", a.toString()).apply()
-                            }) { Text("Hapus") }
                         }
                     }
+                }
+                if (loading) LinearProgressIndicator(Modifier.fillMaxWidth(), color = Green)
+                if (discovered.isNotEmpty()) {
+                    Text("Ekstensi ditemukan", color = Color.White, fontWeight = FontWeight.Bold)
+                    discovered.forEach { extension ->
+                        val isInstalled = installed.any { it.id == extension.id && it.repositoryUrl == extension.repositoryUrl }
+                        Card(colors = CardDefaults.cardColors(containerColor = Panel)) {
+                            Column(Modifier.fillMaxWidth().padding(10.dp)) {
+                                Text(extension.name, color = Color.White, fontWeight = FontWeight.Bold)
+                                Text(extension.description, color = Muted, fontSize = 11.sp)
+                                TextButton(onClick = {
+                                    installed = if (isInstalled) installed.filterNot {
+                                        it.id == extension.id && it.repositoryUrl == extension.repositoryUrl
+                                    } else installed + extension
+                                    saveInstalled()
+                                }) { Text(if (isInstalled) "Hapus ekstensi" else "Pasang ekstensi", color = Green) }
+                            }
+                        }
+                    }
+                } else if (!loading && repositories.isNotEmpty()) {
+                    Text("Tekan Periksa ekstensi pada repositori untuk memuat daftar ekstensi.",
+                        color = Muted, fontSize = 11.sp)
+                }
+                Text("Ekstensi terpasang: ${installed.size}", color = Color.White, fontWeight = FontWeight.Bold)
+                installed.forEach { ext ->
+                    Text("• ${ext.name}", color = Muted, fontSize = 12.sp)
                 }
             }
         },
