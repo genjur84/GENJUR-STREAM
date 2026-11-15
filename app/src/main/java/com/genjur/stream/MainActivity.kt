@@ -688,20 +688,6 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                                 }
                             }
                         }
-                        Spacer(Modifier.height(24.dp))
-                        Card(
-                            Modifier.fillMaxWidth().clickable { category = "Film Domain Publik"; selectedTab = "Kategori" },
-                            shape = RoundedCornerShape(18.dp),
-                            colors = CardDefaults.cardColors(containerColor = Color(0xFF24202E))
-                        ) {
-                            Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Column(Modifier.weight(1f)) {
-                                    Text("FILM GRATIS & LEGAL", color = Color(0xFFC4A7FF), fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                                    Text("Film gratis dari penyedia resmi & domain publik", color = Muted, fontSize = 11.sp)
-                                }
-                                Text("Jelajahi  →", color = Green, fontWeight = FontWeight.Bold)
-                            }
-                        }
                         Spacer(Modifier.height(18.dp))
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                             Text("Lanjutkan Menonton", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
