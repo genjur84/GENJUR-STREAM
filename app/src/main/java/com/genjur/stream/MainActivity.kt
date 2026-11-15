@@ -696,6 +696,23 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                                     selectedTab = "Browser Sumber"
                                 })
                             }
+                            "Pengaturan" -> {
+                                Card(
+                                    Modifier.fillMaxWidth(),
+                                    colors = CardDefaults.cardColors(containerColor = Panel),
+                                    shape = RoundedCornerShape(14.dp)
+                                ) {
+                                    Column(Modifier.fillMaxWidth().padding(16.dp)) {
+                                        Text("Pengaturan aplikasi", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                                        Spacer(Modifier.height(6.dp))
+                                        Text("Kelola sumber situs yang tersimpan di GENJUR STREAM.", color = Muted, fontSize = 13.sp)
+                                        Spacer(Modifier.height(10.dp))
+                                        TextButton(onClick = { selectedTab = "Sumber Link" }) {
+                                            Text("Kelola Sumber Link  ›", color = Green)
+                                        }
+                                    }
+                                }
+                            }
                             "Browser Sumber" -> {
                                 Row(
                                     Modifier.fillMaxWidth().background(Color(0xFF15141B)).padding(horizontal = 8.dp, vertical = 2.dp),
@@ -850,7 +867,7 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     // Pencarian tetap berada di ikon kaca pembesar bagian atas.
-                    listOf("Beranda" to "⌂", "Sumber Link" to "↗", "Unduhan" to "⇩", "Favorit" to "♡", "Riwayat" to "◷").forEach { (tab, glyph) ->
+                    listOf("Beranda" to "⌂", "Sumber Link" to "↗", "Unduhan" to "⇩", "Favorit" to "♡", "Riwayat" to "◷", "Pengaturan" to "⚙").forEach { (tab, glyph) ->
                         Column(
                             modifier = Modifier.width(if (tvLayout) 104.dp else 76.dp).clickable {
                                 selectedTab = tab
