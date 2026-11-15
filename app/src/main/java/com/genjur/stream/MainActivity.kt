@@ -1462,24 +1462,27 @@ private fun SourceLinksScreen(activity: MainActivity, onOpenLink: (String) -> Un
                     )
                     Icon(Icons.Filled.ArrowDropDown, contentDescription = "Tampilkan daftar sumber")
                 }
-                DropdownMenu(
-                    expanded = savedSourcesDropdownExpanded,
-                    onDismissRequest = { savedSourcesDropdownExpanded = false },
-                    modifier = Modifier.background(Panel),
-                    offset = androidx.compose.ui.unit.DpOffset(0.dp, 48.dp)
-                ) {
-                    links.forEachIndexed { index, item ->
-                        DropdownMenuItem(
-                            text = {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
+                if (savedSourcesDropdownExpanded) {
+                    Card(
+                        modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
+                        colors = CardDefaults.cardColors(containerColor = Panel),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Column {
+                            links.forEachIndexed { index, item ->
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().clickable {
+                                        selectedSavedSourceIndex = index
+                                        savedSourcesDropdownExpanded = false
+                                        onOpenLink(item.url)
+                                    }.padding(start = 14.dp, end = 6.dp, top = 4.dp, bottom = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
                                     Text(
                                         item.name,
-                                        modifier = Modifier.weight(1f).clickable {
-                                            selectedSavedSourceIndex = index
-                                            savedSourcesDropdownExpanded = false
-                                            onOpenLink(item.url)
-                                        },
+                                        modifier = Modifier.weight(1f).padding(vertical = 10.dp),
                                         color = Color.White,
+                                        fontWeight = FontWeight.SemiBold,
                                         maxLines = 1
                                     )
                                     IconButton(onClick = {
@@ -1501,13 +1504,8 @@ private fun SourceLinksScreen(activity: MainActivity, onOpenLink: (String) -> Un
                                         Icon(Icons.Filled.Delete, contentDescription = "Hapus sumber", tint = Muted)
                                     }
                                 }
-                            },
-                            onClick = {
-                                selectedSavedSourceIndex = index
-                                savedSourcesDropdownExpanded = false
-                                onOpenLink(item.url)
                             }
-                        )
+                        }
                     }
                 }
             }
