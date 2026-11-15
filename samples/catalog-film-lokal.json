@@ -10,6 +10,9 @@
       "title": "Senja di Kota Lama",
       "description": "Contoh sinopsis fiktif tentang dua sahabat yang bertemu kembali di sebuah kota tua.",
       "category": "Drama Indonesia",
+      "releaseYear": "2026",
+      "genres": ["Drama", "Persahabatan"],
+      "duration": "Demo metadata",
       "videoUrl": "",
       "posterUrl": "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?auto=format&fit=crop&w=600&h=900&q=80"
     },
@@ -17,6 +20,9 @@
       "title": "Warung Tengah Malam",
       "description": "Contoh sinopsis fiktif komedi tentang kejadian lucu di sebuah warung kecil.",
       "category": "Komedi Indonesia",
+      "releaseYear": "2026",
+      "genres": ["Komedi", "Keluarga"],
+      "duration": "Demo metadata",
       "videoUrl": "",
       "posterUrl": "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=600&h=900&q=80"
     },
@@ -24,6 +30,9 @@
       "title": "Jejak dari Timur",
       "description": "Contoh sinopsis fiktif petualangan keluarga yang menjelajahi keindahan alam Indonesia.",
       "category": "Petualangan Indonesia",
+      "releaseYear": "2026",
+      "genres": ["Petualangan", "Keluarga"],
+      "duration": "Demo metadata",
       "videoUrl": "",
       "posterUrl": "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=600&h=900&q=80"
     }
