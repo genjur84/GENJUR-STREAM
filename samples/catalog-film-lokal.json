@@ -1,0 +1,28 @@
+{
+  "rights": {
+    "redistributionAllowed": true,
+    "licenseId": "GENJUR-DEMO-OWN-CONTENT-1",
+    "termsUrl": "https://github.com/genjur84/GENJUR-STREAM/blob/main/samples/TERMS.md",
+    "attribution": "GENJUR STREAM — katalog demo film Indonesia"
+  },
+  "items": [
+    {
+      "title": "Senja di Kota Lama",
+      "description": "Contoh sinopsis fiktif tentang dua sahabat yang bertemu kembali di sebuah kota tua.",
+      "category": "Drama Indonesia",
+      "videoUrl": ""
+    },
+    {
+      "title": "Warung Tengah Malam",
+      "description": "Contoh sinopsis fiktif komedi tentang kejadian lucu di sebuah warung kecil.",
+      "category": "Komedi Indonesia",
+      "videoUrl": ""
+    },
+    {
+      "title": "Jejak dari Timur",
+      "description": "Contoh sinopsis fiktif petualangan keluarga yang menjelajahi keindahan alam Indonesia.",
+      "category": "Petualangan Indonesia",
+      "videoUrl": ""
+    }
+  ]
+}
