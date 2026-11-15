@@ -13,6 +13,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -856,14 +857,14 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                 }
 
                 Row(
-                    Modifier.fillMaxWidth().background(Color(0xFF15141B)).padding(horizontal = 4.dp, vertical = 7.dp),
+                    Modifier.fillMaxWidth().background(Color(0xFF15141B)).horizontalScroll(rememberScrollState()).padding(horizontal = 4.dp, vertical = 7.dp),
                     horizontalArrangement = Arrangement.spacedBy(2.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     // Pencarian tetap berada di ikon kaca pembesar bagian atas.
                     listOf("Beranda" to "⌂", "Sumber Link" to "↗", "Browser Sumber" to "◎", "Kategori" to "▦", "Unduhan" to "⇩", "Favorit" to "♡", "Riwayat" to "◷", "Pengaturan" to "⚙").forEach { (tab, glyph) ->
                         Column(
-                            modifier = Modifier.weight(1f).clickable {
+                            modifier = Modifier.width(if (tvLayout) 104.dp else 76.dp).clickable {
                                 if (tab == "Pengaturan") onOpenSources() else selectedTab = tab
                             }.padding(vertical = 5.dp),
                             horizontalAlignment = Alignment.CenterHorizontally,
