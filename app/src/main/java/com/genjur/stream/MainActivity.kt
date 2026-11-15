@@ -310,6 +310,7 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
     var selectedTab by remember { mutableStateOf("Beranda") }
     var savedSourceMenu by remember { mutableStateOf(emptyList<SavedSourceLink>()) }
     var selectedSearchSourceUrl by remember { mutableStateOf<String?>(null) }
+    var searchSourceDropdownExpanded by remember { mutableStateOf(false) }
     var sourceMenuExpanded by remember { mutableStateOf(false) }
     var selectedSourceName by remember { mutableStateOf("Sumber Link") }
     LaunchedEffect(selectedTab) {
@@ -719,16 +720,32 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                                         unfocusedBorderColor = Color(0xFF393344), cursorColor = Green))
                                 Spacer(Modifier.height(8.dp))
                                 Text("Cari dari sumber:", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-                                Row(Modifier.fillMaxWidth().clickable { selectedSearchSourceUrl = null }, verticalAlignment = Alignment.CenterVertically) {
-                                    Checkbox(checked = selectedSearchSourceUrl == null, onCheckedChange = { if (it) selectedSearchSourceUrl = null },
-                                        colors = CheckboxDefaults.colors(checkedColor = Green, uncheckedColor = Muted))
-                                    Text("Semua sumber", color = Color.White, fontSize = 13.sp)
-                                }
-                                savedSourceMenu.forEach { source ->
-                                    Row(Modifier.fillMaxWidth().clickable { selectedSearchSourceUrl = source.url }, verticalAlignment = Alignment.CenterVertically) {
-                                        Checkbox(checked = selectedSearchSourceUrl == source.url, onCheckedChange = { checked -> selectedSearchSourceUrl = if (checked) source.url else null },
-                                            colors = CheckboxDefaults.colors(checkedColor = Green, uncheckedColor = Muted))
-                                        Text(source.name, color = Color.White, fontSize = 13.sp, maxLines = 1)
+                                Spacer(Modifier.height(4.dp))
+                                Box {
+                                    OutlinedButton(
+                                        onClick = { searchSourceDropdownExpanded = true },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
+                                    ) {
+                                        Text(savedSourceMenu.firstOrNull { it.url == selectedSearchSourceUrl }?.name ?: "Semua sumber",
+                                            modifier = Modifier.weight(1f), color = Color.White, maxLines = 1)
+                                        Text("⌄", color = Green, fontSize = 18.sp)
+                                    }
+                                    DropdownMenu(
+                                        expanded = searchSourceDropdownExpanded,
+                                        onDismissRequest = { searchSourceDropdownExpanded = false },
+                                        modifier = Modifier.fillMaxWidth(0.88f).background(Panel)
+                                    ) {
+                                        DropdownMenuItem(
+                                            text = { Text("Semua sumber", color = Color.White) },
+                                            onClick = { selectedSearchSourceUrl = null; searchSourceDropdownExpanded = false }
+                                        )
+                                        savedSourceMenu.forEach { source ->
+                                            DropdownMenuItem(
+                                                text = { Text(source.name, color = Color.White, maxLines = 1) },
+                                                onClick = { selectedSearchSourceUrl = source.url; searchSourceDropdownExpanded = false }
+                                            )
+                                        }
                                     }
                                 }
                             }
