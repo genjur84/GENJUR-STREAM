@@ -1770,7 +1770,7 @@ private fun SourceBrowser(
                     webChromeClient = WebChromeClient()
                     addJavascriptInterface(PlaybackStartedBridge(
                         onPlayback = { title, pageUrl -> post { onPlaybackStarted(title, pageUrl) } },
-                        onVideoAvailable = { title, pageUrl, videoUrl, quality, sizeBytes ->
+                        onVideoDetected = { title, pageUrl, videoUrl, quality, sizeBytes ->
                             post {
                                 val uri = Uri.parse(videoUrl)
                                 val path = uri.path.orEmpty().lowercase()
