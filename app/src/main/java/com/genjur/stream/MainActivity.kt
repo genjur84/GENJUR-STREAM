@@ -270,6 +270,18 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                                         item.optString("genre").split(",").map { it.trim() }
                                             .filter { it.isNotBlank() }.distinct()
                                     }
+                                    val downloadLink = item.optString("downloadUrl").trim()
+                                    val downloadAllowed = item.optBoolean("downloadAllowed", false)
+                                    require(!downloadAllowed || downloadLink.isNotBlank()) {
+                                        "Unduhan diizinkan tetapi downloadUrl belum tersedia"
+                                    }
+                                    if (downloadLink.isNotBlank()) {
+                                        val downloadUri = Uri.parse(downloadLink)
+                                        require(downloadUri.scheme == "https" && !downloadUri.host.isNullOrBlank() &&
+                                            downloadUri.path.orEmpty().lowercase().endsWith(".mp4")) {
+                                            "URL unduhan harus berupa file MP4 HTTPS langsung"
+                                        }
+                                    }
                                     movies.add(FeedMovie(
                                         title = title,
                                         description = item.optString("description", "Sinopsis belum tersedia."),
@@ -282,17 +294,9 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                                         releaseYear = item.optString("releaseYear").trim(),
                                         genres = genres,
                                         duration = item.optString("duration").trim(),
-                                        downloadUrl = item.optString("downloadUrl").trim(),
-                                        downloadAllowed = item.optBoolean("downloadAllowed", false)
+                                        downloadUrl = downloadLink,
+                                        downloadAllowed = downloadAllowed
                                     ))
-                                    val downloadLink = item.optString("downloadUrl").trim()
-                                    if (downloadLink.isNotBlank()) {
-                                        val downloadUri = Uri.parse(downloadLink)
-                                        require(downloadUri.scheme == "https" && !downloadUri.host.isNullOrBlank() &&
-                                            downloadUri.path.orEmpty().lowercase().endsWith(".mp4")) {
-                                            "URL unduhan harus berupa file MP4 HTTPS langsung"
-                                        }
-                                    }
                                 }
                             }
                         }
@@ -665,7 +669,7 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                     horizontalArrangement = Arrangement.SpaceEvenly,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    listOf("Beranda" to "⌂", "Kategori" to "▦", "Cari" to "⌕", "Favorit" to "♡", "Riwayat" to "◷", "Pengaturan" to "⚙").forEach { (tab, glyph) ->
+                    listOf("Beranda" to "⌂", "Kategori" to "▦", "Cari" to "⌕", "Unduhan" to "⇩", "Favorit" to "♡", "Riwayat" to "◷", "Pengaturan" to "⚙").forEach { (tab, glyph) ->
                         TextButton(onClick = { if (tab == "Pengaturan") onOpenSources() else selectedTab = tab },
                             modifier = Modifier.weight(1f)) {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
