@@ -1797,7 +1797,7 @@ private fun SourceBrowser(
                             post {
                                 val uri = Uri.parse(videoUrl)
                                 val path = uri.path.orEmpty().lowercase()
-                                val playableMedia = Regex("""\\.(m3u8|mpd|mp4|m4v|webm|mov|mkv)(?:$|[?#&])""").containsMatchIn(videoUrl.lowercase())
+                                val playableMedia = Regex("""\.(m3u8|mpd|mp4|m4v|webm|mov|mkv)(?:$|[?#&])""").containsMatchIn(videoUrl.lowercase())
                                 if (playableMedia && uri.scheme in listOf("http", "https") && !uri.host.isNullOrBlank()) {
                                     detectedVideoTitle = title
                                     detectedVideoPage = pageUrl
@@ -1824,7 +1824,7 @@ private fun SourceBrowser(
                             val requestedUri = request.url
                             val mediaPath = requestedUri.path.orEmpty().lowercase()
                             val mediaUrlLower = requestedUri.toString().lowercase()
-                            val mediaMatch = Regex("""\\.(m3u8|mpd|mp4|m4v|webm|mov|mkv)(?:$|[?#&])""").containsMatchIn(mediaUrlLower)
+                            val mediaMatch = Regex("""\.(m3u8|mpd|mp4|m4v|webm|mov|mkv)(?:$|[?#&])""").containsMatchIn(mediaUrlLower)
                             if (requestedUri.scheme in listOf("http", "https") &&
                                 !requestedUri.host.isNullOrBlank() && mediaMatch) {
                                 val label = when {
