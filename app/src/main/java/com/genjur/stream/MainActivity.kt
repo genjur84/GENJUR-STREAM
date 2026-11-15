@@ -1412,7 +1412,11 @@ private fun SourceBrowser(initialUrl: String, fullScreen: Boolean = false, onPla
                     settings.domStorageEnabled = true
                     settings.loadsImagesAutomatically = true
                     settings.mediaPlaybackRequiresUserGesture = true
-                    webChromeClient = WebChromeClient()
+                    webChromeClient = object : WebChromeClient() {
+                        override fun onProgressChanged(view: WebView, newProgress: Int) {
+                            isLoading = newProgress < 100
+                        }
+                    }
                     addJavascriptInterface(PlaybackStartedBridge { title, pageUrl ->
                         post { onPlaybackStarted(title, pageUrl) }
                     }, "GenjurPlayback")
