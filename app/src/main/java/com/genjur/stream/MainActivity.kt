@@ -437,14 +437,39 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                         updateError = null
                         val downloaded = withContext(Dispatchers.IO) {
                             runCatching {
-                                val connection = URL(apkLink).openConnection()
-                                connection.connectTimeout = 15000
-                                connection.readTimeout = 30000
-                                val file = File(activity.cacheDir, "genjur-stream-update.apk")
-                                connection.getInputStream().use { input ->
-                                    file.outputStream().use { output -> input.copyTo(output) }
+                                val connection = (URL(apkLink).openConnection() as java.net.HttpURLConnection).apply {
+                                    instanceFollowRedirects = true
+                                    connectTimeout = 20000
+                                    readTimeout = 60000
+                                    requestMethod = "GET"
+                                    setRequestProperty("User-Agent", "GENJUR-STREAM-Android")
+                                    setRequestProperty("Accept", "application/vnd.android.package-archive, application/octet-stream, */*")
+                                    setRequestProperty("Cache-Control", "no-cache")
                                 }
-                                file
+                                try {
+                                    val status = connection.responseCode
+                                    require(status in 200..299) { "Server unduhan membalas HTTP $status" }
+                                    val contentType = connection.contentType.orEmpty()
+                                    require(!contentType.contains("text/html", ignoreCase = true)) {
+                                        "Server mengirim halaman web, bukan berkas APK"
+                                    }
+                                    val file = File(activity.cacheDir, "genjur-stream-update.apk")
+                                    connection.inputStream.use { input ->
+                                        file.outputStream().buffered().use { output -> input.copyTo(output) }
+                                    }
+                                    require(file.length() > 1_000_000L) {
+                                        "Berkas APK tidak lengkap (${file.length()} byte)"
+                                    }
+                                    val signature = file.inputStream().use { input ->
+                                        byteArrayOf(input.read().toByte(), input.read().toByte())
+                                    }
+                                    require(signature[0] == 0x50.toByte() && signature[1] == 0x4b.toByte()) {
+                                        "Berkas yang diterima bukan APK yang valid"
+                                    }
+                                    file
+                                } finally {
+                                    connection.disconnect()
+                                }
                             }
                         }
                         downloading = false
@@ -460,10 +485,11 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                                 activity.startActivity(installIntent)
                                 updateVersion = null
                             } catch (_: Exception) {
-                                updateError = "Tidak dapat membuka pemasang. Periksa izin instalasi aplikasi."
+                                updateError = "APK berhasil diunduh, tetapi pemasang tidak dapat dibuka. Periksa izin instalasi aplikasi."
                             }
-                        }.onFailure {
-                            updateError = "Unduhan gagal. Periksa koneksi internet lalu coba lagi."
+                        }.onFailure { error ->
+                            val detail = error.message?.takeIf { it.isNotBlank() } ?: error.javaClass.simpleName
+                            updateError = "Unduhan pembaruan gagal: $detail"
                         }
                     }
                 }) { Text(if (downloading) "Mengunduh..." else "Perbarui sekarang") }
