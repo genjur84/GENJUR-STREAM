@@ -283,6 +283,20 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
     var search by remember { mutableStateOf("") }
     var category by remember { mutableStateOf("Semua") }
     var selectedTab by remember { mutableStateOf("Beranda") }
+    var savedSourceMenu by remember { mutableStateOf(emptyList<SavedSourceLink>()) }
+    var sourceMenuExpanded by remember { mutableStateOf(false) }
+    LaunchedEffect(selectedTab) {
+        val prefs = activity.getSharedPreferences("genjur_stream_saved_links", 0)
+        savedSourceMenu = runCatching {
+            val array = JSONArray(prefs.getString("items", "[]"))
+            (0 until array.length()).mapNotNull { index ->
+                val item = array.optJSONObject(index) ?: return@mapNotNull null
+                val sourceName = item.optString("name").trim()
+                val sourceUrl = item.optString("url").trim()
+                if (sourceName.isNotBlank() && sourceUrl.startsWith("https://")) SavedSourceLink(sourceName, sourceUrl) else null
+            }
+        }.getOrDefault(emptyList())
+    }
     var browserInitialUrl by remember { mutableStateOf("") }
     var updateVersion by remember { mutableStateOf<String?>(null) }
     var updateUrl by remember { mutableStateOf<String?>(null) }
@@ -879,6 +893,37 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                                 fontWeight = if (selectedTab == tab) FontWeight.Bold else FontWeight.Normal,
                                 maxLines = 1, softWrap = false)
                         }
+                    }
+                }
+            }
+            if (savedSourceMenu.isNotEmpty()) {
+                Column(
+                    modifier = Modifier.align(Alignment.BottomEnd).padding(end = 16.dp, bottom = 82.dp),
+                    horizontalAlignment = Alignment.End
+                ) {
+                    DropdownMenu(
+                        expanded = sourceMenuExpanded,
+                        onDismissRequest = { sourceMenuExpanded = false },
+                        modifier = Modifier.heightIn(max = 320.dp).background(Panel)
+                    ) {
+                        savedSourceMenu.forEach { source ->
+                            DropdownMenuItem(
+                                text = { Text(source.name, color = Color.White, maxLines = 1) },
+                                onClick = {
+                                    browserInitialUrl = source.url
+                                    selectedTab = "Browser Sumber"
+                                    sourceMenuExpanded = false
+                                }
+                            )
+                        }
+                    }
+                    Button(
+                        onClick = { sourceMenuExpanded = !sourceMenuExpanded },
+                        colors = ButtonDefaults.buttonColors(containerColor = Green, contentColor = Color.White),
+                        shape = RoundedCornerShape(24.dp),
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp)
+                    ) {
+                        Text("Sumber Link  ▾", fontWeight = FontWeight.Bold)
                     }
                 }
             }
