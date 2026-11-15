@@ -53,6 +53,7 @@ import org.json.JSONObject
 import org.json.JSONArray
 import java.io.File
 import java.net.URL
+import org.jsoup.Jsoup
 
 private const val UPDATE_INFO_URL = "https://raw.githubusercontent.com/genjur84/GENJUR-STREAM/main/latest.json"
 private val Bg = Color(0xFF09090D)
@@ -210,6 +211,46 @@ private fun savedFeedUrls(activity: MainActivity): List<String> = runCatching {
     }.distinct()
 }.getOrDefault(emptyList())
 
+private fun loadGenericHtmlCatalog(sourceUrl: String, html: String): List<FeedMovie> {
+    val document = Jsoup.parse(html, sourceUrl)
+    val pageDescription = document.selectFirst("meta[name=description]")?.attr("content").orEmpty()
+    val categoryWords = listOf(
+        "Action", "Adventure", "Animasi", "Animation", "Anime", "Comedy", "Komedi",
+        "Crime", "Dokumenter", "Documentary", "Drama", "Family", "Fantasy", "Horor",
+        "Horror", "Mystery", "Romance", "Sci-Fi", "Thriller", "Serial", "Series"
+    )
+    val results = mutableListOf<FeedMovie>()
+    document.select("a[href]").forEach { link ->
+        val href = link.absUrl("href").trim()
+        val uri = Uri.parse(href)
+        if (uri.scheme != "https" || uri.host.isNullOrBlank()) return@forEach
+        if (uri.host != Uri.parse(sourceUrl).host) return@forEach
+        val path = uri.path.orEmpty().lowercase()
+        if (!Regex("/(film|movie|watch|title|series|serial|episode|drama)(/|$|-|_)").containsMatchIn(path)) return@forEach
+        val image = link.selectFirst("img")
+        val title = link.text().trim().ifBlank { image?.attr("alt").orEmpty().trim() }
+            .replace(Regex("\\s+"), " ")
+        if (title.length !in 2..100) return@forEach
+        if (title.lowercase() in setOf("watch now", "play", "read more", "lihat semua", "more")) return@forEach
+        val contextText = link.parent()?.parent()?.text().orEmpty().take(500)
+        val category = categoryWords.firstOrNull { contextText.contains(it, true) } ?: "Sumber Web"
+        val poster = image?.absUrl("src")?.takeIf { it.startsWith("https://") }.orEmpty()
+        val description = link.attr("title").ifBlank { pageDescription }
+            .ifBlank { "Judul ditemukan otomatis dari halaman sumber. Buka situs sumber untuk detail dan pemutaran." }
+        results.add(FeedMovie(
+            title = title,
+            description = description,
+            category = category,
+            videoUrl = href,
+            licenseId = "Metadata halaman sumber",
+            termsUrl = sourceUrl,
+            attribution = "Metadata ditemukan di $sourceUrl",
+            posterUrl = poster
+        ))
+    }
+    return results.distinctBy { it.videoUrl }.take(100)
+}
+
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -341,7 +382,16 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                             val connection = URL(sourceUrl).openConnection()
                             connection.connectTimeout = 12000
                             connection.readTimeout = 20000
-                            val root = JSONObject(connection.getInputStream().bufferedReader().use { it.readText() })
+                            val responseBody = connection.getInputStream().bufferedReader().use { it.readText() }
+                            val root = runCatching { JSONObject(responseBody) }.getOrNull()
+                            if (root == null) {
+                                val htmlItems = loadGenericHtmlCatalog(sourceUrl, responseBody)
+                                require(htmlItems.isNotEmpty()) {
+                                    "Halaman terbaca, tetapi pola daftar film tidak dikenali otomatis."
+                                }
+                                movies.addAll(htmlItems)
+                                return@runCatching
+                            }
                             if (root.optString("catalogType") == "wikimedia_public_domain_videos") {
                                 movies.addAll(loadWikimediaPublicDomainMovies())
                                 return@runCatching
@@ -856,7 +906,12 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                                             Text(movie.title, color = Color.White, fontWeight = FontWeight.Bold)
                                             Text(movie.category, color = Green, fontSize = 11.sp)
                                         }
-                                        TextButton(onClick = { selectedMovie = movie }) { Text("Detail", color = Green) }
+                                        TextButton(onClick = {
+                                            if (movie.licenseId == "Metadata halaman sumber") {
+                                                browserInitialUrl = movie.videoUrl
+                                                selectedTab = "Browser Sumber"
+                                            } else selectedMovie = movie
+                                        }) { Text(if (movie.licenseId == "Metadata halaman sumber") "Buka sumber" else "Detail", color = Green) }
                                     }
                                 }
                             }
