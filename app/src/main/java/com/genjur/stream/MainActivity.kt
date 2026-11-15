@@ -32,6 +32,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Settings
@@ -947,6 +948,18 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                                                 attribution = "Situs sumber: ${Uri.parse(pageUrl).host.orEmpty()}"
                                             ))
                                         },
+                                        onPlayCandidate = { title, pageUrl, mediaUrl ->
+                                            val safeTitle = title.ifBlank { "Video dari situs" }
+                                            playingMovie = FeedMovie(
+                                                title = safeTitle,
+                                                description = "Video terdeteksi dari pemutar situs.",
+                                                category = "Sumber Web",
+                                                videoUrl = mediaUrl,
+                                                licenseId = "User-provided website",
+                                                termsUrl = pageUrl,
+                                                attribution = "Situs sumber: ${Uri.parse(pageUrl).host.orEmpty()}"
+                                            )
+                                        },
                                         onDownloadCandidate = { title, pageUrl, mediaUrl ->
                                             startWebVideoDownload(title, pageUrl, mediaUrl)
                                         }
@@ -1660,6 +1673,7 @@ private fun SourceBrowser(
     initialUrl: String,
     fullScreen: Boolean = false,
     onPlaybackStarted: (String, String) -> Unit,
+    onPlayCandidate: (String, String, String) -> Unit,
     onDownloadCandidate: (String, String, String) -> Unit
 ) {
     var address by remember(initialUrl) { mutableStateOf(initialUrl) }
@@ -1708,11 +1722,20 @@ private fun SourceBrowser(
                         Text("Pilihan kualitas download tersedia", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                         Text(detectedVideoTitle.ifBlank { "Video dari situs" }, color = Muted, fontSize = 10.sp, maxLines = 2)
                     }
-                    Button(onClick = { showDownloadChoices = true },
-                        colors = ButtonDefaults.buttonColors(containerColor = Green, contentColor = Color.White)) {
-                        Icon(Icons.Filled.Download, contentDescription = null)
-                        Spacer(Modifier.width(4.dp))
-                        Text("Pilih")
+                    Column(horizontalAlignment = Alignment.End) {
+                        Button(onClick = {
+                            detectedVideoOptions.firstOrNull()?.let {
+                                onPlayCandidate(detectedVideoTitle, detectedVideoPage, it.videoUrl)
+                            }
+                        }, colors = ButtonDefaults.buttonColors(containerColor = Green, contentColor = Color.White)) {
+                            Icon(Icons.Filled.PlayArrow, contentDescription = null)
+                            Spacer(Modifier.width(4.dp))
+                            Text("Putar")
+                        }
+                        TextButton(onClick = { showDownloadChoices = true }) {
+                            Icon(Icons.Filled.Download, contentDescription = null, tint = Green)
+                            Text("Unduh", color = Green)
+                        }
                     }
                 }
             }
@@ -1774,8 +1797,8 @@ private fun SourceBrowser(
                             post {
                                 val uri = Uri.parse(videoUrl)
                                 val path = uri.path.orEmpty().lowercase()
-                                val directFile = listOf(".mp4", ".webm", ".mov", ".mkv").any { path.endsWith(it) }
-                                if (directFile && uri.scheme in listOf("http", "https") && !uri.host.isNullOrBlank()) {
+                                val playableMedia = listOf(".mp4", ".webm", ".mov", ".mkv", ".m3u8", ".mpd").any { path.endsWith(it) }
+                                if (playableMedia && uri.scheme in listOf("http", "https") && !uri.host.isNullOrBlank()) {
                                     detectedVideoTitle = title
                                     detectedVideoPage = pageUrl
                                     val label = quality.ifBlank {
@@ -1785,6 +1808,8 @@ private fun SourceBrowser(
                                             path.contains("720") -> "HD 720p"
                                             path.contains("480") -> "SD 480p"
                                             path.contains("360") -> "SD 360p"
+                                            path.endsWith(".m3u8") -> "Streaming HLS"
+                                            path.endsWith(".mpd") -> "Streaming DASH"
                                             else -> "Kualitas terdeteksi"
                                         }
                                     }
@@ -1796,7 +1821,31 @@ private fun SourceBrowser(
                     ), "GenjurPlayback")
                     webViewClient = object : WebViewClient() {
                         override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): android.webkit.WebResourceResponse? {
-                            if (!request.isForMainFrame && isGenjurAdHost(request.url.host)) {
+                            val requestedUri = request.url
+                            val mediaPath = requestedUri.path.orEmpty().lowercase()
+                            val mediaExtensions = listOf(".m3u8", ".mpd", ".mp4", ".webm", ".mov", ".mkv")
+                            if (requestedUri.scheme in listOf("http", "https") &&
+                                !requestedUri.host.isNullOrBlank() &&
+                                mediaExtensions.any { mediaPath.endsWith(it) }) {
+                                val label = when {
+                                    mediaPath.endsWith(".m3u8") -> "Streaming HLS"
+                                    mediaPath.endsWith(".mpd") -> "Streaming DASH"
+                                    mediaPath.contains("2160") || mediaPath.contains("4k") -> "4K"
+                                    mediaPath.contains("1080") -> "Full HD 1080p"
+                                    mediaPath.contains("720") -> "HD 720p"
+                                    mediaPath.contains("480") -> "SD 480p"
+                                    else -> "Video terdeteksi dari jaringan"
+                                }
+                                view.post {
+                                    val mediaUrl = requestedUri.toString()
+                                    if (detectedVideoOptions.none { it.videoUrl == mediaUrl }) {
+                                        detectedVideoTitle = view.title?.takeIf { it.isNotBlank() } ?: "Video dari situs"
+                                        detectedVideoPage = view.url ?: currentUrl
+                                        detectedVideoOptions = detectedVideoOptions + StreamOption(label, mediaUrl)
+                                    }
+                                }
+                            }
+                            if (!request.isForMainFrame && isGenjurAdHost(requestedUri.host)) {
                                 return android.webkit.WebResourceResponse(
                                     "text/plain", "utf-8", ByteArrayInputStream(ByteArray(0))
                                 )
