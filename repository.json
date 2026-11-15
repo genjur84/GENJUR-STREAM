@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "name": "GENJUR STREAM — Repositori Penyedia Legal",
+  "description": "Katalog penyedia film legal, domain publik, dan layanan resmi.",
+  "extensions": [
+    {
+      "id": "wikimedia-public-domain",
+      "name": "Film Domain Publik — Wikimedia Commons",
+      "description": "Katalog video film dengan lisensi domain publik, CC0, atau CC BY yang memenuhi pemeriksaan lisensi aplikasi.",
+      "language": "Beragam",
+      "contentTypes": [
+        "Film",
+        "Video"
+      ],
+      "subtitleLanguages": [],
+      "feedUrl": "https://raw.githubusercontent.com/genjur84/GENJUR-STREAM/main/feeds/wikimedia-public-domain.json",
+      "websiteUrl": "",
+      "freeNote": "Periksa lisensi dan atribusi pada halaman setiap berkas."
+    },
+    {
+      "id": "internet-archive",
+      "name": "Internet Archive — Koleksi Film",
+      "description": "Buka koleksi film di Internet Archive. Hak penggunaan berbeda untuk tiap judul; periksa keterangan dan ketentuan item sebelum menonton atau mengunduh.",
+      "language": "Beragam",
+      "contentTypes": [
+        "Film",
+        "Dokumenter",
+        "Arsip"
+      ],
+      "subtitleLanguages": [],
+      "feedUrl": "",
+      "websiteUrl": "https://archive.org/details/movies",
+      "freeNote": "Tautan membuka situs resmi; belum menjadi katalog internal GENJUR."
+    }
+  ]
+}
