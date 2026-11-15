@@ -8,12 +8,25 @@ android {
     namespace = "com.genjur.stream"
     compileSdk = 35
 
+    val stableKeystorePath = System.getenv("ANDROID_KEYSTORE_PATH")
+    val stableKeystorePassword = System.getenv("ANDROID_KEYSTORE_PASSWORD")
+    val stableKeyAlias = System.getenv("ANDROID_KEY_ALIAS")
+    val stableKeyPassword = System.getenv("ANDROID_KEY_PASSWORD")
+    val hasStableSigning = listOf(
+        stableKeystorePath,
+        stableKeystorePassword,
+        stableKeyAlias,
+        stableKeyPassword
+    ).all { !it.isNullOrBlank() }
+
     signingConfigs {
-        create("stableRelease") {
-            storeFile = file(System.getenv("ANDROID_KEYSTORE_PATH") ?: "keystore.jks")
-            storePassword = System.getenv("ANDROID_KEYSTORE_PASSWORD")
-            keyAlias = System.getenv("ANDROID_KEY_ALIAS")
-            keyPassword = System.getenv("ANDROID_KEY_PASSWORD")
+        if (hasStableSigning) {
+            create("stableRelease") {
+                storeFile = file(stableKeystorePath!!)
+                storePassword = stableKeystorePassword
+                keyAlias = stableKeyAlias
+                keyPassword = stableKeyPassword
+            }
         }
     }
 
@@ -27,7 +40,10 @@ android {
 
     buildTypes {
         getByName("debug") {
-            signingConfig = signingConfigs.getByName("stableRelease")
+            // Use the stable key when configured; otherwise use Android's generated debug key.
+            if (hasStableSigning) {
+                signingConfig = signingConfigs.getByName("stableRelease")
+            }
         }
     }
 
