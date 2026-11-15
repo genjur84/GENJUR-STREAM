@@ -482,7 +482,11 @@ private data class RepositoryExtension(
     val name: String,
     val description: String,
     val feedUrl: String,
-    val repositoryUrl: String
+    val repositoryUrl: String,
+    val pluginUrl: String = "",
+    val language: String = "",
+    val tvTypes: String = "",
+    val isCloudStream: Boolean = false
 )
 
 @Composable
@@ -509,7 +513,9 @@ private fun RepositoryDialog(activity: MainActivity, onClose: () -> Unit) {
         (0 until a.length()).mapNotNull { i ->
             val o = a.optJSONObject(i) ?: return@mapNotNull null
             RepositoryExtension(o.optString("id"), o.optString("name"),
-                o.optString("description"), o.optString("feedUrl"), o.optString("repositoryUrl"))
+                o.optString("description"), o.optString("feedUrl"), o.optString("repositoryUrl"),
+                o.optString("pluginUrl"), o.optString("language"), o.optString("tvTypes"),
+                o.optBoolean("isCloudStream", false))
         }
     }.getOrDefault(emptyList())
 
@@ -531,7 +537,9 @@ private fun RepositoryDialog(activity: MainActivity, onClose: () -> Unit) {
         val a = JSONArray()
         installed.forEach { a.put(JSONObject().put("id", it.id).put("name", it.name)
             .put("description", it.description).put("feedUrl", it.feedUrl)
-            .put("repositoryUrl", it.repositoryUrl)) }
+            .put("repositoryUrl", it.repositoryUrl).put("pluginUrl", it.pluginUrl)
+            .put("language", it.language).put("tvTypes", it.tvTypes)
+            .put("isCloudStream", it.isCloudStream)) }
         prefs.edit().putString("installed_extensions", a.toString()).apply()
     }
     fun loadRepository(repository: SavedRepository) {
@@ -546,22 +554,64 @@ private fun RepositoryDialog(activity: MainActivity, onClose: () -> Unit) {
                     connection.connectTimeout = 12000
                     connection.readTimeout = 20000
                     val root = JSONObject(connection.getInputStream().bufferedReader().use { it.readText() })
-                    require(root.optInt("schemaVersion", 0) == 1) { "Format repositori tidak didukung (schemaVersion harus 1)." }
-                    val array = root.optJSONArray("extensions") ?: error("Repositori tidak memiliki daftar extensions.")
                     val parsed = mutableListOf<RepositoryExtension>()
-                    for (i in 0 until array.length()) {
-                        val item = array.optJSONObject(i) ?: continue
-                        val id = item.optString("id").trim()
-                        val extName = item.optString("name").trim()
-                        val feed = item.optString("feedUrl").trim()
-                        val feedUri = Uri.parse(feed)
-                        require(id.isNotBlank() && extName.isNotBlank() &&
-                            feedUri.scheme == "https" && !feedUri.host.isNullOrBlank()) {
-                            "Ekstensi ditolak: id, nama, atau feedUrl tidak valid."
+                    if (root.optInt("schemaVersion", 0) == 1) {
+                        val array = root.optJSONArray("extensions")
+                            ?: error("Repositori GENJUR tidak memiliki daftar extensions.")
+                        for (i in 0 until array.length()) {
+                            val item = array.optJSONObject(i) ?: continue
+                            val id = item.optString("id").trim()
+                            val extName = item.optString("name").trim()
+                            val feed = item.optString("feedUrl").trim()
+                            val feedUri = Uri.parse(feed)
+                            require(id.isNotBlank() && extName.isNotBlank() &&
+                                feedUri.scheme == "https" && !feedUri.host.isNullOrBlank()) {
+                                "Ekstensi ditolak: id, nama, atau feedUrl tidak valid."
+                            }
+                            parsed.add(RepositoryExtension(id, extName,
+                                item.optString("description", "Ekstensi katalog resmi."),
+                                feed, repository.url))
                         }
-                        parsed.add(RepositoryExtension(id, extName,
-                            item.optString("description", "Ekstensi katalog resmi."),
-                            feed, repository.url))
+                    } else if (root.optInt("manifestVersion", 0) == 1) {
+                        val pluginLists = root.optJSONArray("pluginLists")
+                            ?: error("Manifest CloudStream tidak memiliki pluginLists.")
+                        for (listIndex in 0 until pluginLists.length()) {
+                            val listUrl = pluginLists.optString(listIndex).trim()
+                            val listUri = Uri.parse(listUrl)
+                            require(listUri.scheme == "https" && !listUri.host.isNullOrBlank()) {
+                                "URL daftar plugin CloudStream harus HTTPS."
+                            }
+                            val listConnection = URL(listUrl).openConnection()
+                            listConnection.connectTimeout = 12000
+                            listConnection.readTimeout = 20000
+                            val plugins = JSONArray(listConnection.getInputStream().bufferedReader().use { it.readText() })
+                            for (pluginIndex in 0 until plugins.length()) {
+                                val item = plugins.optJSONObject(pluginIndex) ?: continue
+                                val pluginName = item.optString("name").trim()
+                                val pluginUrl = item.optString("url").trim()
+                                val pluginUri = Uri.parse(pluginUrl)
+                                if (pluginName.isBlank() || pluginUri.scheme != "https" ||
+                                    pluginUri.host.isNullOrBlank()) continue
+                                val internalName = item.optString("internalName").ifBlank { pluginName }
+                                val types = item.optJSONArray("tvTypes")
+                                val typeNames = if (types == null) "" else
+                                    (0 until types.length()).map { types.optString(it) }.filter { it.isNotBlank() }.distinct().joinToString(", ")
+                                val language = item.optString("language").trim()
+                                parsed.add(RepositoryExtension(
+                                    "cloudstream:$internalName:$pluginUrl",
+                                    pluginName,
+                                    "Plugin CloudStream • ${language.ifBlank { "bahasa tidak dicantumkan" }}",
+                                    "",
+                                    repository.url,
+                                    pluginUrl,
+                                    language,
+                                    typeNames,
+                                    true
+                                ))
+                            }
+                        }
+                    } else {
+                        error("Format repositori tidak dikenal. Mendukung GENJUR schemaVersion 1 dan CloudStream manifestVersion 1.")
                     }
                     parsed
                 }
@@ -633,12 +683,20 @@ private fun RepositoryDialog(activity: MainActivity, onClose: () -> Unit) {
                             Column(Modifier.fillMaxWidth().padding(10.dp)) {
                                 Text(extension.name, color = Color.White, fontWeight = FontWeight.Bold)
                                 Text(extension.description, color = Muted, fontSize = 11.sp)
-                                TextButton(onClick = {
-                                    installed = if (isInstalled) installed.filterNot {
-                                        it.id == extension.id && it.repositoryUrl == extension.repositoryUrl
-                                    } else installed + extension
-                                    saveInstalled()
-                                }) { Text(if (isInstalled) "Hapus ekstensi" else "Pasang ekstensi", color = Green) }
+                                if (extension.isCloudStream) {
+                                    if (extension.language.isNotBlank()) Text("Bahasa: ${extension.language}", color = Muted, fontSize = 10.sp)
+                                    if (extension.tvTypes.isNotBlank()) Text("Kategori: ${extension.tvTypes}", color = Muted, fontSize = 10.sp)
+                                    Text("File: ${extension.pluginUrl.substringAfterLast('/')}", color = Muted, fontSize = 10.sp)
+                                    Text("Daftar berhasil dibaca. Plugin .cs3 belum dapat dijalankan di GENJUR STREAM.",
+                                        color = Color(0xFFFFC857), fontSize = 11.sp)
+                                } else {
+                                    TextButton(onClick = {
+                                        installed = if (isInstalled) installed.filterNot {
+                                            it.id == extension.id && it.repositoryUrl == extension.repositoryUrl
+                                        } else installed + extension
+                                        saveInstalled()
+                                    }) { Text(if (isInstalled) "Hapus ekstensi" else "Pasang ekstensi", color = Green) }
+                                }
                             }
                         }
                     }
