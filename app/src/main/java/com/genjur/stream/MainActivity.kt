@@ -916,14 +916,18 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                                     Row(Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
                                         Column(Modifier.weight(1f)) {
                                             Text(movie.title, color = Color.White, fontWeight = FontWeight.Bold)
-                                            Text(movie.category, color = Green, fontSize = 11.sp)
+                                            if (selectedTab != "Cari") {
+                                                Text(movie.category, color = Green, fontSize = 11.sp)
+                                            }
                                         }
-                                        TextButton(onClick = {
-                                            if (movie.licenseId == "Metadata halaman sumber") {
-                                                browserInitialUrl = movie.videoUrl
-                                                selectedTab = "Browser Sumber"
-                                            } else selectedMovie = movie
-                                        }) { Text(if (movie.licenseId == "Metadata halaman sumber") "Buka sumber" else "Detail", color = Green) }
+                                        if (selectedTab != "Cari") {
+                                            TextButton(onClick = {
+                                                if (movie.licenseId == "Metadata halaman sumber") {
+                                                    browserInitialUrl = movie.videoUrl
+                                                    selectedTab = "Browser Sumber"
+                                                } else selectedMovie = movie
+                                            }) { Text(if (movie.licenseId == "Metadata halaman sumber") "Buka sumber" else "Detail", color = Green) }
+                                        }
                                     }
                                 }
                             }
