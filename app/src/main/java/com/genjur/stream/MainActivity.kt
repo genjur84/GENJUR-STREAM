@@ -970,7 +970,11 @@ private fun RepositoryDialog(activity: MainActivity, onClose: () -> Unit) {
                 runCatching {
                     val uri = Uri.parse(repository.url)
                     require(uri.scheme == "https" && !uri.host.isNullOrBlank()) { "URL repositori harus HTTPS." }
-                    val connection = URL(repository.url).openConnection()
+                    val freshUrl = repository.url + (if (repository.url.contains("?")) "&" else "?") + "genjur_refresh=" + System.currentTimeMillis()
+                    val connection = URL(freshUrl).openConnection()
+                    connection.useCaches = false
+                    connection.setRequestProperty("Cache-Control", "no-cache, no-store")
+                    connection.setRequestProperty("Pragma", "no-cache")
                     connection.connectTimeout = 12000
                     connection.readTimeout = 20000
                     val root = JSONObject(connection.getInputStream().bufferedReader().use { it.readText() })
@@ -1118,8 +1122,8 @@ private fun RepositoryDialog(activity: MainActivity, onClose: () -> Unit) {
                         }
                     }
                 } else if (!loading && repositories.isNotEmpty()) {
-                    Text("Tekan Periksa ekstensi pada repositori untuk memuat daftar ekstensi.",
-                        color = Muted, fontSize = 11.sp)
+                    Text(error ?: "Tekan Lihat penyedia pada repositori untuk memuat daftar penyedia.",
+                        color = if (error != null) MaterialTheme.colorScheme.error else Muted, fontSize = 11.sp)
                 }
                 Text("Penyedia terpasang: ${installed.size}", color = Color.White, fontWeight = FontWeight.Bold)
                 installed.forEach { ext ->
