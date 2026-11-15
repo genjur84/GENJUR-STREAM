@@ -673,43 +673,7 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                     Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = horizontal)
                 ) {
                     if (selectedTab == "Beranda") {
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                            Text("Lanjutkan Menonton", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-                            TextButton(onClick = { selectedTab = "Riwayat" }) { Text("Lihat semua  →", color = Green) }
-                        }
-                        if (watchHistory.isEmpty()) {
-                            Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = Panel), shape = RoundedCornerShape(18.dp)) {
-                                Column(Modifier.padding(18.dp)) {
-                                    Text("Belum ada tontonan", color = Color.White, fontWeight = FontWeight.Bold)
-                                    Spacer(Modifier.height(5.dp))
-                                    Text("Film yang mulai kamu tonton dari player atau Browser Sumber akan muncul di sini.",
-                                        color = Muted, fontSize = 12.sp)
-                                }
-                            }
-                        } else {
-                            watchHistory.take(12).forEach { movie ->
-                                Card(Modifier.fillMaxWidth().padding(bottom = 9.dp),
-                                    shape = RoundedCornerShape(16.dp),
-                                    colors = CardDefaults.cardColors(containerColor = Panel)) {
-                                    Row(Modifier.fillMaxWidth().padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
-                                        MoviePoster(movie.posterUrl, movie.title, 104.dp, 76.dp)
-                                        Spacer(Modifier.width(12.dp))
-                                        Column(Modifier.weight(1f)) {
-                                            Text(movie.title, color = Color.White, fontWeight = FontWeight.Bold, maxLines = 2)
-                                            Text(if (movie.category == "Sumber Web") "Dari Browser Sumber" else movie.category,
-                                                color = Green, fontSize = 11.sp)
-                                            TextButton(onClick = {
-                                                if (movie.category == "Sumber Web") {
-                                                    browserInitialUrl = movie.videoUrl
-                                                    selectedTab = "Browser Sumber"
-                                                } else selectedMovie = movie
-                                            }) { Text("▶  Lanjutkan", color = Green) }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
+                        // Bagian Lanjutkan Menonton di Beranda dihapus sesuai permintaan.
                     } else {
                         Text(selectedTab, color = Color.White, fontSize = 27.sp, fontWeight = FontWeight.ExtraBold)
                         Spacer(Modifier.height(14.dp))
