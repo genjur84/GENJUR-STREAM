@@ -190,6 +190,20 @@ private fun decodeMovie(json: JSONObject): FeedMovie {
 }
 
 
+private fun downloadFileName(title: String, year: String, extension: String): String {
+    val detectedYear = year.trim().ifBlank {
+        Regex("\\b(?:18|19|20)\\d{2}\\b").find(title)?.value.orEmpty()
+    }
+    val titleWithoutYear = title.replace(Regex("\\b(?:18|19|20)\\d{2}\\b"), " ")
+    val safeTitle = titleWithoutYear.lowercase(java.util.Locale.ROOT)
+        .replace(Regex("[^a-z0-9]+"), "_").trim('_')
+        .ifBlank { "video" }
+    val safeYear = detectedYear.takeIf { it.matches(Regex("(18|19|20)\\d{2}")) }
+        ?.let { "_$it" }.orEmpty()
+    val safeExtension = extension.lowercase().filter { it.isLetterOrDigit() }.ifBlank { "mp4" }
+    return "$safeTitle$safeYear.$safeExtension"
+}
+
 private fun formatVideoSize(bytes: Long): String {
     if (bytes <= 0L) return "Tidak diketahui"
     val mb = bytes / (1024.0 * 1024.0)
@@ -467,14 +481,14 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
             path.endsWith(".mkv") -> "mkv"
             else -> "mp4"
         }
+        val fileName = downloadFileName(movie.title, movie.releaseYear, extension)
         val request = DownloadManager.Request(uri)
-            .setTitle(movie.title)
-            .setDescription("Mengunduh ke GENJUR STREAM")
+            .setTitle(fileName)
+            .setDescription("Unduhan GENJUR STREAM")
             .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
             .setAllowedOverMetered(true)
             .setAllowedOverRoaming(false)
-            .setDestinationInExternalFilesDir(activity, Environment.DIRECTORY_MOVIES,
-                "genjur_${System.currentTimeMillis()}.$extension")
+            .setDestinationInExternalFilesDir(activity, Environment.DIRECTORY_MOVIES, fileName)
         val pageUri = Uri.parse(movie.termsUrl)
         request.addRequestHeader("User-Agent", "Mozilla/5.0 (Linux; Android 11) AppleWebKit/537.36 Chrome/120.0.0.0 Mobile Safari/537.36")
         request.addRequestHeader("Accept", "video/*,application/octet-stream,*/*;q=0.8")
@@ -520,8 +534,8 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
             downloadMessage = "Gagal menyiapkan folder penyimpanan MP4."
             return
         }
-        val outputFile = File(outputDir, "genjur_${kotlin.math.abs(id)}.mp4")
         val safeTitle = title.ifBlank { "Video dari situs" }
+        val outputFile = File(outputDir, downloadFileName(safeTitle, "", "mp4"))
         val movie = FeedMovie(
             title = safeTitle,
             description = "Streaming HLS/DASH yang dikonversi menjadi MP4.",
@@ -1169,7 +1183,14 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                                             shape = RoundedCornerShape(14.dp)
                                         ) {
                                             Column(Modifier.fillMaxWidth().padding(12.dp)) {
-                                                Text(entry.movie.title, color = Color.White, fontWeight = FontWeight.Bold)
+                                                val savedFileName = if (entry.id < 0L) {
+                                                    File(Uri.parse(entry.movie.videoUrl).path.orEmpty()).name
+                                                } else {
+                                                    val originalPath = Uri.parse(entry.movie.downloadUrl).path.orEmpty()
+                                                    downloadFileName(entry.movie.title, entry.movie.releaseYear,
+                                                        originalPath.substringAfterLast('.', "mp4"))
+                                                }
+                                                Text(savedFileName, color = Color.White, fontWeight = FontWeight.Bold, maxLines = 1)
                                                 Text(state.second, color = Muted, fontSize = 11.sp)
                                                 if (state.second == "Mengunduh" || state.second == "Menunggu") {
                                                     Spacer(Modifier.height(7.dp))
