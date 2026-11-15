@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "name": "GENJUR STREAM — Film Lokal Demo",
+  "extensions": [
+    {
+      "id": "genjur-film-lokal-demo",
+      "name": "Katalog Film Indonesia (Demo)",
+      "description": "Katalog uji berisi metadata film Indonesia fiktif; tanpa video untuk diputar.",
+      "feedUrl": "https://raw.githubusercontent.com/genjur84/GENJUR-STREAM/main/samples/catalog-film-lokal.json"
+    }
+  ]
+}
