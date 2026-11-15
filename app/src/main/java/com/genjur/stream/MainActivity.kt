@@ -34,6 +34,12 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.delay
+import androidx.work.Constraints
+import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.NetworkType
+import androidx.work.PeriodicWorkRequestBuilder
+import androidx.work.WorkManager
+import java.util.concurrent.TimeUnit
 import org.json.JSONObject
 import org.json.JSONArray
 import java.io.File
@@ -135,7 +141,22 @@ private fun savedFeedUrls(activity: MainActivity): List<String> = runCatching {
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        scheduleBackgroundCatalogChecks()
         setContent { MaterialTheme { GenjurStreamApp(this) } }
+    }
+
+    private fun scheduleBackgroundCatalogChecks() {
+        val constraints = Constraints.Builder()
+            .setRequiredNetworkType(NetworkType.CONNECTED)
+            .build()
+        val request = PeriodicWorkRequestBuilder<CatalogRefreshWorker>(12, TimeUnit.HOURS)
+            .setConstraints(constraints)
+            .build()
+        WorkManager.getInstance(applicationContext).enqueueUniquePeriodicWork(
+            "genjur_stream_catalog_refresh",
+            ExistingPeriodicWorkPolicy.KEEP,
+            request
+        )
     }
 }
 
