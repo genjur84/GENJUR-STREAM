@@ -776,9 +776,8 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                                             browserInitialUrl = if (host == "youtube.com" || host.endsWith(".youtube.com") || host == "youtu.be") {
                                                 "https://www.youtube.com/results?search_query=$query"
                                             } else {
-                                                // Cari dengan kata kunci persis seperti yang diketik pengguna.
-                                                // Jangan menambahkan site:domain karena dapat menyaring hasil yang sebenarnya tersedia.
-                                                "https://www.google.com/search?q=" + Uri.encode(search.trim())
+                                                // Sertakan domain sumber sebagai kata kunci biasa, bukan operator site:
+                                                "https://www.google.com/search?q=" + Uri.encode("${search.trim()} $host")
                                             }
                                             selectedTab = "Browser Sumber"
                                         }
