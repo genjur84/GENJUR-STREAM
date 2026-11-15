@@ -864,11 +864,12 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                     }
                     Spacer(Modifier.height(18.dp))
                     if (selectedTab == "Beranda" || selectedTab == "Cari" || selectedTab == "Kategori") {
-                        Button(onClick = { refreshCatalog() }, enabled = !feedLoading,
+                        Button(onClick = { selectedTab = "Sumber Link" },
                             colors = ButtonDefaults.buttonColors(containerColor = Green, contentColor = Color.White)) {
-                            Text(if (feedLoading) "Memuat katalog..." else "Muat katalog dari sumber")
+                            Text("Buka sumber link tersimpan")
                         }
-                        Text(feedMessage, color = Muted, fontSize = 11.sp)
+                        Text("Pilih sumber yang sudah kamu simpan, lalu tekan Buka untuk melihat situsnya di GENJUR STREAM.",
+                            color = Muted, fontSize = 11.sp)
                     }
                     Text("GENJUR STREAM • Versi ${BuildConfig.VERSION_NAME}", color = Color(0xFF777180),
                         fontSize = 10.sp, modifier = Modifier.padding(vertical = 16.dp))
