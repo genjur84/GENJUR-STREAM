@@ -1206,10 +1206,15 @@ private fun SourceBrowser(initialUrl: String, onVideoDetected: (String) -> Unit)
                         }
                     }
                     webView = this
-                    if (currentUrl.isNotBlank()) loadUrl(currentUrl)
                 }
             },
-            update = { view -> webView = view },
+            update = { view ->
+                webView = view
+                if (currentUrl.isNotBlank() && view.tag != currentUrl) {
+                    view.tag = currentUrl
+                    view.loadUrl(currentUrl)
+                }
+            },
             modifier = Modifier.fillMaxWidth().height(420.dp)
         )
         Text("Situs dengan DRM, login khusus, atau pemutar tanpa tautan video langsung mungkin tidak dapat dialihkan ke GENJUR Player.", color = Muted, fontSize = 10.sp)
