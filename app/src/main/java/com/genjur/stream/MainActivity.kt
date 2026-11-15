@@ -862,18 +862,14 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                     // Pencarian tetap berada di ikon kaca pembesar bagian atas.
                     listOf("Beranda" to "⌂", "Sumber Link" to "↗", "Unduhan" to "⇩", "Favorit" to "♡", "Riwayat" to "◷", "Pengaturan" to "⚙").forEach { (tab, glyph) ->
                         Column(
-                            modifier = Modifier.width(if (tvLayout) 104.dp else 76.dp).clickable {
+                            modifier = Modifier.width(if (tvLayout) 104.dp else 56.dp).clickable {
                                 selectedTab = tab
-                            }.padding(vertical = 5.dp),
+                            }.padding(vertical = 8.dp),
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.Center
                         ) {
                             Text(glyph, color = if (selectedTab == tab) Green else Muted,
-                                fontSize = if (tvLayout) 23.sp else 21.sp, maxLines = 1)
-                            Text(tab, color = if (selectedTab == tab) Green else Muted,
-                                fontSize = if (tvLayout) 12.sp else 9.sp,
-                                fontWeight = if (selectedTab == tab) FontWeight.Bold else FontWeight.Normal,
-                                maxLines = 1, softWrap = false)
+                                fontSize = if (tvLayout) 25.sp else 24.sp, maxLines = 1)
                         }
                     }
                 }
