@@ -13,6 +13,7 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -317,6 +318,13 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
     var search by remember { mutableStateOf("") }
     var category by remember { mutableStateOf("Semua") }
     var selectedTab by remember { mutableStateOf("Beranda") }
+    BackHandler(enabled = selectedMovie != null || playingMovie != null || selectedTab != "Beranda") {
+        when {
+            playingMovie != null -> playingMovie = null
+            selectedMovie != null -> selectedMovie = null
+            selectedTab != "Beranda" -> selectedTab = "Beranda"
+        }
+    }
     var savedSourceMenu by remember { mutableStateOf(emptyList<SavedSourceLink>()) }
     var selectedSearchSourceUrl by remember { mutableStateOf<String?>(null) }
     var searchSourceDropdownExpanded by remember { mutableStateOf(false) }
@@ -1538,6 +1546,9 @@ private fun SourceBrowser(initialUrl: String, fullScreen: Boolean = false, onPla
     var isLoading by remember(initialUrl) { mutableStateOf(initialUrl.isNotBlank()) }
     var webView by remember { mutableStateOf<WebView?>(null) }
     val loadingFallback = remember { Runnable { isLoading = false } }
+    BackHandler(enabled = webView?.canGoBack() == true) {
+        webView?.goBack()
+    }
     Column(Modifier.fillMaxSize().padding(if (fullScreen) 0.dp else 8.dp), verticalArrangement = Arrangement.spacedBy(if (fullScreen) 4.dp else 8.dp)) {
         if (!fullScreen) Text("Buka situs sumber video di dalam GENJUR STREAM. Gunakan hanya situs dan video yang boleh kamu akses.", color = Muted, fontSize = 12.sp)
         if (!fullScreen) {
