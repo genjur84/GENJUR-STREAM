@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "catalogType": "wikimedia_public_domain_videos",
+  "provider": {
+    "id": "genjur-wikimedia-auto",
+    "name": "Katalog Film Domain Publik Otomatis",
+    "version": "1.0.0",
+    "description": "Mengambil daftar video film dari kategori Wikimedia Commons yang ditandai domain publik. Daftar diperbarui saat katalog dimuat."
+  },
+  "source": {
+    "name": "Wikimedia Commons",
+    "category": "Videos of films in the public domain",
+    "url": "https://commons.wikimedia.org/wiki/Category:Videos_of_films_in_the_public_domain"
+  }
+}
