@@ -211,6 +211,17 @@ private fun formatVideoSize(bytes: Long): String {
         else String.format(java.util.Locale.US, "%.1f MB", mb)
 }
 
+private fun formatDownloadSpeed(bytesPerSecond: Double): String {
+    val mbps = (bytesPerSecond.coerceAtLeast(0.0) * 8.0) / 1_000_000.0
+    return String.format(java.util.Locale.US, "%.2f Mbps", mbps)
+}
+
+private data class DownloadMetrics(
+    val downloadedBytes: Long,
+    val totalBytes: Long,
+    val speedMbps: Double
+)
+
 private fun cleanCommonsText(value: String): String =
     value.replace(Regex("<[^>]+>"), " ").replace(Regex("\\s+"), " ").trim()
 
@@ -447,6 +458,7 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
     var downloadMessage by remember { mutableStateOf<String?>(null) }
     var confirmClearDownloads by remember { mutableStateOf(false) }
     var downloadStates by remember { mutableStateOf<Map<Long, Pair<Int, String>>>(emptyMap()) }
+    var downloadMetrics by remember { mutableStateOf<Map<Long, DownloadMetrics>>(emptyMap()) }
     val libraryPrefs = remember { activity.getSharedPreferences("genjur_stream_library", 0) }
     val downloadManager = remember { activity.getSystemService(DownloadManager::class.java) }
     fun persistDownloads(items: List<DownloadEntry>) {
@@ -665,17 +677,25 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(downloads, selectedTab) {
+        val previousSamples = mutableMapOf<Long, Pair<Long, Long>>()
         while (true) {
             val states = mutableMapOf<Long, Pair<Int, String>>()
+            val metrics = mutableMapOf<Long, DownloadMetrics>()
+            val sampleTime = System.currentTimeMillis()
             downloads.forEach { entry ->
                 if (entry.id < 0L) {
                     val path = Uri.parse(entry.movie.videoUrl).path.orEmpty()
                     val file = File(path)
+                    val currentBytes = if (file.exists()) file.length() else 0L
+                    val previous = previousSamples.put(entry.id, currentBytes to sampleTime)
+                    val elapsed = previous?.let { ((sampleTime - it.second).coerceAtLeast(1L)) / 1000.0 } ?: 1.0
+                    val speed = previous?.let { ((currentBytes - it.first).coerceAtLeast(0L) / elapsed).toDouble() } ?: 0.0
                     states[entry.id] = when {
-                        file.exists() && file.length() > 0L -> 100 to "Selesai"
+                        file.exists() && currentBytes > 0L -> 100 to "Selesai"
                         downloadStates[entry.id]?.second == "Gagal" -> downloadStates[entry.id]!!
                         else -> downloadStates[entry.id] ?: (0 to "Menyiapkan")
                     }
+                    metrics[entry.id] = DownloadMetrics(currentBytes, 0L, speed)
                 } else {
                     val query = DownloadManager.Query().setFilterById(entry.id)
                     val cursor = downloadManager.query(query)
@@ -692,12 +712,17 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                                 DownloadManager.STATUS_PENDING -> "Menunggu"
                                 else -> "Mengunduh"
                             }
+                            val previous = previousSamples.put(entry.id, soFar to sampleTime)
+                            val elapsed = previous?.let { ((sampleTime - it.second).coerceAtLeast(1L)) / 1000.0 } ?: 1.0
+                            val speed = previous?.let { ((soFar - it.first).coerceAtLeast(0L) / elapsed).toDouble() } ?: 0.0
                             states[entry.id] = percent to label
+                            metrics[entry.id] = DownloadMetrics(soFar, total, speed)
                         } else states[entry.id] = 0 to "Tidak ditemukan"
                     }
                 }
             }
             downloadStates = states
+            downloadMetrics = metrics
             delay(1000)
         }
     }
@@ -1197,6 +1222,20 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                                                 }
                                                 Text(savedFileName, color = Color.White, fontWeight = FontWeight.Bold, maxLines = 1)
                                                 Text(state.second, color = Muted, fontSize = 11.sp)
+                                                val metrics = downloadMetrics[entry.id]
+                                                if (metrics != null) {
+                                                    val sizeText = if (metrics.totalBytes > 0L) {
+                                                        "${formatVideoSize(metrics.downloadedBytes)} / ${formatVideoSize(metrics.totalBytes)}"
+                                                    } else {
+                                                        formatVideoSize(metrics.downloadedBytes).let {
+                                                            if (it == "Tidak diketahui") "Menunggu data ukuran" else "Terunduh: $it"
+                                                        }
+                                                    }
+                                                    Text("Ukuran: $sizeText", color = Muted, fontSize = 11.sp)
+                                                    if (state.second == "Mengunduh" || state.second == "Menyiapkan") {
+                                                        Text("Kecepatan: ${formatDownloadSpeed(metrics.speedMbps / 8.0 * 1_000_000.0)}", color = Green, fontSize = 11.sp)
+                                                    }
+                                                }
                                                 if (state.second == "Mengunduh" || state.second == "Menunggu") {
                                                     Spacer(Modifier.height(7.dp))
                                                     LinearProgressIndicator(
