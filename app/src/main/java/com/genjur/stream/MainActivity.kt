@@ -850,7 +850,7 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     // Pencarian tetap berada di ikon kaca pembesar bagian atas.
-                    listOf("Beranda" to "⌂", "Sumber Link" to "↗", "Browser Sumber" to "◎", "Kategori" to "▦", "Unduhan" to "⇩", "Favorit" to "♡", "Riwayat" to "◷").forEach { (tab, glyph) ->
+                    listOf("Beranda" to "⌂", "Sumber Link" to "↗", "Kategori" to "▦", "Unduhan" to "⇩", "Favorit" to "♡", "Riwayat" to "◷").forEach { (tab, glyph) ->
                         Column(
                             modifier = Modifier.width(if (tvLayout) 104.dp else 76.dp).clickable {
                                 selectedTab = tab
