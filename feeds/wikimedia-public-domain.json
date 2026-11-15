@@ -1,0 +1,7 @@
+{
+  "catalogType": "wikimedia_public_domain_videos",
+  "name": "Film Domain Publik — Wikimedia Commons",
+  "description": "Katalog video film berlisensi domain publik, CC0, atau CC BY yang memenuhi filter lisensi GENJUR STREAM.",
+  "source": "https://commons.wikimedia.org/wiki/Category:Videos_of_films_in_the_public_domain",
+  "refresh": "Aplikasi mengambil data terbaru dari Wikimedia Commons saat katalog diperbarui."
+}
