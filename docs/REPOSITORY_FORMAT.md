@@ -47,3 +47,10 @@ The feed URL must return JSON with an explicit distribution-rights declaration:
 Use only catalog metadata, artwork, and playback URLs that the provider has authorized you to redistribute or display. The app validates the rights declaration when loading a feed. A repository index is not itself proof of rights; each feed provider remains responsible for its license and terms.
 
 The current app version supports JSON catalog feeds. It does not execute downloaded scripts, scrape arbitrary website pages, or treat a normal website homepage as a repository index.
+
+
+## CloudStream repository discovery (read-only)
+
+The app can also read a CloudStream repository manifest with `manifestVersion: 1` and its `pluginLists` array. It fetches each HTTPS plugin-list JSON file and displays plugin metadata such as name, language, supported media types, and the HTTPS `.cs3` file URL.
+
+This is discovery-only compatibility. GENJUR STREAM does not download, install, or execute CloudStream `.cs3` code. Those plugins use the CloudStream runtime and are not GENJUR STREAM feed extensions. To play content in GENJUR STREAM, use a compatible JSON catalog feed with the rights declaration described above.
