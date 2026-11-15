@@ -679,8 +679,10 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                     if (selectedTab == "Beranda") {
                         // Bagian Lanjutkan Menonton di Beranda dihapus sesuai permintaan.
                     } else {
-                        Text(selectedTab, color = Color.White, fontSize = 27.sp, fontWeight = FontWeight.ExtraBold)
-                        Spacer(Modifier.height(14.dp))
+                        if (selectedTab != "Browser Sumber") {
+                            Text(selectedTab, color = Color.White, fontSize = 27.sp, fontWeight = FontWeight.ExtraBold)
+                            Spacer(Modifier.height(14.dp))
+                        }
                         when (selectedTab) {
                             "Cari" -> {
                                 OutlinedTextField(value = search, onValueChange = { search = it },
