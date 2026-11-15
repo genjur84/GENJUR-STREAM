@@ -12,6 +12,17 @@
         "Film Klasik"
       ],
       "subtitleLanguages": []
+    },
+    {
+      "id": "genjur-wikimedia-auto",
+      "name": "Katalog Film Domain Publik Otomatis",
+      "description": "Katalog otomatis dari video film Wikimedia Commons yang ditandai domain publik; poster dan tautan video diambil saat katalog dimuat.",
+      "feedUrl": "https://raw.githubusercontent.com/genjur84/GENJUR-STREAM/main/extensions-repo/feeds/wikimedia-auto.json",
+      "contentTypes": [
+        "Film Klasik",
+        "Film Domain Publik"
+      ],
+      "subtitleLanguages": []
     }
   ]
 }
