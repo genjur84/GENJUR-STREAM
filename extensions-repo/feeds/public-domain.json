@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "provider": {
+    "id": "genjur-public-domain-catalog",
+    "name": "Katalog Domain Publik",
+    "version": "1.0.0",
+    "description": "Katalog video yang hak distribusinya telah diperiksa."
+  },
+  "rights": {
+    "redistributionAllowed": true,
+    "licenseId": "CC0-1.0",
+    "termsUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "attribution": "Katalog GENJUR; setiap item wajib mencantumkan sumber dan status haknya."
+  },
+  "items": []
+}
