@@ -695,38 +695,7 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                                 }
                             }
                         }
-                        if (feedMovies.isNotEmpty()) {
-                            Spacer(Modifier.height(22.dp))
-                            Text("Katalog dari Sumber", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-                            Text("${feedMovies.size} judul berhasil dikenali dari sumber tersimpan", color = Muted, fontSize = 11.sp)
-                            Spacer(Modifier.height(12.dp))
-                            feedMovies.groupBy { it.category.ifBlank { "Sumber Web" } }.forEach { (groupName, items) ->
-                                Text(groupName, color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                                Spacer(Modifier.height(8.dp))
-                                Row(
-                                    Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                                ) {
-                                    items.take(30).forEach { movie ->
-                                        Column(
-                                            Modifier.width(if (tvLayout) 150.dp else 116.dp)
-                                                .clickable {
-                                                    if (movie.licenseId == "Metadata halaman sumber") {
-                                                        browserInitialUrl = movie.videoUrl
-                                                        selectedTab = "Browser Sumber"
-                                                    } else selectedMovie = movie
-                                                }
-                                        ) {
-                                            MoviePoster(movie.posterUrl, movie.title, if (tvLayout) 190.dp else 148.dp)
-                                            Spacer(Modifier.height(6.dp))
-                                            Text(movie.title, color = Color.White, fontSize = 12.sp,
-                                                fontWeight = FontWeight.SemiBold, maxLines = 2)
-                                        }
-                                    }
-                                }
-                                Spacer(Modifier.height(16.dp))
-                            }
-                        }
+
                     } else {
                         Text(selectedTab, color = Color.White, fontSize = 27.sp, fontWeight = FontWeight.ExtraBold)
                         Spacer(Modifier.height(14.dp))
@@ -885,14 +854,6 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                         }
                     }
                     Spacer(Modifier.height(18.dp))
-                    if (selectedTab == "Beranda" || selectedTab == "Cari" || selectedTab == "Kategori") {
-                        Button(onClick = { refreshCatalog() }, enabled = !feedLoading,
-                            colors = ButtonDefaults.buttonColors(containerColor = Green, contentColor = Color.White)) {
-                            Text(if (feedLoading) "Membaca sumber..." else "Muat katalog dari sumber tersimpan")
-                        }
-                        Text(feedMessage.ifBlank { "Katalog akan dicoba dibaca otomatis dari link yang tersimpan." },
-                            color = Muted, fontSize = 11.sp)
-                    }
                     Text("GENJUR STREAM • Versi ${BuildConfig.VERSION_NAME}", color = Color(0xFF777180),
                         fontSize = 10.sp, modifier = Modifier.padding(vertical = 16.dp))
                 }
