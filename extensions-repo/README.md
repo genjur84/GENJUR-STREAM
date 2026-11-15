@@ -1,33 +1,31 @@
-# GENJUR EXTENSIONS
+# GENJUR MOVIE PROVIDERS
 
-Repositori data ekstensi untuk GENJUR STREAM. Ekstensi memakai format JSON deklaratif; repositori ini **tidak menjalankan kode/plugin jarak jauh**.
+Repositori penyedia situs/katalog film untuk GENJUR STREAM. Satu entri ekstensi mewakili satu penyedia (provider). Setelah dipasang, URL feed penyedia akan dibaca GENJUR dan item katalog tampil di aplikasi.
 
 ## URL repositori
 
 `https://raw.githubusercontent.com/genjur84/GENJUR-STREAM/main/extensions-repo/repo.json`
 
-Tambahkan URL tersebut melalui **Pengaturan → Repositori → Tambah repositori**.
+Tambahkan melalui **Pengaturan → Repositori → Tambah repositori**.
 
-## Struktur
+## Cara kerja
 
-- `repo.json`: daftar ekstensi dan URL feed masing-masing.
-- `feeds/public-domain.json`: feed katalog untuk konten domain publik atau konten yang memiliki izin distribusi.
+1. Repositori menampilkan daftar penyedia film.
+2. Pengguna memasang penyedia yang diinginkan.
+3. GENJUR membaca katalog dari feed penyedia.
+4. Pengguna membuka detail dan memutar tautan MP4/HLS langsung yang kompatibel.
 
-## Format feed
+## Format
 
-Setiap feed wajib menyediakan objek `rights`:
-- `redistributionAllowed`: harus `true`.
-- `licenseId`: identitas lisensi yang jelas.
-- `termsUrl`: URL HTTPS ke ketentuan/lisensi.
-- `attribution`: atribusi sumber.
+- `repo.json`: daftar penyedia dalam array `extensions`.
+- Setiap penyedia memiliki `id`, `name`, `description`, dan `feedUrl`.
+- Feed penyedia menggunakan format JSON GENJUR dan wajib mencantumkan metadata hak distribusi, lisensi, terms URL HTTPS, dan atribusi.
+- Item dapat menyertakan `posterUrl`, `videoUrl`, metadata film, dan izin unduh terpisah.
 
-Setiap item katalog dapat berisi:
-- `title`, `description`, `category`
-- `posterUrl` (HTTPS)
-- `videoUrl` (tautan HTTPS langsung ke MP4 atau HLS/M3U8 yang berizin)
-- `releaseYear`, `genres`, `duration`
-- `downloadUrl` dan `downloadAllowed` (izin unduh terpisah)
+## Kompatibilitas
 
-## Catatan kompatibilitas dan keamanan
+GENJUR saat ini menggunakan provider berbasis data JSON. Ini memungkinkan katalog dan tautan video langsung yang sah diputar melalui pemutar internal. Plugin CloudStream `.cs3` hanya dapat dikenali metadatanya; kode plugin tidak dieksekusi. Untuk setiap situs yang ingin didukung, perlu dibuat adapter/provider GENJUR yang aman dan mematuhi hak akses situs tersebut.
 
-GENJUR STREAM saat ini membaca feed JSON dan memutar tautan media langsung yang didukung pemutar internal. File plugin CloudStream `.cs3` tidak dieksekusi. Jangan memasukkan tautan streaming tanpa hak distribusi/pemutaran yang jelas. Feed kosong ini adalah kerangka awal; katalog akan diisi setelah sumber video dan lisensinya diverifikasi.
+## Hak cipta dan keamanan
+
+Jangan menambahkan tautan streaming tanpa hak pemutaran/distribusi yang jelas. Jangan mengeksekusi kode provider jarak jauh. Feed awal masih berupa kerangka kosong sampai sumber video yang sah diverifikasi.
