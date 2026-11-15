@@ -653,25 +653,28 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
             val tvLayout = maxWidth >= 720.dp
             val horizontal = if (tvLayout) 36.dp else 18.dp
             Column(Modifier.fillMaxSize().widthIn(max = 1280.dp).align(Alignment.TopCenter)) {
-                Row(
-                    Modifier.fillMaxWidth().padding(horizontal = horizontal, vertical = 16.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Text("▶", color = Green, fontSize = 30.sp, fontWeight = FontWeight.Black)
-                        Column {
-                            Text("GENJUR STREAM", color = Color.White, fontSize = if (tvLayout) 25.sp else 19.sp, fontWeight = FontWeight.ExtraBold)
-                            Text("Hiburan pilihanmu", color = Muted, fontSize = 10.sp)
+                if (selectedTab != "Browser Sumber") {
+                    Row(
+                        Modifier.fillMaxWidth().padding(horizontal = horizontal, vertical = 16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Text("▶", color = Green, fontSize = 30.sp, fontWeight = FontWeight.Black)
+                            Column {
+                                Text("GENJUR STREAM", color = Color.White, fontSize = if (tvLayout) 25.sp else 19.sp, fontWeight = FontWeight.ExtraBold)
+                                Text("Hiburan pilihanmu", color = Muted, fontSize = 10.sp)
+                            }
                         }
-                    }
-                    TextButton(onClick = { selectedTab = "Cari" }) {
-                        Text("⌕", color = Color.White, fontSize = 25.sp)
+                        TextButton(onClick = { selectedTab = "Cari" }) {
+                            Text("⌕", color = Color.White, fontSize = 25.sp)
+                        }
                     }
                 }
 
                 Column(
-                    Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = horizontal)
+                    if (selectedTab == "Browser Sumber") Modifier.weight(1f).fillMaxWidth()
+                    else Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = horizontal)
                 ) {
                     if (selectedTab == "Beranda") {
                         // Bagian Lanjutkan Menonton di Beranda dihapus sesuai permintaan.
@@ -694,7 +697,14 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                                 })
                             }
                             "Browser Sumber" -> {
-                                SourceBrowser(initialUrl = browserInitialUrl, onPlaybackStarted = { pageTitle, pageUrl ->
+                                Row(
+                                    Modifier.fillMaxWidth().background(Color(0xFF15141B)).padding(horizontal = 8.dp, vertical = 2.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    TextButton(onClick = { selectedTab = "Beranda" }) { Text("✕ Tutup", color = Green) }
+                                    Text(selectedSourceName, color = Color.White, fontWeight = FontWeight.Bold, maxLines = 1)
+                                }
+                                SourceBrowser(initialUrl = browserInitialUrl, fullScreen = true, onPlaybackStarted = { pageTitle, pageUrl ->
                                     val safeTitle = pageTitle.trim().takeIf { it.isNotBlank() }
                                         ?: Uri.parse(pageUrl).host.orEmpty().ifBlank { "Video dari situs" }
                                     recordWatch(FeedMovie(
@@ -834,7 +844,7 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                     }
                 }
 
-                Row(
+                if (selectedTab != "Browser Sumber") Row(
                     Modifier.fillMaxWidth().background(Color(0xFF15141B)).horizontalScroll(rememberScrollState()).padding(horizontal = 4.dp, vertical = 7.dp),
                     horizontalArrangement = Arrangement.spacedBy(2.dp),
                     verticalAlignment = Alignment.CenterVertically
@@ -858,7 +868,7 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                     }
                 }
             }
-            if (savedSourceMenu.isNotEmpty()) {
+            if (selectedTab != "Browser Sumber" && savedSourceMenu.isNotEmpty()) {
                 Column(
                     modifier = Modifier.align(Alignment.BottomEnd).padding(end = 16.dp, bottom = 82.dp),
                     horizontalAlignment = Alignment.End
@@ -1345,13 +1355,13 @@ private inline fun <T> List<T>.anyIndexed(predicate: (Int, T) -> Boolean): Boole
     return false
 }
 @Composable
-private fun SourceBrowser(initialUrl: String, onPlaybackStarted: (String, String) -> Unit) {
+private fun SourceBrowser(initialUrl: String, fullScreen: Boolean = false, onPlaybackStarted: (String, String) -> Unit) {
     var address by remember(initialUrl) { mutableStateOf(initialUrl) }
     var currentUrl by remember(initialUrl) { mutableStateOf(initialUrl) }
     var pageTitle by remember { mutableStateOf("Masukkan alamat situs sumber video.") }
     var webView by remember { mutableStateOf<WebView?>(null) }
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text("Buka situs sumber video di dalam GENJUR STREAM. Gunakan hanya situs dan video yang boleh kamu akses.", color = Muted, fontSize = 12.sp)
+    Column(Modifier.fillMaxSize().padding(if (fullScreen) 0.dp else 8.dp), verticalArrangement = Arrangement.spacedBy(if (fullScreen) 4.dp else 8.dp)) {
+        if (!fullScreen) Text("Buka situs sumber video di dalam GENJUR STREAM. Gunakan hanya situs dan video yang boleh kamu akses.", color = Muted, fontSize = 12.sp)
         OutlinedTextField(value = address, onValueChange = { address = it },
             modifier = Modifier.fillMaxWidth(), singleLine = true,
             placeholder = { Text("https://contoh.com", color = Muted) },
@@ -1426,9 +1436,9 @@ private fun SourceBrowser(initialUrl: String, onPlaybackStarted: (String, String
                     view.loadUrl(currentUrl)
                 }
             },
-            modifier = Modifier.fillMaxWidth().height(420.dp)
+            modifier = if (fullScreen) Modifier.fillMaxWidth().weight(1f) else Modifier.fillMaxWidth().height(420.dp)
         )
-        Text("Situs dengan DRM, login khusus, atau pemutar tanpa tautan video langsung mungkin tidak dapat dialihkan ke GENJUR Player.", color = Muted, fontSize = 10.sp)
+        if (!fullScreen) Text("Situs dengan DRM, login khusus, atau pemutar tanpa tautan video langsung mungkin tidak dapat dialihkan ke GENJUR Player.", color = Muted, fontSize = 10.sp)
     }
 }
 
