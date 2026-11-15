@@ -752,18 +752,25 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                 }
 
                 Row(
-                    Modifier.fillMaxWidth().background(Color(0xFF15141B)).padding(horizontal = 5.dp, vertical = 8.dp),
-                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    Modifier.fillMaxWidth().background(Color(0xFF15141B)).padding(horizontal = 4.dp, vertical = 7.dp),
+                    horizontalArrangement = Arrangement.spacedBy(2.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    listOf("Beranda" to "⌂", "Kategori" to "▦", "Cari" to "⌕", "Unduhan" to "⇩", "Favorit" to "♡", "Riwayat" to "◷", "Pengaturan" to "⚙").forEach { (tab, glyph) ->
-                        TextButton(onClick = { if (tab == "Pengaturan") onOpenSources() else selectedTab = tab },
-                            modifier = Modifier.weight(1f)) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text(glyph, color = if (selectedTab == tab) Green else Muted, fontSize = 22.sp)
-                                Text(tab, color = if (selectedTab == tab) Green else Muted, fontSize = if (tvLayout) 12.sp else 9.sp,
-                                    fontWeight = if (selectedTab == tab) FontWeight.Bold else FontWeight.Normal, maxLines = 1)
-                            }
+                    // Pencarian tetap berada di ikon kaca pembesar bagian atas.
+                    listOf("Beranda" to "⌂", "Kategori" to "▦", "Unduhan" to "⇩", "Favorit" to "♡", "Riwayat" to "◷", "Pengaturan" to "⚙").forEach { (tab, glyph) ->
+                        Column(
+                            modifier = Modifier.weight(1f).clickable {
+                                if (tab == "Pengaturan") onOpenSources() else selectedTab = tab
+                            }.padding(vertical = 5.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            Text(glyph, color = if (selectedTab == tab) Green else Muted,
+                                fontSize = if (tvLayout) 23.sp else 21.sp, maxLines = 1)
+                            Text(tab, color = if (selectedTab == tab) Green else Muted,
+                                fontSize = if (tvLayout) 12.sp else 9.sp,
+                                fontWeight = if (selectedTab == tab) FontWeight.Bold else FontWeight.Normal,
+                                maxLines = 1, softWrap = false)
                         }
                     }
                 }
