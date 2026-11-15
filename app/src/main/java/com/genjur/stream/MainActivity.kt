@@ -219,7 +219,7 @@ private fun formatDownloadSpeed(bytesPerSecond: Double): String {
 private data class DownloadMetrics(
     val downloadedBytes: Long,
     val totalBytes: Long,
-    val speedMbps: Double
+    val speedBytesPerSecond: Double
 )
 
 private fun cleanCommonsText(value: String): String =
@@ -1233,7 +1233,7 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                                                     }
                                                     Text("Ukuran: $sizeText", color = Muted, fontSize = 11.sp)
                                                     if (state.second == "Mengunduh" || state.second == "Menyiapkan") {
-                                                        Text("Kecepatan: ${formatDownloadSpeed(metrics.speedMbps / 8.0 * 1_000_000.0)}", color = Green, fontSize = 11.sp)
+                                                        Text("Kecepatan: ${formatDownloadSpeed(metrics.speedBytesPerSecond)}", color = Green, fontSize = 11.sp)
                                                     }
                                                 }
                                                 if (state.second == "Mengunduh" || state.second == "Menunggu") {
