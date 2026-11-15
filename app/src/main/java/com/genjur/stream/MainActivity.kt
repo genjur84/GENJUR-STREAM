@@ -242,7 +242,6 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
     var category by remember { mutableStateOf("Semua") }
     var selectedTab by remember { mutableStateOf("Beranda") }
     var browserInitialUrl by remember { mutableStateOf("") }
-    var browserAllowVideoDetection by remember { mutableStateOf(true) }
     var updateVersion by remember { mutableStateOf<String?>(null) }
     var updateUrl by remember { mutableStateOf<String?>(null) }
     var checking by remember { mutableStateOf(true) }
@@ -655,7 +654,7 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                         Spacer(Modifier.height(18.dp))
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                             Text("Lanjutkan Menonton", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-                            TextButton(onClick = { selectedTab = "Unduhan" }) { Text("Lihat semua  →", color = Green) }
+                            TextButton(onClick = { selectedTab = "Riwayat" }) { Text("Lihat semua  →", color = Green) }
                         }
                         if (watchHistory.isEmpty()) {
                             Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = Panel), shape = RoundedCornerShape(18.dp)) {
@@ -742,6 +741,7 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                                         attribution = "Situs sumber: ${Uri.parse(pageUrl).host.orEmpty()}"
                                     ))
                                 })
+                            }
                             "Kategori" -> {
                                 categories.forEach { item ->
                                     FilterChip(selected = category == item, onClick = { category = item },
@@ -819,8 +819,13 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                                                 Column(Modifier.weight(1f)) {
                                                     Text(movie.title, color = Color.White, fontWeight = FontWeight.Bold)
                                                     Text(movie.category, color = Green, fontSize = 11.sp)
-                                                    TextButton(onClick = { selectedMovie = movie }) {
-                                                        Text("Lihat detail", color = Green)
+                                                    TextButton(onClick = {
+                                                        if (selectedTab == "Riwayat" && movie.category == "Sumber Web") {
+                                                            browserInitialUrl = movie.videoUrl
+                                                            selectedTab = "Browser Sumber"
+                                                        } else selectedMovie = movie
+                                                    }) {
+                                                        Text(if (selectedTab == "Riwayat" && movie.category == "Sumber Web") "Lanjutkan" else "Lihat detail", color = Green)
                                                     }
                                                 }
                                                 if (selectedTab == "Favorit") {
