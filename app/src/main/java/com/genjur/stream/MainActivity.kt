@@ -752,13 +752,32 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                             val status = it.getInt(it.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS))
                             val soFar = it.getLong(it.getColumnIndexOrThrow(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR))
                             val total = it.getLong(it.getColumnIndexOrThrow(DownloadManager.COLUMN_TOTAL_SIZE_BYTES))
+                            val reasonColumn = it.getColumnIndex(DownloadManager.COLUMN_REASON)
+                            val failureReason = if (reasonColumn >= 0) it.getInt(reasonColumn) else 0
                             val percent = if (total > 0) ((soFar * 100) / total).toInt() else 0
+                            val failureDetail = when (failureReason) {
+                                DownloadManager.ERROR_CANNOT_RESUME -> "Tidak bisa melanjutkan"
+                                DownloadManager.ERROR_DEVICE_NOT_FOUND -> "Penyimpanan tidak ditemukan"
+                                DownloadManager.ERROR_FILE_ALREADY_EXISTS -> "File sudah ada"
+                                DownloadManager.ERROR_FILE_ERROR -> "Kesalahan file/penyimpanan"
+                                DownloadManager.ERROR_HTTP_DATA_ERROR -> "Data HTTP terputus"
+                                DownloadManager.ERROR_INSUFFICIENT_SPACE -> "Ruang penyimpanan tidak cukup"
+                                DownloadManager.ERROR_TOO_MANY_REDIRECTS -> "Terlalu banyak pengalihan"
+                                DownloadManager.ERROR_UNHANDLED_HTTP_CODE -> "Kode HTTP tidak didukung"
+                                DownloadManager.ERROR_BLOCKED -> "Unduhan diblokir sistem"
+                                DownloadManager.ERROR_UNKNOWN -> "Kesalahan jaringan tidak diketahui"
+                                in 400..599 -> "Server menolak (HTTP $failureReason)"
+                                else -> if (failureReason != 0) "Kode gagal $failureReason" else "Penyebab tidak diberikan sistem"
+                            }
                             val label = when (status) {
                                 DownloadManager.STATUS_SUCCESSFUL -> "Selesai"
-                                DownloadManager.STATUS_FAILED -> "Gagal"
+                                DownloadManager.STATUS_FAILED -> "Gagal • $failureDetail"
                                 DownloadManager.STATUS_PAUSED -> "Dijeda"
                                 DownloadManager.STATUS_PENDING -> "Menunggu"
                                 else -> "Mengunduh"
+                            }
+                            if (status == DownloadManager.STATUS_FAILED) {
+                                android.util.Log.e("GENJUR_DOWNLOAD", "DownloadManager gagal id=${entry.id}, reason=$failureReason ($failureDetail), url=${entry.movie.downloadUrl.take(500)}")
                             }
                             val previous = previousSamples.put(entry.id, soFar to sampleTime)
                             val elapsed = previous?.let { ((sampleTime - it.second).coerceAtLeast(1L)) / 1000.0 } ?: 1.0
