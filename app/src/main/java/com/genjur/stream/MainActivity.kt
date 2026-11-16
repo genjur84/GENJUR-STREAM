@@ -415,7 +415,7 @@ private fun loadGenericHtmlCatalog(sourceUrl: String, html: String, sourceName: 
                         value.startsWith("https://") -> value
                         value.startsWith("http://") -> value.replaceFirst("http://", "https://")
                         value.startsWith("//") -> "https:$value"
-                        value.isNotBlank() -> runCatching { Uri.parse(sourceUrl).resolve(value).toString() }.getOrNull()
+                        value.isNotBlank() -> runCatching { URL(URL(sourceUrl), value).toString() }.getOrNull()
                         else -> null
                     }
                 }.firstOrNull { it.startsWith("https://") }.orEmpty()
