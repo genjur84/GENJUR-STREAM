@@ -1297,12 +1297,26 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                                                 }
                                                 if (state.second == "Mengunduh" || state.second == "Menunggu") {
                                                     Spacer(Modifier.height(7.dp))
-                                                    LinearProgressIndicator(
-                                                        progress = { state.first / 100f },
-                                                        modifier = Modifier.fillMaxWidth(),
-                                                        color = Green
-                                                    )
-                                                    Text("${state.first}%", color = Muted, fontSize = 10.sp)
+                                                    if (entry.id < 0L) {
+                                                        // HLS/DASH tidak menyediakan ukuran total file MP4 di awal.
+                                                        // Jangan tampilkan 0% palsu; gunakan indikator berjalan sampai mux selesai.
+                                                        LinearProgressIndicator(
+                                                            modifier = Modifier.fillMaxWidth(),
+                                                            color = Green
+                                                        )
+                                                        Text(
+                                                            "Progres: data sedang diterima • persentase belum tersedia",
+                                                            color = Muted,
+                                                            fontSize = 10.sp
+                                                        )
+                                                    } else {
+                                                        LinearProgressIndicator(
+                                                            progress = { state.first / 100f },
+                                                            modifier = Modifier.fillMaxWidth(),
+                                                            color = Green
+                                                        )
+                                                        Text("${state.first}%", color = Muted, fontSize = 10.sp)
+                                                    }
                                                 }
                                                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                                     if (completedUri != null) {
