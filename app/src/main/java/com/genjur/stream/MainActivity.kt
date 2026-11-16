@@ -644,11 +644,14 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                 null,
                 { _ -> setAdaptiveState(id, 0, "Mengunduh") }
             ).also { session -> adaptiveSessions[id] = session.sessionId }
-        } catch (error: Exception) {
+        } catch (error: Throwable) {
+            // Termasuk LinkageError/UnsatisfiedLinkError jika pustaka native FFmpeg
+            // tidak dapat dimuat pada perangkat. Jangan biarkan proses aplikasi tertutup.
             adaptiveSessions.remove(id)
             downloadStates = downloadStates + (id to (0 to "Gagal"))
-            downloadMessage = "Gagal memulai mesin unduhan: ${error.message ?: error.javaClass.simpleName}"
-            android.util.Log.e("GENJUR_DOWNLOAD", "FFmpeg gagal dijalankan", error)
+            val detail = error.message ?: error.javaClass.simpleName
+            downloadMessage = "Mesin unduhan tidak dapat dijalankan: $detail"
+            android.util.Log.e("GENJUR_DOWNLOAD", "FFmpeg gagal dijalankan atau pustaka native tidak tersedia", error)
         }
     }
     fun startWebVideoDownload(title: String, pageUrl: String, mediaUrl: String) {
