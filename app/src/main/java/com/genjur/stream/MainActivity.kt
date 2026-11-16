@@ -367,8 +367,10 @@ private fun loadGenericHtmlCatalog(sourceUrl: String, html: String): List<FeedMo
         if (uri.scheme != "https" || uri.host.isNullOrBlank()) return@forEach
         if (uri.host != Uri.parse(sourceUrl).host) return@forEach
         val path = uri.path.orEmpty().lowercase()
-        if (!Regex("/(film|movie|watch|title|series|serial|episode|drama)(/|$|-|_)").containsMatchIn(path)) return@forEach
+        if (path.isBlank() || path == "/" || path in setOf("/login", "/register", "/contact", "/about", "/genre")) return@forEach
         val image = link.selectFirst("img")
+        val looksLikeMoviePath = Regex("/(film|movie|watch|title|series|serial|episode|drama)(/|$|-|_)").containsMatchIn(path)
+        if (image == null && !looksLikeMoviePath) return@forEach
         val title = link.text().trim().ifBlank { image?.attr("alt").orEmpty().trim() }
             .replace(Regex("\\s+"), " ")
         if (title.length !in 2..100) return@forEach
@@ -480,6 +482,11 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
         }.getOrDefault(emptyList())
     }
     var browserInitialUrl by remember { mutableStateOf("") }
+    var catalogSourceUrl by remember { mutableStateOf("") }
+    var catalogSourceName by remember { mutableStateOf("") }
+    var sourceCatalogMovies by remember { mutableStateOf(emptyList<FeedMovie>()) }
+    var sourceCatalogLoading by remember { mutableStateOf(false) }
+    var sourceCatalogMessage by remember { mutableStateOf<String?>(null) }
     var updateVersion by remember { mutableStateOf<String?>(null) }
     var updateUrl by remember { mutableStateOf<String?>(null) }
     var checking by remember { mutableStateOf(true) }
@@ -498,6 +505,8 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
         when {
             playingMovie != null -> playingMovie = null
             selectedMovie != null -> selectedMovie = null
+            selectedTab == "Browser Sumber" && catalogSourceUrl.isNotBlank() -> selectedTab = "Katalog Sumber"
+            selectedTab == "Katalog Sumber" -> selectedTab = "Sumber Link"
             selectedTab != "Beranda" -> selectedTab = "Beranda"
         }
     }
@@ -1277,11 +1286,33 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                             }
                             "Sumber Link" -> {
                                 SourceLinksScreen(activity = activity, onOpenLink = { link ->
-                                    browserInitialUrl = link
-                                    selectedSourceName = savedSourceMenu.firstOrNull { it.url == link }?.name
+                                    catalogSourceUrl = link
+                                    catalogSourceName = savedSourceMenu.firstOrNull { it.url == link }?.name
                                         ?: Uri.parse(link).host.orEmpty().ifBlank { "Sumber Link" }
-                                    selectedTab = "Browser Sumber"
+                                    sourceCatalogMovies = emptyList()
+                                    sourceCatalogMessage = null
+                                    selectedTab = "Katalog Sumber"
                                 })
+                            }
+                            "Katalog Sumber" -> {
+                                SourceCatalogScreen(
+                                    sourceName = catalogSourceName,
+                                    sourceUrl = catalogSourceUrl,
+                                    movies = sourceCatalogMovies,
+                                    loading = sourceCatalogLoading,
+                                    message = sourceCatalogMessage,
+                                    onMoviesLoaded = { sourceCatalogMovies = it },
+                                    onLoadingChanged = { sourceCatalogLoading = it },
+                                    onMessageChanged = { sourceCatalogMessage = it },
+                                    onOpenMovie = { movieUrl ->
+                                        browserInitialUrl = movieUrl
+                                        selectedTab = "Browser Sumber"
+                                    },
+                                    onOpenSource = {
+                                        browserInitialUrl = catalogSourceUrl
+                                        selectedTab = "Browser Sumber"
+                                    }
+                                )
                             }
                             "Pengaturan" -> {
                                 Card(
@@ -2004,6 +2035,66 @@ private fun refreshSavedSourceDomains(activity: MainActivity): Int {
 private data class SourceRepositoryEntry(val id: String, val name: String, val url: String, val category: String = "", val description: String = "")
 
 private data class SavedSourceLink(val name: String, val url: String)
+
+@Composable
+private fun SourceCatalogScreen(
+    sourceName: String, sourceUrl: String, movies: List<FeedMovie>, loading: Boolean, message: String?,
+    onMoviesLoaded: (List<FeedMovie>) -> Unit, onLoadingChanged: (Boolean) -> Unit,
+    onMessageChanged: (String?) -> Unit, onOpenMovie: (String) -> Unit, onOpenSource: () -> Unit
+) {
+    LaunchedEffect(sourceUrl) {
+        if (sourceUrl.isBlank()) return@LaunchedEffect
+        onLoadingChanged(true)
+        onMessageChanged("Mengambil daftar film dari $sourceName…")
+        val result = withContext(Dispatchers.IO) {
+            runCatching {
+                val connection = (URL(sourceUrl).openConnection() as java.net.HttpURLConnection).apply {
+                    connectTimeout = 15000; readTimeout = 25000; instanceFollowRedirects = true
+                    setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 11) AppleWebKit/537.36 Chrome/120.0.0.0 Mobile Safari/537.36")
+                    setRequestProperty("Accept", "text/html,application/xhtml+xml,application/json;q=0.9,*/*;q=0.8")
+                    setRequestProperty("Accept-Language", "id-ID,id;q=0.9,en-US;q=0.8")
+                }
+                try {
+                    val status = connection.responseCode
+                    require(status in 200..299) { "Situs membalas HTTP $status." }
+                    val html = connection.inputStream.bufferedReader().use { it.readText() }
+                    val parsed = loadGenericHtmlCatalog(connection.url.toString(), html)
+                    require(parsed.isNotEmpty()) { "Halaman terbuka, tetapi daftar film belum bisa dikenali. Situs mungkin memakai JavaScript atau perlindungan anti-bot." }
+                    parsed
+                } finally { connection.disconnect() }
+            }
+        }
+        onLoadingChanged(false)
+        result.onSuccess { found -> onMoviesLoaded(found); onMessageChanged("${found.size} judul ditemukan dari halaman $sourceName.") }
+            .onFailure { error -> onMoviesLoaded(emptyList()); onMessageChanged(error.message ?: "Katalog tidak dapat dimuat otomatis.") }
+    }
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            TextButton(onClick = { onMessageChanged(null); onMoviesLoaded(emptyList()) }) { Text("‹ Daftar Sumber", color = Green) }
+            Spacer(Modifier.weight(1f))
+            TextButton(onClick = onOpenSource) { Text("Buka situs", color = Green) }
+        }
+        Text(sourceName, color = Color.White, fontSize = 23.sp, fontWeight = FontWeight.ExtraBold)
+        Text(sourceUrl, color = Muted, fontSize = 10.sp, maxLines = 1)
+        if (loading) LinearProgressIndicator(Modifier.fillMaxWidth(), color = Green)
+        message?.let { Text(it, color = if (it.startsWith("Gagal")) MaterialTheme.colorScheme.error else Muted, fontSize = 12.sp) }
+        if (movies.isEmpty() && !loading) {
+            Text("Jika katalog otomatis tidak tersedia, tekan Buka situs untuk melihat daftar film langsung dari sumber.", color = Muted, fontSize = 12.sp)
+        } else movies.forEach { movie ->
+            Card(Modifier.fillMaxWidth().clickable { onOpenMovie(movie.videoUrl) }, colors = CardDefaults.cardColors(containerColor = Panel), shape = RoundedCornerShape(12.dp)) {
+                Row(Modifier.fillMaxWidth().padding(9.dp), verticalAlignment = Alignment.CenterVertically) {
+                    MoviePoster(movie.posterUrl, movie.title, 104.dp, 76.dp)
+                    Spacer(Modifier.width(12.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(movie.title, color = Color.White, fontWeight = FontWeight.Bold, maxLines = 2)
+                        Text(movie.category, color = Green, fontSize = 11.sp)
+                        Text("Buka halaman film  ›", color = Muted, fontSize = 11.sp)
+                    }
+                }
+            }
+        }
+    }
+}
 
 @Composable
 private fun SourceLinksScreen(activity: MainActivity, onOpenLink: (String) -> Unit) {
