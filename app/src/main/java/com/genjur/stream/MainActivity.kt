@@ -2262,7 +2262,7 @@ private fun SourceBrowser(
                     setDownloadListener(DownloadListener { url, _, _, _, _ ->
                         val downloadUri = Uri.parse(url)
                         val downloadPath = url.lowercase()
-                        val isVideoFile = Regex("""(?i)\\.(m3u8|mpd|mp4|m4v|webm|mov|mkv)(?:$|[?#&])""").containsMatchIn(downloadPath)
+                        val isVideoFile = Regex("""(?i)\.(m3u8|mpd|mp4|m4v|webm|mov|mkv)(?:$|[?#&])""").containsMatchIn(downloadPath)
                         val looksLikeAd = isGenjurAdHost(downloadUri.host) ||
                             Regex("""(?i)(/ads?/|advert|doubleclick|popunder|banner|tracking|analytics)""").containsMatchIn(downloadPath)
                         if (sitePlaybackStarted && url.isNotBlank() && isVideoFile && !looksLikeAd) {
