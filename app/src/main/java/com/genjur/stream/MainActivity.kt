@@ -2514,6 +2514,7 @@ private fun SourceBrowser(
                                         detectedVideoOptions = (detectedVideoOptions.filterNot {
                                             it.quality == label || it.videoUrl == mediaUrl
                                         } + StreamOption(label, mediaUrl))
+                                        fullscreenDownloadButton?.visibility = android.view.View.VISIBLE
                                     }
                                 }
                             }
