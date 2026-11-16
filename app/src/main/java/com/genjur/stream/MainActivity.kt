@@ -3398,7 +3398,7 @@ private fun SourceFallbackPlayer(
                                     view: android.view.View,
                                     callback: android.webkit.WebChromeClient.CustomViewCallback
                                 ) {
-                                    val decor = activity.window.decorView as? android.view.ViewGroup
+                                    val decor = view.rootView as? android.view.ViewGroup
                                     if (decor == null || fullscreenView != null) {
                                         callback.onCustomViewHidden()
                                         return
@@ -3417,7 +3417,7 @@ private fun SourceFallbackPlayer(
                                 }
 
                                 override fun onHideCustomView() {
-                                    val decor = activity.window.decorView as? android.view.ViewGroup
+                                    val decor = fullscreenView?.rootView as? android.view.ViewGroup
                                     fullscreenView?.let { view -> decor?.removeView(view) }
                                     fullscreenView = null
                                     fullscreenCallback = null
@@ -3430,7 +3430,7 @@ private fun SourceFallbackPlayer(
                             loadUrl(movie.termsUrl.ifBlank { movie.videoUrl })
                         }
                     },
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier.fillMaxWidth().weight(1f),
                     update = { webViewRef.value = it }
                 )
             }
