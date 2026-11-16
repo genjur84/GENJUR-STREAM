@@ -299,7 +299,7 @@ private fun publishMp4ToPublicMovies(activity: MainActivity, source: File, title
         put(android.provider.MediaStore.MediaColumns.DISPLAY_NAME, fileName)
         put(android.provider.MediaStore.MediaColumns.MIME_TYPE, "video/mp4")
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            put(android.provider.MediaStore.MediaColumns.RELATIVE_PATH, "${D}Environment.DIRECTORY_MOVIES}/GENJUR STREAM")
+            put(android.provider.MediaStore.MediaColumns.RELATIVE_PATH, "${Environment.DIRECTORY_MOVIES}/GENJUR STREAM")
             put(android.provider.MediaStore.MediaColumns.IS_PENDING, 1)
         } else {
             val dir = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MOVIES), "GENJUR STREAM")
