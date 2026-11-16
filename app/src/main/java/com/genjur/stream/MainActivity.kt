@@ -66,6 +66,8 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.datasource.DefaultHttpDataSource
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.ui.PlayerView
 import androidx.media3.ui.PlayerNotificationManager
 import com.arthenica.ffmpegkit.FFmpegKit
@@ -433,15 +435,62 @@ internal fun loadGenericHtmlCatalog(sourceUrl: String, html: String, sourceName:
     return results.distinctBy { it.videoUrl }.take(120)
 }
 
-/** Ambil metadata halaman detail secara native; tidak mengekstrak stream dari situs. */
+/** Ambil metadata film dan URL media langsung yang memang dipublikasikan halaman sumber. */
 private suspend fun loadSourceMovieDetails(movie: FeedMovie): FeedMovie = withContext(Dispatchers.IO) {
-    val document = Jsoup.connect(movie.videoUrl)
-        .userAgent("Mozilla/5.0 (Linux; Android 11) AppleWebKit/537.36 Chrome/131.0.0.0 Mobile Safari/537.36")
-        .timeout(15000).followRedirects(true).get()
+    val pageUrl = movie.videoUrl
+    val userAgent = "Mozilla/5.0 (Linux; Android 11) AppleWebKit/537.36 Chrome/131.0.0.0 Mobile Safari/537.36"
+    val document = Jsoup.connect(pageUrl).userAgent(userAgent).timeout(18000)
+        .followRedirects(true).get()
     fun meta(vararg selectors: String): String =
         selectors.asSequence().mapNotNull { selector ->
             document.selectFirst(selector)?.attr("content")?.trim()?.takeIf { it.isNotBlank() }
         }.firstOrNull().orEmpty()
+
+    fun mediaUrls(doc: org.jsoup.nodes.Document, baseUrl: String): List<String> {
+        val found = LinkedHashSet<String>()
+        fun add(rawValue: String) {
+            val raw = rawValue.trim().trim('"', '\'').replace("\\\\/", "/")
+                .replace("\\/", "/").replace("&amp;", "&")
+            if (raw.isBlank() || raw.startsWith("blob:", true) || raw.startsWith("data:", true)) return
+            val absolute = runCatching {
+                when {
+                    raw.startsWith("//") -> "https:$raw"
+                    raw.startsWith("https://", true) -> raw
+                    raw.startsWith("http://", true) -> raw.replaceFirst("http://", "https://")
+                    else -> URL(URL(baseUrl), raw).toString()
+                }
+            }.getOrNull() ?: return
+            val uri = Uri.parse(absolute)
+            val path = uri.path.orEmpty().lowercase()
+            if (uri.scheme == "https" && (path.endsWith(".m3u8") || path.endsWith(".mp4"))) {
+                found.add(absolute)
+            }
+        }
+        doc.select("video[src], video source[src], source[src], a[href]").forEach { element ->
+            val value = if (element.hasAttr("src")) element.attr("src") else element.attr("href")
+            add(value)
+        }
+        val mediaPattern = Regex("""(?i)(?:https?:)?(?:\\?/\\?/)[^"'\\s<>]+?\\.(?:m3u8|mp4)(?:\\?[^"'\\s<>]*)?|(?:/|\\./)[^"'\\s<>]+?\\.(?:m3u8|mp4)(?:\\?[^"'\\s<>]*)?""")
+        doc.select("script").forEach { script ->
+            mediaPattern.findAll(script.data() + " " + script.html()).forEach { add(it.value) }
+        }
+        return found.toList()
+    }
+
+    val streams = LinkedHashSet<String>()
+    streams.addAll(mediaUrls(document, pageUrl))
+    // Banyak halaman menyematkan player pihak ketiga melalui iframe. Periksa hanya
+    // URL iframe HTTPS yang terlihat di halaman; tidak melewati login atau DRM.
+    val embeds = document.select("iframe[src]").map { it.absUrl("src") }
+        .filter { it.startsWith("https://") }.distinct().take(5)
+    for (embedUrl in embeds) {
+        runCatching {
+            val embed = Jsoup.connect(embedUrl).userAgent(userAgent).referrer(pageUrl)
+                .header("Accept", "*/*").timeout(12000).followRedirects(true).get()
+            streams.addAll(mediaUrls(embed, embedUrl))
+        }
+    }
+
     val title = meta("meta[property=og:title]", "meta[name=twitter:title]")
         .ifBlank { document.selectFirst("h1")?.text()?.trim().orEmpty() }.ifBlank { movie.title }
     val description = meta("meta[property=og:description]", "meta[name=description]", "meta[name=twitter:description]")
@@ -458,8 +507,10 @@ private suspend fun loadSourceMovieDetails(movie: FeedMovie): FeedMovie = withCo
         .distinct().take(8).ifEmpty { movie.genres }
     val duration = document.selectFirst("[itemprop=duration], .runtime, .duration, .movie-runtime")
         ?.text()?.trim()?.takeIf { it.isNotBlank() } ?: movie.duration
+    val options = streams.map { url -> StreamOption(detectedQualityLabel("", url), url) }
     movie.copy(title = title.take(140), description = description.take(1200), posterUrl = poster,
-        releaseYear = year, genres = genres, duration = duration)
+        releaseYear = year, genres = genres, duration = duration, termsUrl = pageUrl,
+        streamOptions = options)
 }
 
 class MainActivity : ComponentActivity() {
@@ -1889,7 +1940,8 @@ private fun MovieDetailDialog(
 ) {
     val isSourceMetadataOnly = movie.licenseId == "Metadata halaman sumber"
     var selectedStreamUrl by remember(movie) {
-        mutableStateOf(if (isSourceMetadataOnly) "" else movie.streamOptions.firstOrNull()?.videoUrl ?: movie.videoUrl)
+        mutableStateOf(if (isSourceMetadataOnly) movie.streamOptions.firstOrNull()?.videoUrl.orEmpty()
+            else movie.streamOptions.firstOrNull()?.videoUrl ?: movie.videoUrl)
     }
     Dialog(onDismissRequest = onClose, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Surface(Modifier.fillMaxWidth().fillMaxHeight(0.9f).padding(12.dp),
@@ -1931,7 +1983,7 @@ private fun MovieDetailDialog(
                     Spacer(Modifier.height(8.dp))
                     Text(movie.description.ifBlank { "Sinopsis belum tersedia." },
                         color = Muted, fontSize = 14.sp, lineHeight = 22.sp)
-                    val availableStreams = if (isSourceMetadataOnly) emptyList() else movie.streamOptions.ifEmpty {
+                    val availableStreams = if (isSourceMetadataOnly) movie.streamOptions else movie.streamOptions.ifEmpty {
                         if (movie.videoUrl.isNotBlank()) listOf(StreamOption("Otomatis", movie.videoUrl)) else emptyList()
                     }
                     if (detailLoading) {
@@ -1941,8 +1993,11 @@ private fun MovieDetailDialog(
                     }
                     if (isSourceMetadataOnly) {
                         Spacer(Modifier.height(12.dp))
-                        Text("Tombol PLAY memakai player GENJUR STREAM. Stream langsung belum tersedia dari metadata katalog ini, jadi film tidak akan dibuka melalui player situs.",
-                            color = Muted, fontSize = 11.sp, lineHeight = 17.sp)
+                        Text(
+                            if (movie.streamOptions.isNotEmpty()) "Sumber video langsung ditemukan. PLAY akan memakai player internal GENJUR STREAM."
+                            else "Belum ditemukan URL video langsung pada halaman ini. Situs mungkin memuat player secara dinamis atau memerlukan metode resmi; halaman situs tidak akan dipakai sebagai video.",
+                            color = Muted, fontSize = 11.sp, lineHeight = 17.sp
+                        )
                     }
                     if (availableStreams.isNotEmpty()) {
                         Spacer(Modifier.height(16.dp))
@@ -3251,7 +3306,20 @@ private fun ProviderWebDialog(url: String, onClose: () -> Unit) {
 private fun InAppVideoPlayer(activity: MainActivity, movie: FeedMovie, onDownload: () -> Unit, onClose: () -> Unit) {
     var isFullscreen by remember { mutableStateOf(false) }
     val player = remember(movie.videoUrl) {
-        ExoPlayer.Builder(activity).build().apply {
+        val requestHeaders = buildMap {
+            put("User-Agent", "Mozilla/5.0 (Linux; Android 11) AppleWebKit/537.36 Chrome/131.0.0.0 Mobile Safari/537.36")
+            if (movie.termsUrl.startsWith("https://")) {
+                put("Referer", movie.termsUrl)
+                Uri.parse(movie.termsUrl).host?.let { put("Origin", "https://$it") }
+            }
+        }
+        val dataSourceFactory = DefaultHttpDataSource.Factory()
+            .setUserAgent(requestHeaders["User-Agent"]!!)
+            .setAllowCrossProtocolRedirects(true)
+            .setDefaultRequestProperties(requestHeaders)
+        ExoPlayer.Builder(activity)
+            .setMediaSourceFactory(DefaultMediaSourceFactory(dataSourceFactory))
+            .build().apply {
             val mediaItem = MediaItem.Builder().setUri(movie.videoUrl)
                 .setMediaMetadata(
                     androidx.media3.common.MediaMetadata.Builder()
