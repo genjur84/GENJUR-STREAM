@@ -2372,7 +2372,6 @@ private fun SourceBrowser(
                                 callback.onCustomViewHidden()
                                 return
                             }
-                            siteFullscreenView = view
                             siteFullscreenCallback = callback
                             val fullscreenContainer = android.widget.FrameLayout(activity).apply {
                                 setBackgroundColor(android.graphics.Color.BLACK)
@@ -2381,11 +2380,14 @@ private fun SourceBrowser(
                                     android.view.ViewGroup.LayoutParams.MATCH_PARENT
                                 ))
                                 val downloadButton = android.widget.Button(activity).apply {
-                                    text = "⬇ Unduh"
-                                    textSize = 14f
+                                    text = "↓"
+                                    textSize = 25f
+                                    contentDescription = "Unduh video"
                                     isAllCaps = false
                                     setTextColor(android.graphics.Color.WHITE)
                                     backgroundTintList = android.content.res.ColorStateList.valueOf(android.graphics.Color.rgb(35, 155, 90))
+                                    minWidth = (48 * resources.displayMetrics.density).toInt()
+                                    minHeight = (48 * resources.displayMetrics.density).toInt()
                                     visibility = if (sitePlaybackStarted && detectedVideoOptions.isNotEmpty()) android.view.View.VISIBLE else android.view.View.GONE
                                     setOnClickListener {
                                         selectedDownloadOption = detectedVideoOptions.firstOrNull()
@@ -2402,6 +2404,7 @@ private fun SourceBrowser(
                                     marginEnd = (16 * resources.displayMetrics.density).toInt()
                                 })
                             }
+                            siteFullscreenView = fullscreenContainer
                             activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
                             WindowCompat.setDecorFitsSystemWindows(activity.window, false)
                             WindowInsetsControllerCompat(activity.window, decor)
@@ -2473,7 +2476,7 @@ private fun SourceBrowser(
                                     detectedVideoOptions = (detectedVideoOptions.filterNot {
                                         it.quality == label || it.videoUrl == videoUrl
                                     } + item)
-                                    fullscreenDownloadButton?.visibility = android.view.View.VISIBLE
+                                    fullscreenDownloadButton?.visibility = if (sitePlaybackStarted) android.view.View.VISIBLE else android.view.View.GONE
                                 }
                             }
                         }
@@ -2693,8 +2696,6 @@ private fun SourceBrowser(
                 contentPadding = PaddingValues(horizontal = 14.dp, vertical = 9.dp)
             ) {
                 Icon(Icons.Filled.Download, contentDescription = "Unduh video situs")
-                Spacer(Modifier.width(6.dp))
-                Text("Unduh")
             }
         }
         if (isLoading) {
