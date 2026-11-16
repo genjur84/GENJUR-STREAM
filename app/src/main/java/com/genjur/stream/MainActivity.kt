@@ -148,7 +148,7 @@ private fun detectedQualityLabel(label: String, videoUrl: String): String {
     return "Kualitas sumber (otomatis)"
 }
 
-private data class FeedMovie(
+internal data class FeedMovie(
     val title: String,
     val description: String,
     val category: String,
@@ -352,7 +352,7 @@ private fun savedFeedUrls(activity: MainActivity): List<String> = runCatching {
     }.distinct()
 }.getOrDefault(emptyList())
 
-private fun loadGenericHtmlCatalog(sourceUrl: String, html: String, sourceName: String = ""): List<FeedMovie> {
+internal fun loadGenericHtmlCatalog(sourceUrl: String, html: String, sourceName: String = ""): List<FeedMovie> {
     val document = Jsoup.parse(html, sourceUrl)
     val sourceHost = Uri.parse(sourceUrl).host.orEmpty().removePrefix("www.").lowercase()
     val sourceLabel = sourceName.ifBlank { sourceHost }
@@ -2081,157 +2081,84 @@ private fun SourceCatalogScreen(
     onMessageChanged: (String?) -> Unit, onOpenMovie: (String) -> Unit, onOpenSource: () -> Unit
 ) {
     var reloadToken by remember(sourceUrl) { mutableIntStateOf(0) }
-    val context = LocalContext.current
-    if (sourceUrl.isNotBlank()) {
-        key(sourceUrl, reloadToken) {
-            AndroidView(
-                modifier = Modifier.size(1.dp),
-                factory = { viewContext ->
-                    WebView(viewContext).apply {
-                        alpha = 0f
-                        settings.javaScriptEnabled = true
-                        settings.domStorageEnabled = true
-                        settings.loadsImagesAutomatically = true
-                        settings.blockNetworkImage = false
-                        settings.userAgentString = "Mozilla/5.0 (Linux; Android 11) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36"
-                        val bridge = object {
-                            @JavascriptInterface
-                            fun onCatalogData(json: String) {
-                                (context as? MainActivity)?.runOnUiThread {
-                                    val parsed = runCatching {
-                                        val array = JSONArray(json)
-                                        (0 until array.length()).mapNotNull { index ->
-                                            val item = array.optJSONObject(index) ?: return@mapNotNull null
-                                            val title = item.optString("title").trim()
-                                            val href = item.optString("url").trim()
-                                            val poster = item.optString("poster").trim()
-                                            val host = Uri.parse(sourceUrl).host.orEmpty()
-                                            val itemHost = Uri.parse(href).host.orEmpty()
-                                            if (title.length !in 2..140 || href.isBlank() ||
-                                                Uri.parse(href).scheme != "https" ||
-                                                itemHost.removePrefix("www.") != host.removePrefix("www.") ||
-                                                poster.isBlank()) return@mapNotNull null
-                                            val description = item.optString("description").trim()
-                                            val year = Regex("\\b(?:19|20)\\d{2}\\b")
-                                                .find(title + " " + description)?.value.orEmpty()
-                                            FeedMovie(
-                                                title = title,
-                                                description = description.ifBlank { "Informasi film dari katalog $sourceName." }.take(700),
-                                                category = "Film",
-                                                videoUrl = href,
-                                                licenseId = "Metadata halaman sumber",
-                                                termsUrl = sourceUrl,
-                                                attribution = "Metadata katalog $sourceName",
-                                                posterUrl = poster,
-                                                releaseYear = year
-                                            )
-                                        }.distinctBy { it.videoUrl }.take(100)
-                                    }.getOrDefault(emptyList())
-                                    if (parsed.isNotEmpty()) {
-                                        onMoviesLoaded(parsed)
-                                        onMessageChanged(parsed.size.toString() + " judul berhasil dibaca dari halaman Cmax.")
-                                        onLoadingChanged(false)
-                                    }
-                                }
-                            }
-                        }
-                        addJavascriptInterface(bridge, "GenjurCatalogBridge")
-                        webViewClient = object : WebViewClient() {
-                            override fun onPageStarted(view: WebView?, url: String?, favicon: android.graphics.Bitmap?) {
-                                onLoadingChanged(true)
-                                onMessageChanged("Membaca katalog Cmax dan menunggu konten situs dimuat…")
-                            }
-                            override fun onPageFinished(view: WebView?, url: String?) {
-                                val script = """
-                                    (function() {
-                                      var attempts = 0;
-                                      function collect() {
-                                        var out = [], seen = {};
-                                        document.querySelectorAll('a[href]').forEach(function(a) {
-                                          var img = a.querySelector('img') || (a.closest('article,.item,.movie-item,.film-item,.ml-item,.poster,.thumb,.grid-item,.movie,.film') || {}).querySelector?.('img');
-                                          if (!img) return;
-                                          var href = a.href || '';
-                                          var u;
-                                          try { u = new URL(href); } catch(e) { return; }
-                                          if (u.origin !== location.origin || u.protocol !== 'https:' || u.pathname === '/') return;
-                                          if (/\/(genre|category|tag|login|register|contact|about|privacy|dmca)(\/|$)/i.test(u.pathname)) return;
-                                          var card = a.closest('article,.item,.movie-item,.film-item,.ml-item,.poster,.thumb,.grid-item,.movie,.film,.card') || a.parentElement?.parentElement || a;
-                                          var heading = card.querySelector('h1,h2,h3,h4,.title,.name,.film-title,.movie-title');
-                                          var title = (heading && heading.textContent || img.getAttribute('alt') || img.getAttribute('title') || a.getAttribute('title') || a.textContent || '').replace(/\s+/g,' ').trim();
-                                          var poster = img.getAttribute('data-src') || img.getAttribute('data-lazy-src') || img.getAttribute('data-original') || img.getAttribute('data-original-src') || img.currentSrc || img.src || '';
-                                          try { poster = new URL(poster, location.href).href; } catch(e) { poster = ''; }
-                                          if (title.length < 2 || title.length > 140 || !poster.startsWith('https://') || seen[href]) return;
-                                          if (/^(watch now|watch movie|play|read more|lihat semua|more|trailer)$/i.test(title)) return;
-                                          seen[href] = true;
-                                          out.push({title:title,url:href,poster:poster,description:(card.innerText || '').replace(/\s+/g,' ').trim().slice(0,700)});
-                                        });
-                                        return out;
-                                      }
-                                      var timer = setInterval(function() {
-                                        attempts++;
-                                        var items = collect();
-                                        if (items.length >= 3 || attempts >= 15) {
-                                          clearInterval(timer);
-                                          if (window.GenjurCatalogBridge) window.GenjurCatalogBridge.onCatalogData(JSON.stringify(items));
-                                        }
-                                      }, 1000);
-                                    })();
-                                """.trimIndent()
-                                view?.evaluateJavascript(script, null)
-                            }
-                            override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
-                                val target = request?.url ?: return false
-                                return target.host != Uri.parse(sourceUrl).host
-                            }
-                        }
-                        loadUrl(sourceUrl)
-                    }
-                },
-                update = {}
-            )
-        }
-    }
+    val plugin = remember(sourceUrl) { SourcePluginRegistry.resolve(sourceUrl) }
+
     LaunchedEffect(sourceUrl, reloadToken) {
         if (sourceUrl.isBlank()) return@LaunchedEffect
         onMoviesLoaded(emptyList())
         onLoadingChanged(true)
-        onMessageChanged("Mengambil katalog Cmax melalui pemuatan JavaScript situs…")
-        delay(22000)
-        if (loading) {
+        if (plugin == null) {
             onLoadingChanged(false)
-            if (movies.isEmpty()) onMessageChanged("Cmax belum mengirim daftar film yang bisa dibaca. Tekan Muat Ulang atau Buka situs untuk memeriksa sumber.")
+            onMessageChanged("Plugin untuk sumber ini belum tersedia di GENJUR STREAM. Saat ini plugin pertama yang sedang diuji adalah Cmax.")
+            return@LaunchedEffect
+        }
+        onMessageChanged("Plugin ${plugin.displayName} sedang mengambil data katalog…")
+        val result = runCatching { plugin.loadCatalog(sourceName, sourceUrl) }
+        result.onSuccess { items ->
+            onMoviesLoaded(items)
+            onLoadingChanged(false)
+            onMessageChanged(
+                if (items.isEmpty()) "Plugin ${plugin.displayName} belum menemukan daftar film pada halaman katalog sumber."
+                else "${items.size} judul berhasil dimuat oleh plugin ${plugin.displayName}."
+            )
+        }.onFailure { error ->
+            onLoadingChanged(false)
+            onMessageChanged("Plugin ${plugin.displayName} gagal memuat katalog: ${error.message ?: error.javaClass.simpleName}")
         }
     }
+
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            TextButton(onClick = { onMessageChanged(null); onMoviesLoaded(emptyList()) }) { Text("‹ Daftar Sumber", color = Green) }
+            TextButton(onClick = { onMessageChanged(null); onMoviesLoaded(emptyList()) }) {
+                Text("‹ Daftar Sumber", color = Green)
+            }
             Spacer(Modifier.weight(1f))
-            TextButton(onClick = { onMoviesLoaded(emptyList()); reloadToken++ }) { Text("Muat Ulang", color = Green) }
+            TextButton(onClick = { onMoviesLoaded(emptyList()); reloadToken++ }) {
+                Text("Muat Ulang", color = Green)
+            }
             TextButton(onClick = onOpenSource) { Text("Buka situs", color = Green) }
         }
         Text(sourceName, color = Color.White, fontSize = 23.sp, fontWeight = FontWeight.ExtraBold)
-        Text("Katalog otomatis dari " + sourceName, color = Muted, fontSize = 11.sp)
+        Text(
+            if (plugin == null) "Plugin sumber belum terpasang"
+            else "Katalog native • Plugin ${plugin.displayName}",
+            color = Muted, fontSize = 11.sp
+        )
         if (loading) LinearProgressIndicator(Modifier.fillMaxWidth(), color = Green)
-        message?.let { Text(it, color = if (it.startsWith("Gagal") || it.contains("belum mengirim")) MaterialTheme.colorScheme.error else Muted, fontSize = 12.sp) }
+        message?.let {
+            Text(it, color = if (it.startsWith("Plugin") && (it.contains("gagal") || it.contains("belum tersedia"))) MaterialTheme.colorScheme.error else Muted, fontSize = 12.sp)
+        }
         if (movies.isEmpty() && !loading) {
-            Text("Belum ada judul yang berhasil dibaca. Periksa koneksi atau coba muat ulang.", color = Muted, fontSize = 12.sp)
+            Text(
+                "Belum ada judul yang dapat ditampilkan di katalog aplikasi.",
+                color = Muted, fontSize = 12.sp
+            )
         } else movies.forEach { movie ->
-            Card(Modifier.fillMaxWidth().clickable { onOpenMovie(movie.videoUrl) }, colors = CardDefaults.cardColors(containerColor = Panel), shape = RoundedCornerShape(12.dp)) {
+            Card(
+                Modifier.fillMaxWidth().clickable { onOpenMovie(movie.videoUrl) },
+                colors = CardDefaults.cardColors(containerColor = Panel),
+                shape = RoundedCornerShape(12.dp)
+            ) {
                 Row(Modifier.fillMaxWidth().padding(9.dp), verticalAlignment = Alignment.CenterVertically) {
                     MoviePoster(movie.posterUrl, movie.title, 104.dp, 76.dp)
                     Spacer(Modifier.width(12.dp))
                     Column(Modifier.weight(1f)) {
                         Text(movie.title, color = Color.White, fontWeight = FontWeight.Bold, maxLines = 2)
-                        Text(listOfNotNull(movie.releaseYear.takeIf { it.isNotBlank() }, movie.category).joinToString(" • "), color = Green, fontSize = 11.sp)
-                        if (movie.description.isNotBlank()) Text(movie.description, color = Muted, fontSize = 11.sp, maxLines = 2)
-                        Text("Buka halaman film  ›", color = Muted, fontSize = 11.sp)
+                        Text(
+                            listOfNotNull(movie.releaseYear.takeIf { it.isNotBlank() }, movie.category).joinToString(" • "),
+                            color = Green, fontSize = 11.sp
+                        )
+                        if (movie.description.isNotBlank()) {
+                            Text(movie.description, color = Muted, fontSize = 11.sp, maxLines = 2)
+                        }
+                        Text("Buka detail film  ›", color = Muted, fontSize = 11.sp)
                     }
                 }
             }
         }
     }
 }
-@Composable
+
 private fun SourceLinksScreen(activity: MainActivity, onOpenLink: (String) -> Unit) {
     val prefs = remember { activity.getSharedPreferences("genjur_stream_saved_links", 0) }
     fun readLinks(): List<SavedSourceLink> = runCatching {
