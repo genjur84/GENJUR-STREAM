@@ -1608,7 +1608,7 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
             // sesi login, dan halaman situs tidak di-reset. Saat tab lain aktif,
             // WebView dipindahkan ke luar layar tanpa dihancurkan.
             if (browserInitialUrl.isNotBlank()) {
-                val sourceVisible = selectedTab == "Beranda" || selectedTab == "Browser Sumber"
+                val sourceVisible = selectedTab == "Browser Sumber"
                 Box(
                     Modifier
                         .align(Alignment.TopCenter)
@@ -1679,9 +1679,12 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                             DropdownMenuItem(
                                 text = { Text(source.name, color = Color.White, maxLines = 1) },
                                 onClick = {
-                                    browserInitialUrl = source.url
+                                    catalogSourceUrl = source.url
+                                    catalogSourceName = source.name
+                                    sourceCatalogMovies = emptyList()
+                                    sourceCatalogMessage = null
                                     selectedSourceName = source.name
-                                    selectedTab = "Browser Sumber"
+                                    selectedTab = "Katalog Sumber"
                                     sourceMenuExpanded = false
                                 }
                             )
