@@ -115,10 +115,16 @@ private val Muted = Color(0xFFACB7C5)
 
 private class PlaybackStartedBridge(
     private val onPlayback: (String, String) -> Unit,
+    private val onAutoPlay: (String, String, String) -> Unit,
     private val onVideoDetected: (String, String, String, String, Long) -> Unit
 ) {
     @JavascriptInterface
-    fun onVideoPlay(title: String, pageUrl: String) { onPlayback(title, pageUrl) }
+    fun onVideoPlay(title: String, pageUrl: String, videoUrl: String) {
+        onPlayback(title, pageUrl)
+        if (videoUrl.startsWith("https://") || videoUrl.startsWith("http://")) {
+            onAutoPlay(title, pageUrl, videoUrl)
+        }
+    }
     @JavascriptInterface
     fun onVideoAvailable(title: String, pageUrl: String, videoUrl: String, quality: String, sizeBytes: Long) {
         onVideoDetected(title, pageUrl, videoUrl, quality, sizeBytes)
@@ -2190,6 +2196,13 @@ private fun SourceBrowser(
                                 onPlaybackStarted(title, pageUrl)
                             }
                         } },
+                        onAutoPlay = { title, pageUrl, mediaUrl -> post {
+                            val uri = Uri.parse(mediaUrl)
+                            if (uri.scheme in listOf("http", "https") && !uri.host.isNullOrBlank()) {
+                                val safeTitle = title.ifBlank { "Video dari situs" }
+                                onPlayCandidate(safeTitle, pageUrl, mediaUrl)
+                            }
+                        } },
                         onVideoDetected = { title, pageUrl, videoUrl, quality, sizeBytes ->
                             post {
                                 val uri = Uri.parse(videoUrl)
@@ -2317,7 +2330,12 @@ private fun SourceBrowser(
                                         v.addEventListener('play', function() {
                                             try {
                                                 var title = document.title || 'Video dari situs';
-                                                GenjurPlayback.onVideoPlay(title, location.href);
+                                                var activeMedia = v.currentSrc || v.src || '';
+                                                if (activeMedia) {
+                                                    GenjurPlayback.onVideoPlay(title, location.href, new URL(activeMedia, location.href).href);
+                                                } else {
+                                                    GenjurPlayback.onVideoPlay(title, location.href, '');
+                                                }
                                                 scanSources();
                                             } catch(e) {}
                                         }, { once: true });
