@@ -2191,6 +2191,7 @@ private fun SourceBrowser(
     var isLoading by remember(initialUrl) { mutableStateOf(initialUrl.isNotBlank()) }
     var webView by remember { mutableStateOf<WebView?>(null) }
     var siteFullscreenView by remember { mutableStateOf<android.view.View?>(null) }
+    var fullscreenDownloadButton by remember { mutableStateOf<android.widget.Button?>(null) }
     var siteFullscreenCallback by remember { mutableStateOf<WebChromeClient.CustomViewCallback?>(null) }
     fun exitSiteFullscreen() {
         val activity = hostActivity
@@ -2198,6 +2199,7 @@ private fun SourceBrowser(
         if (fullscreen != null) {
             (fullscreen.parent as? android.view.ViewGroup)?.removeView(fullscreen)
             siteFullscreenView = null
+            fullscreenDownloadButton = null
             siteFullscreenCallback?.onCustomViewHidden()
             siteFullscreenCallback = null
             if (activity != null) {
@@ -2274,27 +2276,6 @@ private fun SourceBrowser(
             }
             Text(pageTitle, color = Muted, fontSize = 11.sp, maxLines = 2)
         }
-        if (detectedVideoOptions.isNotEmpty()) {
-            Card(colors = CardDefaults.cardColors(containerColor = Panel)) {
-                Row(Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 7.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween) {
-                    Column(Modifier.weight(1f)) {
-                        Text("Pilihan kualitas download tersedia", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                        Text(detectedVideoTitle.ifBlank { "Video dari situs" }, color = Muted, fontSize = 10.sp, maxLines = 2)
-                    }
-                    Column(horizontalAlignment = Alignment.End) {
-                        TextButton(onClick = {
-            selectedDownloadOption = detectedVideoOptions.firstOrNull()
-            showDownloadChoices = true
-        }) {
-                            Icon(Icons.Filled.Download, contentDescription = null, tint = Green)
-                            Text("Unduh", color = Green)
-                        }
-                    }
-                }
-            }
-        }
         if (showDownloadChoices) {
             AlertDialog(
                 onDismissRequest = { showDownloadChoices = false },
@@ -2356,6 +2337,7 @@ private fun SourceBrowser(
             contentAlignment = Alignment.Center
         ) {
         AndroidView(
+            modifier = Modifier.fillMaxSize(),
             factory = { context ->
                 WebView(context).apply {
                     // Catat sentuhan pengguna di area WebView. Ini juga menangkap tombol
@@ -2393,6 +2375,34 @@ private fun SourceBrowser(
                             }
                             siteFullscreenView = view
                             siteFullscreenCallback = callback
+                            val fullscreenContainer = android.widget.FrameLayout(activity).apply {
+                                setBackgroundColor(android.graphics.Color.BLACK)
+                                addView(view, android.widget.FrameLayout.LayoutParams(
+                                    android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                                    android.view.ViewGroup.LayoutParams.MATCH_PARENT
+                                ))
+                                val downloadButton = android.widget.Button(activity).apply {
+                                    text = "⬇ Unduh"
+                                    textSize = 14f
+                                    isAllCaps = false
+                                    setTextColor(android.graphics.Color.WHITE)
+                                    backgroundTintList = android.content.res.ColorStateList.valueOf(android.graphics.Color.rgb(35, 155, 90))
+                                    visibility = if (sitePlaybackStarted && detectedVideoOptions.isNotEmpty()) android.view.View.VISIBLE else android.view.View.GONE
+                                    setOnClickListener {
+                                        selectedDownloadOption = detectedVideoOptions.firstOrNull()
+                                        showDownloadChoices = true
+                                    }
+                                }
+                                fullscreenDownloadButton = downloadButton
+                                addView(downloadButton, android.widget.FrameLayout.LayoutParams(
+                                    android.view.ViewGroup.LayoutParams.WRAP_CONTENT,
+                                    android.view.ViewGroup.LayoutParams.WRAP_CONTENT,
+                                    android.view.Gravity.TOP or android.view.Gravity.END
+                                ).apply {
+                                    topMargin = (16 * resources.displayMetrics.density).toInt()
+                                    marginEnd = (16 * resources.displayMetrics.density).toInt()
+                                })
+                            }
                             activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
                             WindowCompat.setDecorFitsSystemWindows(activity.window, false)
                             WindowInsetsControllerCompat(activity.window, decor)
@@ -2401,11 +2411,11 @@ private fun SourceBrowser(
                                     hide(WindowInsetsCompat.Type.systemBars())
                                 }
                             (view.parent as? android.view.ViewGroup)?.removeView(view)
-                            decor.addView(view, android.view.ViewGroup.LayoutParams(
+                            decor.addView(fullscreenContainer, android.view.ViewGroup.LayoutParams(
                                 android.view.ViewGroup.LayoutParams.MATCH_PARENT,
                                 android.view.ViewGroup.LayoutParams.MATCH_PARENT
                             ))
-                            view.bringToFront()
+                            fullscreenContainer.bringToFront()
                         }
 
                         override fun onHideCustomView() {
@@ -2464,6 +2474,7 @@ private fun SourceBrowser(
                                     detectedVideoOptions = (detectedVideoOptions.filterNot {
                                         it.quality == label || it.videoUrl == videoUrl
                                     } + item)
+                                    fullscreenDownloadButton?.visibility = android.view.View.VISIBLE
                                 }
                             }
                         }
