@@ -440,6 +440,9 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
     var updateUrl by remember { mutableStateOf<String?>(null) }
     var checking by remember { mutableStateOf(true) }
     var downloading by remember { mutableStateOf(false) }
+    var updateProgress by remember { mutableStateOf(0f) }
+    var updateDownloadedBytes by remember { mutableStateOf(0L) }
+    var updateTotalBytes by remember { mutableStateOf(-1L) }
     var updateError by remember { mutableStateOf<String?>(null) }
     var feedMovies by remember { mutableStateOf(emptyList<FeedMovie>()) }
     var feedLoading by remember { mutableStateOf(false) }
@@ -925,7 +928,11 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                     if (downloading) {
                         Spacer(Modifier.height(12.dp))
                         LinearProgressIndicator(Modifier.fillMaxWidth(), color = Green)
-                        Text("Sedang mengunduh pembaruan...", color = Muted)
+                        Text(
+                            if (updateTotalBytes > 0L) "${(updateProgress * 100).toInt()}%  •  ${formatVideoSize(updateDownloadedBytes)} / ${formatVideoSize(updateTotalBytes)}"
+                            else "${formatVideoSize(updateDownloadedBytes)} diunduh • ukuran total belum diketahui",
+                            color = Muted
+                        )
                     }
                     updateError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
                 }
@@ -935,6 +942,9 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                     val apkLink = updateUrl!!
                     scope.launch {
                         downloading = true
+                        updateProgress = 0f
+                        updateDownloadedBytes = 0L
+                        updateTotalBytes = -1L
                         updateError = null
                         val downloaded = withContext(Dispatchers.IO) {
                             runCatching {
@@ -954,9 +964,27 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                                     require(!contentType.contains("text/html", ignoreCase = true)) {
                                         "Server mengirim halaman web, bukan berkas APK"
                                     }
+                                    val totalBytes = connection.contentLengthLong
+                                    withContext(Dispatchers.Main) { updateTotalBytes = totalBytes }
                                     val file = File(activity.cacheDir, "genjur-stream-update.apk")
+                                    var copiedBytes = 0L
                                     connection.inputStream.use { input ->
-                                        file.outputStream().buffered().use { output -> input.copyTo(output) }
+                                        file.outputStream().buffered().use { output ->
+                                            val buffer = ByteArray(64 * 1024)
+                                            while (true) {
+                                                val count = input.read(buffer)
+                                                if (count < 0) break
+                                                output.write(buffer, 0, count)
+                                                copiedBytes += count
+                                                withContext(Dispatchers.Main) {
+                                                    updateDownloadedBytes = copiedBytes
+                                                    if (totalBytes > 0L) updateProgress = (copiedBytes.toFloat() / totalBytes).coerceIn(0f, 1f)
+                                                }
+                                            }
+                                        }
+                                    }
+                                    require(totalBytes <= 0L || copiedBytes == totalBytes) {
+                                        "Unduhan belum lengkap (${formatVideoSize(copiedBytes)} dari ${formatVideoSize(totalBytes)})"
                                     }
                                     require(file.length() > 1_000_000L) {
                                         "Berkas APK tidak lengkap (${file.length()} byte)"
