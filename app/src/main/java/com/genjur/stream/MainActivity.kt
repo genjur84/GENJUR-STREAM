@@ -1543,7 +1543,18 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
         )
     }
     playingMovie?.let { movie ->
-        InAppVideoPlayer(activity, movie, onClose = { playingMovie = null })
+        InAppVideoPlayer(
+            activity,
+            movie,
+            onDownload = {
+                if (movie.downloadAllowed && movie.downloadUrl.isNotBlank()) {
+                    startDownload(movie)
+                } else {
+                    startWebVideoDownload(movie.title, movie.termsUrl, movie.videoUrl)
+                }
+            },
+            onClose = { playingMovie = null }
+        )
     }
 }
 
@@ -2519,7 +2530,7 @@ private fun ProviderWebDialog(url: String, onClose: () -> Unit) {
 }
 
 @Composable
-private fun InAppVideoPlayer(activity: MainActivity, movie: FeedMovie, onClose: () -> Unit) {
+private fun InAppVideoPlayer(activity: MainActivity, movie: FeedMovie, onDownload: () -> Unit, onClose: () -> Unit) {
     var isFullscreen by remember { mutableStateOf(false) }
     val player = remember(movie.videoUrl) {
         ExoPlayer.Builder(activity).build().apply {
@@ -2628,11 +2639,17 @@ private fun InAppVideoPlayer(activity: MainActivity, movie: FeedMovie, onClose: 
                         update = { it.player = player },
                         modifier = Modifier.fillMaxSize()
                     )
-                    IconButton(
-                        onClick = { setFullscreen(false) },
-                        modifier = Modifier.align(Alignment.TopEnd).padding(12.dp)
+                    Row(
+                        modifier = Modifier.align(Alignment.TopEnd).padding(8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(Icons.Filled.FullscreenExit, contentDescription = "Keluar full screen", tint = Color.White)
+                        IconButton(onClick = onDownload) {
+                            Icon(Icons.Filled.Download, contentDescription = "Unduh video", tint = Color.White)
+                        }
+                        IconButton(onClick = { setFullscreen(false) }) {
+                            Icon(Icons.Filled.FullscreenExit, contentDescription = "Keluar full screen", tint = Color.White)
+                        }
                     }
                 }
             } else {
@@ -2644,6 +2661,9 @@ private fun InAppVideoPlayer(activity: MainActivity, movie: FeedMovie, onClose: 
                     ) {
                         Text(movie.title, color = Color.White, fontWeight = FontWeight.Bold,
                             modifier = Modifier.weight(1f), maxLines = 1)
+                        IconButton(onClick = onDownload) {
+                            Icon(Icons.Filled.Download, contentDescription = "Unduh video", tint = Green)
+                        }
                         IconButton(onClick = { setFullscreen(true) }) {
                             Icon(Icons.Filled.Fullscreen, contentDescription = "Full screen", tint = Green)
                         }
