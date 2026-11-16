@@ -3411,6 +3411,33 @@ private fun SourceFallbackPlayer(
                                     }
                                 }, "GenjurMediaBridge")
                                 webViewClient = object : android.webkit.WebViewClient() {
+                                    override fun shouldInterceptRequest(
+                                        view: android.webkit.WebView,
+                                        request: android.webkit.WebResourceRequest
+                                    ): android.webkit.WebResourceResponse? {
+                                        // Pantau permintaan media yang benar-benar diminta player,
+                                        // termasuk yang berasal dari iframe lintas domain.
+                                        val uri = request.url
+                                        val path = uri.path.orEmpty().lowercase()
+                                        val fullUrl = uri.toString()
+                                        val accept = request.requestHeaders.entries
+                                            .firstOrNull { it.key.equals("Accept", ignoreCase = true) }
+                                            ?.value.orEmpty().lowercase()
+                                        val directMedia = path.endsWith(".mp4") || path.endsWith(".m4v") ||
+                                            path.endsWith(".webm") || path.endsWith(".m3u8") ||
+                                            accept.contains("video/") || accept.contains("application/vnd.apple.mpegurl")
+                                        val looksLikeAd = isGenjurAdHost(uri.host) ||
+                                            Regex("""(?i)(/ads?/|advert|doubleclick|popunder|banner|tracking|analytics)""")
+                                                .containsMatchIn(fullUrl)
+                                        if (directMedia && !looksLikeAd &&
+                                            uri.scheme in listOf("https", "http") && !uri.host.isNullOrBlank()) {
+                                            view.post {
+                                                if (detectedDirectUrl.isBlank()) detectedDirectUrl = fullUrl
+                                            }
+                                        }
+                                        return super.shouldInterceptRequest(view, request)
+                                    }
+
                                     override fun shouldOverrideUrlLoading(
                                         view: android.webkit.WebView,
                                         request: android.webkit.WebResourceRequest
