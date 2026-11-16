@@ -2190,6 +2190,27 @@ private fun SourceBrowser(
     var selectedDownloadOption by remember { mutableStateOf<StreamOption?>(null) }
     var isLoading by remember(initialUrl) { mutableStateOf(initialUrl.isNotBlank()) }
     var webView by remember { mutableStateOf<WebView?>(null) }
+    var siteFullscreenView by remember { mutableStateOf<android.view.View?>(null) }
+    var siteFullscreenCallback by remember { mutableStateOf<WebChromeClient.CustomViewCallback?>(null) }
+    fun exitSiteFullscreen() {
+        val activity = hostActivity
+        val fullscreen = siteFullscreenView
+        if (fullscreen != null) {
+            (fullscreen.parent as? android.view.ViewGroup)?.removeView(fullscreen)
+            siteFullscreenView = null
+            siteFullscreenCallback?.onCustomViewHidden()
+            siteFullscreenCallback = null
+            if (activity != null) {
+                activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+                WindowCompat.setDecorFitsSystemWindows(activity.window, true)
+                WindowInsetsControllerCompat(activity.window, activity.window.decorView)
+                    .show(WindowInsetsCompat.Type.systemBars())
+            }
+        }
+    }
+    DisposableEffect(Unit) {
+        onDispose { exitSiteFullscreen() }
+    }
     val loadingFallback = remember { Runnable { isLoading = false } }
     fun stopSitePlayback() {
         webView?.evaluateJavascript(
@@ -2226,8 +2247,8 @@ private fun SourceBrowser(
             stopSitePlayback()
         }
     }
-    BackHandler(enabled = active && webView?.canGoBack() == true) {
-        webView?.goBack()
+    BackHandler(enabled = active && (siteFullscreenView != null || webView?.canGoBack() == true)) {
+        if (siteFullscreenView != null) exitSiteFullscreen() else webView?.goBack()
     }
     Column(Modifier.fillMaxSize().padding(if (fullScreen) 0.dp else 8.dp), verticalArrangement = Arrangement.spacedBy(if (fullScreen) 4.dp else 8.dp)) {
         if (!fullScreen) Text("Buka situs sumber video di dalam GENJUR STREAM. Gunakan hanya situs dan video yang boleh kamu akses.", color = Muted, fontSize = 12.sp)
@@ -2358,7 +2379,39 @@ private fun SourceBrowser(
                     settings.setSupportMultipleWindows(false)
                     // Jangan gunakan progress WebView untuk indikator buffering.
                     // Iklan/iframe dapat mengubah progres setelah halaman utama selesai.
-                    webChromeClient = WebChromeClient()
+                    webChromeClient = object : WebChromeClient() {
+                        override fun onShowCustomView(view: android.view.View, callback: CustomViewCallback) {
+                            val activity = hostActivity
+                            val decor = activity?.window?.decorView as? android.view.ViewGroup
+                            if (activity == null || decor == null) {
+                                callback.onCustomViewHidden()
+                                return
+                            }
+                            if (siteFullscreenView != null) {
+                                callback.onCustomViewHidden()
+                                return
+                            }
+                            siteFullscreenView = view
+                            siteFullscreenCallback = callback
+                            activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+                            WindowCompat.setDecorFitsSystemWindows(activity.window, false)
+                            WindowInsetsControllerCompat(activity.window, decor)
+                                .apply {
+                                    systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                                    hide(WindowInsetsCompat.Type.systemBars())
+                                }
+                            (view.parent as? android.view.ViewGroup)?.removeView(view)
+                            decor.addView(view, android.view.ViewGroup.LayoutParams(
+                                android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                                android.view.ViewGroup.LayoutParams.MATCH_PARENT
+                            ))
+                            view.bringToFront()
+                        }
+
+                        override fun onHideCustomView() {
+                            exitSiteFullscreen()
+                        }
+                    }
                     // Tangkap unduhan dari situs di dalam aplikasi, bukan melemparkannya
                     // ke browser atau aplikasi unduhan eksternal.
                     setDownloadListener(DownloadListener { url, _, _, _, _ ->
