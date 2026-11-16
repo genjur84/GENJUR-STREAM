@@ -2033,6 +2033,8 @@ private fun SourceBrowser(
         }
     }
     var playbackNotificationSent by remember(initialUrl) { mutableStateOf(false) }
+    var sitePlaybackStarted by remember(initialUrl) { mutableStateOf(false) }
+    var autoPlayerOpened by remember(initialUrl) { mutableStateOf(false) }
     var address by remember(initialUrl) { mutableStateOf(initialUrl) }
     var currentUrl by remember(initialUrl) { mutableStateOf(initialUrl) }
     var pageTitle by remember { mutableStateOf("Masukkan alamat situs sumber video.") }
@@ -2191,6 +2193,7 @@ private fun SourceBrowser(
                     })
                     addJavascriptInterface(PlaybackStartedBridge(
                         onPlayback = { title, pageUrl -> post {
+                            sitePlaybackStarted = true
                             if (!playbackNotificationSent) {
                                 playbackNotificationSent = true
                                 onPlaybackStarted(title, pageUrl)
@@ -2208,7 +2211,12 @@ private fun SourceBrowser(
                                 val uri = Uri.parse(videoUrl)
                                 val path = uri.path.orEmpty().lowercase()
                                 val adaptiveStream = uri.path.orEmpty().lowercase().let { it.endsWith(".m3u8") || it.endsWith(".mpd") }
-                                if (!adaptiveStream && uri.scheme in listOf("http", "https") && !uri.host.isNullOrBlank()) {
+                                if (uri.scheme in listOf("http", "https") && !uri.host.isNullOrBlank()) {
+                                    if (sitePlaybackStarted && !autoPlayerOpened) {
+                                        autoPlayerOpened = true
+                                        onPlayCandidate(title.ifBlank { "Video dari situs" }, pageUrl, videoUrl)
+                                    }
+                                    if (!adaptiveStream) {
                                     detectedVideoTitle = title
                                     detectedVideoPage = pageUrl
                                     val label = detectedQualityLabel(quality, videoUrl)
@@ -2216,6 +2224,7 @@ private fun SourceBrowser(
                                     detectedVideoOptions = (detectedVideoOptions.filterNot {
                                         it.quality == label || it.videoUrl == videoUrl
                                     } + item)
+                                    }
                                 }
                             }
                         }
@@ -2235,6 +2244,14 @@ private fun SourceBrowser(
                                         playbackNotificationSent = true
                                         onPlaybackStarted(view.title?.takeIf { it.isNotBlank() } ?: "Video dari situs", view.url ?: currentUrl)
                                     }
+                                    if (sitePlaybackStarted && !autoPlayerOpened) {
+                                        autoPlayerOpened = true
+                                        onPlayCandidate(
+                                            view.title?.takeIf { it.isNotBlank() } ?: "Video dari situs",
+                                            view.url ?: currentUrl,
+                                            mediaUrl
+                                        )
+                                    }
                                     if (detectedVideoOptions.none { it.videoUrl == mediaUrl }) {
                                         detectedVideoTitle = view.title?.takeIf { it.isNotBlank() } ?: "Video dari situs"
                                         detectedVideoPage = view.url ?: currentUrl
@@ -2253,6 +2270,8 @@ private fun SourceBrowser(
                         }
                         override fun onPageStarted(view: WebView, url: String, favicon: android.graphics.Bitmap?) {
                             playbackNotificationSent = false
+                            sitePlaybackStarted = false
+                            autoPlayerOpened = false
                             isLoading = true
                             view.removeCallbacks(loadingFallback)
                             // Pengaman: jangan biarkan overlay menutupi situs tanpa batas waktu.
