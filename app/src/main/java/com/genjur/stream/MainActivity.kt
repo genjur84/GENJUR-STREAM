@@ -2371,13 +2371,15 @@ private fun SourceBrowser(
                                 return
                             }
                             siteFullscreenCallback = callback
+                            // Lepaskan custom video view dari parent asal sebelum dipindahkan.
+                            (view.parent as? android.view.ViewGroup)?.removeView(view)
+                            view.visibility = android.view.View.VISIBLE
                             val fullscreenContainer = android.widget.FrameLayout(activity).apply {
                                 setBackgroundColor(android.graphics.Color.BLACK)
                                 addView(view, android.widget.FrameLayout.LayoutParams(
                                     android.view.ViewGroup.LayoutParams.MATCH_PARENT,
                                     android.view.ViewGroup.LayoutParams.MATCH_PARENT
                                 ))
-
                             }
                             siteFullscreenView = fullscreenContainer
                             activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
@@ -2387,7 +2389,6 @@ private fun SourceBrowser(
                                     systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
                                     hide(WindowInsetsCompat.Type.systemBars())
                                 }
-                            (view.parent as? android.view.ViewGroup)?.removeView(view)
                             decor.addView(fullscreenContainer, android.view.ViewGroup.LayoutParams(
                                 android.view.ViewGroup.LayoutParams.MATCH_PARENT,
                                 android.view.ViewGroup.LayoutParams.MATCH_PARENT
