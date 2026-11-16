@@ -2191,7 +2191,6 @@ private fun SourceBrowser(
     var isLoading by remember(initialUrl) { mutableStateOf(initialUrl.isNotBlank()) }
     var webView by remember { mutableStateOf<WebView?>(null) }
     var siteFullscreenView by remember { mutableStateOf<android.view.View?>(null) }
-    var fullscreenDownloadButton by remember { mutableStateOf<android.widget.Button?>(null) }
     var siteFullscreenCallback by remember { mutableStateOf<WebChromeClient.CustomViewCallback?>(null) }
     fun exitSiteFullscreen() {
         val activity = hostActivity
@@ -2199,7 +2198,6 @@ private fun SourceBrowser(
         if (fullscreen != null) {
             (fullscreen.parent as? android.view.ViewGroup)?.removeView(fullscreen)
             siteFullscreenView = null
-            fullscreenDownloadButton = null
             siteFullscreenCallback?.onCustomViewHidden()
             siteFullscreenCallback = null
             if (activity != null) {
@@ -2379,30 +2377,7 @@ private fun SourceBrowser(
                                     android.view.ViewGroup.LayoutParams.MATCH_PARENT,
                                     android.view.ViewGroup.LayoutParams.MATCH_PARENT
                                 ))
-                                val downloadButton = android.widget.Button(activity).apply {
-                                    text = "↓"
-                                    textSize = 25f
-                                    contentDescription = "Unduh video"
-                                    isAllCaps = false
-                                    setTextColor(android.graphics.Color.WHITE)
-                                    backgroundTintList = android.content.res.ColorStateList.valueOf(android.graphics.Color.rgb(35, 155, 90))
-                                    minWidth = (48 * resources.displayMetrics.density).toInt()
-                                    minHeight = (48 * resources.displayMetrics.density).toInt()
-                                    visibility = if (sitePlaybackStarted && detectedVideoOptions.isNotEmpty()) android.view.View.VISIBLE else android.view.View.GONE
-                                    setOnClickListener {
-                                        selectedDownloadOption = detectedVideoOptions.firstOrNull()
-                                        showDownloadChoices = true
-                                    }
-                                }
-                                fullscreenDownloadButton = downloadButton
-                                addView(downloadButton, android.widget.FrameLayout.LayoutParams(
-                                    android.view.ViewGroup.LayoutParams.WRAP_CONTENT,
-                                    android.view.ViewGroup.LayoutParams.WRAP_CONTENT,
-                                    android.view.Gravity.TOP or android.view.Gravity.END
-                                ).apply {
-                                    topMargin = (16 * resources.displayMetrics.density).toInt()
-                                    marginEnd = (16 * resources.displayMetrics.density).toInt()
-                                })
+
                             }
                             siteFullscreenView = fullscreenContainer
                             activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
@@ -2476,7 +2451,6 @@ private fun SourceBrowser(
                                     detectedVideoOptions = (detectedVideoOptions.filterNot {
                                         it.quality == label || it.videoUrl == videoUrl
                                     } + item)
-                                    fullscreenDownloadButton?.visibility = if (sitePlaybackStarted) android.view.View.VISIBLE else android.view.View.GONE
                                 }
                             }
                         }
@@ -2514,7 +2488,6 @@ private fun SourceBrowser(
                                         detectedVideoOptions = (detectedVideoOptions.filterNot {
                                             it.quality == label || it.videoUrl == mediaUrl
                                         } + StreamOption(label, mediaUrl))
-                                        fullscreenDownloadButton?.visibility = android.view.View.VISIBLE
                                     }
                                 }
                             }
