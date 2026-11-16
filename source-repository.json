@@ -9,7 +9,8 @@
       "url": "https://cimax21.my/",
       "category": "Film",
       "description": "Situs Cmax",
-      "authorized": true
+      "authorized": true,
+      "pluginId": "cmax"
     },
     {
       "id": "klikxxi",
@@ -17,7 +18,8 @@
       "url": "https://klikxxi.shop/",
       "category": "Film",
       "description": "Situs Klikxxi",
-      "authorized": true
+      "authorized": true,
+      "pluginId": "pending"
     },
     {
       "id": "lk21",
@@ -25,7 +27,8 @@
       "url": "https://tv12.lk21official.cc/",
       "category": "Film",
       "description": "Situs LK21",
-      "authorized": true
+      "authorized": true,
+      "pluginId": "pending"
     },
     {
       "id": "duta-movie",
@@ -33,7 +36,8 @@
       "url": "https://geeknotdead.com/",
       "category": "Film",
       "description": "Situs Duta Movie",
-      "authorized": true
+      "authorized": true,
+      "pluginId": "pending"
     }
   ]
 }
