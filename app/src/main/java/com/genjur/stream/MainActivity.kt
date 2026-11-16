@@ -546,9 +546,19 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
             return
         }
         if (retryId != null) {
-            adaptiveSessions[retryId]?.let { FFmpegKit.cancel(it) }
+            // Entri yang bisa ditekan "Mulai ulang" sudah berstatus terhenti/gagal.
+            // Jangan memanggil FFmpegKit.cancel pada sesi lama: sesi native bisa
+            // sudah tidak ada (mis. proses aplikasi sebelumnya dihentikan Android).
+            adaptiveSessions.remove(retryId)
             val oldEntry = downloads.firstOrNull { it.id == retryId }
-            oldEntry?.let { File(Uri.parse(it.movie.videoUrl).path.orEmpty()).delete() }
+            oldEntry?.let { entry ->
+                runCatching {
+                    val oldPath = Uri.parse(entry.movie.videoUrl).path
+                    if (!oldPath.isNullOrBlank()) File(oldPath).delete()
+                }.onFailure { error ->
+                    android.util.Log.w("GENJUR_DOWNLOAD", "Tidak dapat membersihkan file unduhan lama", error)
+                }
+            }
             downloads = downloads.filterNot { it.id == retryId }
             downloadStates = downloadStates - retryId
             persistDownloads(downloads)
