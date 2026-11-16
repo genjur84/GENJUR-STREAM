@@ -2337,7 +2337,6 @@ private fun SourceBrowser(
             contentAlignment = Alignment.Center
         ) {
         AndroidView(
-            modifier = Modifier.fillMaxSize(),
             factory = { context ->
                 WebView(context).apply {
                     // Catat sentuhan pengguna di area WebView. Ini juga menangkap tombol
