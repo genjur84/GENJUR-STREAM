@@ -2678,7 +2678,7 @@ private fun SourceBrowser(
                     selectedDownloadOption = detectedVideoOptions.firstOrNull()
                     showDownloadChoices = true
                 },
-                modifier = Modifier.align(Alignment.BottomEnd).padding(12.dp),
+                modifier = Modifier.align(Alignment.TopEnd).padding(top = 12.dp, end = 12.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = Green, contentColor = Color.White),
                 contentPadding = PaddingValues(horizontal = 14.dp, vertical = 9.dp)
             ) {
