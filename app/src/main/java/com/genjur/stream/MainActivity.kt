@@ -473,60 +473,61 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
         }.toString()).apply()
     }
     fun startDownload(movie: FeedMovie) {
-        if (!movie.downloadAllowed || movie.downloadUrl.isBlank()) {
-            downloadMessage = "Sumber ini belum memberikan tautan unduhan langsung."
-            return
-        }
-        if (downloads.any { it.movie.downloadUrl == movie.downloadUrl }) {
-            downloadMessage = "Tautan ini sudah ada di daftar Unduhan."
-            return
-        }
-        val uri = Uri.parse(movie.downloadUrl)
-        if (uri.scheme !in listOf("http", "https") || uri.host.isNullOrBlank()) {
-            downloadMessage = "Alamat unduhan tidak valid."
-            return
-        }
-        val path = uri.path.orEmpty().lowercase()
-        if (path.endsWith(".m3u8") || path.endsWith(".mpd")) {
-            downloadMessage = "Format streaming adaptif belum didukung oleh pengunduh ini."
-            return
-        }
-        val extension = when {
-            path.endsWith(".webm") -> "webm"
-            path.endsWith(".mov") -> "mov"
-            path.endsWith(".mkv") -> "mkv"
-            else -> "mp4"
-        }
-        val fileName = downloadFileName(movie.title, movie.releaseYear, extension)
-        val request = DownloadManager.Request(uri)
-            .setTitle(fileName)
-            .setDescription("Unduhan GENJUR STREAM")
-            .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
-            .setAllowedOverMetered(true)
-            .setAllowedOverRoaming(false)
-            .setDestinationInExternalFilesDir(activity, Environment.DIRECTORY_MOVIES, fileName)
-        val pageUri = Uri.parse(movie.termsUrl)
-        request.addRequestHeader("User-Agent", "Mozilla/5.0 (Linux; Android 11) AppleWebKit/537.36 Chrome/120.0.0.0 Mobile Safari/537.36")
-        request.addRequestHeader("Accept", "video/*,application/octet-stream,*/*;q=0.8")
-        request.addRequestHeader("Accept-Language", "id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7")
-        if (movie.termsUrl.startsWith("http")) {
-            request.addRequestHeader("Referer", movie.termsUrl)
-            if (!pageUri.host.isNullOrBlank()) request.addRequestHeader("Origin", "${pageUri.scheme}://${pageUri.host}")
-        }
-        val cookieManager = android.webkit.CookieManager.getInstance()
-        val cookies = sequenceOf(movie.downloadUrl, movie.termsUrl)
-            .mapNotNull { url -> runCatching { cookieManager.getCookie(url) }.getOrNull() }
-            .firstOrNull { it.isNotBlank() }
-        cookies?.let { request.addRequestHeader("Cookie", it) }
-        runCatching { downloadManager.enqueue(request) }
-            .onSuccess { id ->
-                downloads = listOf(DownloadEntry(id, movie)) + downloads
-                persistDownloads(downloads)
-                downloadMessage = "Download dimulai. Pantau progresnya di menu Unduhan."
+        try {
+            if (!movie.downloadAllowed || movie.downloadUrl.isBlank()) {
+                downloadMessage = "Sumber ini belum memberikan tautan unduhan langsung."
+                return
             }
-            .onFailure { error ->
-                downloadMessage = "Gagal memulai download: ${error.message ?: "kesalahan sistem"}"
+            if (downloads.any { it.movie.downloadUrl == movie.downloadUrl }) {
+                downloadMessage = "Tautan ini sudah ada di daftar Unduhan."
+                return
             }
+            val uri = Uri.parse(movie.downloadUrl)
+            if (uri.scheme !in listOf("http", "https") || uri.host.isNullOrBlank()) {
+                downloadMessage = "Alamat unduhan tidak valid."
+                return
+            }
+            val path = uri.path.orEmpty().lowercase()
+            if (path.endsWith(".m3u8") || path.endsWith(".mpd")) {
+                downloadMessage = "Format streaming adaptif belum didukung oleh pengunduh ini."
+                return
+            }
+            val extension = when {
+                path.endsWith(".webm") -> "webm"
+                path.endsWith(".mov") -> "mov"
+                path.endsWith(".mkv") -> "mkv"
+                else -> "mp4"
+            }
+            val fileName = downloadFileName(movie.title, movie.releaseYear, extension)
+            val request = DownloadManager.Request(uri)
+                .setTitle(fileName)
+                .setDescription("Unduhan GENJUR STREAM")
+                .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+                .setAllowedOverMetered(true)
+                .setAllowedOverRoaming(false)
+                .setDestinationInExternalFilesDir(activity, Environment.DIRECTORY_MOVIES, fileName)
+            val pageUri = Uri.parse(movie.termsUrl)
+            request.addRequestHeader("User-Agent", "Mozilla/5.0 (Linux; Android 11) AppleWebKit/537.36 Chrome/120.0.0.0 Mobile Safari/537.36")
+            request.addRequestHeader("Accept", "video/*,application/octet-stream,*/*;q=0.8")
+            request.addRequestHeader("Accept-Language", "id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7")
+            if (movie.termsUrl.startsWith("http")) {
+                request.addRequestHeader("Referer", movie.termsUrl)
+                if (!pageUri.host.isNullOrBlank()) request.addRequestHeader("Origin", "${pageUri.scheme}://${pageUri.host}")
+            }
+            val cookieManager = android.webkit.CookieManager.getInstance()
+            val cookies = sequenceOf(movie.downloadUrl, movie.termsUrl)
+                .mapNotNull { url -> runCatching { cookieManager.getCookie(url) }.getOrNull() }
+                .firstOrNull { it.isNotBlank() }
+            cookies?.let { request.addRequestHeader("Cookie", it) }
+            val queuedId = downloadManager.enqueue(request)
+            downloads = listOf(DownloadEntry(queuedId, movie)) + downloads
+            persistDownloads(downloads)
+            downloadMessage = "Download dimulai. Pantau progresnya di menu Unduhan."
+            android.util.Log.i("GENJUR_DOWNLOAD", "DownloadManager menerima tugas id=$queuedId file=$fileName")
+        } catch (error: Exception) {
+            downloadMessage = "Gagal memulai download: ${error.message ?: error.javaClass.simpleName}"
+            android.util.Log.e("GENJUR_DOWNLOAD", "Gagal menyiapkan unduhan dari dialog resolusi", error)
+        }
     }
     val adaptiveSessions = remember { mutableMapOf<Long, Long>() }
     fun setAdaptiveState(id: Long, percent: Int, label: String) {
