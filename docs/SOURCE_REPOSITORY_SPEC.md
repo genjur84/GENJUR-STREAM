@@ -1,39 +1,44 @@
-# GENJUR STREAM — Source Repository
+# GENJUR STREAM — Source & Plugin Repository
 
-Repositori ini adalah katalog tautan sumber yang dapat dibaca aplikasi. Isi repositori berupa JSON biasa; aplikasi tidak menjalankan kode dari katalog.
+Repositori ini menyimpan metadata sumber dan identitas plugin yang dipakai aplikasi. Repositori tidak mengirim kode yang dieksekusi langsung oleh aplikasi.
 
-## URL katalog bawaan
-
+## URL repositori
 `https://raw.githubusercontent.com/genjur84/GENJUR-STREAM/main/source-repository.json`
 
-## Format
+## Format entri
+Setiap sumber dapat menyertakan `pluginId`:
 
+- `cmax`: plugin Cmax bawaan APK.
+- `pending`: plugin belum tersedia; sumber tidak akan dipaksa dibuka sebagai katalog native.
+- ID lain hanya dapat digunakan setelah plugin yang cocok tersedia dan terdaftar di APK.
+
+Contoh:
 ```json
 {
   "schemaVersion": 1,
-  "name": "GENJUR STREAM Source Repository",
-  "updatedAt": "2026-11-16",
+  "name": "GENJUR STREAM Source & Plugin Repository",
   "sources": [
     {
-      "id": "contoh-sumber",
-      "name": "Contoh Sumber Resmi",
-      "url": "https://example.org/",
-      "category": "Streaming resmi",
-      "description": "Situs resmi penyedia konten berizin",
+      "id": "cmax",
+      "name": "Cmax",
+      "url": "https://cimax21.my/",
+      "pluginId": "cmax",
+      "category": "Film",
+      "description": "Plugin katalog Cmax",
       "authorized": true
     }
   ]
 }
 ```
 
-## Aturan katalog
+## Arsitektur keamanan
 
-- Hanya URL HTTPS dengan host yang valid yang dimuat.
-- Entri harus memiliki `authorized: true`; entri lain dilewati.
-- `id` harus stabil dan unik. Jika kosong, aplikasi memakai host sebagai identitas.
-- Nama dan URL wajib tersedia.
-- Aplikasi tidak mengunduh atau menyalin konten dari tautan katalog. Tautan hanya ditambahkan ke menu Daftar Sumber setelah dipilih pengguna.
-- Pastikan pengelola katalog memiliki izin untuk mencantumkan dan mendistribusikan tautan tersebut serta mematuhi ketentuan layanan terkait.
+1. APK memiliki kontrak `SourcePlugin` dan `SourcePluginRegistry`.
+2. Plugin yang dapat berjalan harus sudah disertakan dan diizinkan di APK.
+3. File repositori hanya mendeklarasikan metadata, bukan kode Kotlin/DEX atau skrip yang dieksekusi.
+4. Sumber tanpa plugin yang cocok akan diberi status plugin belum tersedia; aplikasi tidak menganggap halaman situs sebagai katalog.
+5. Plugin mengambil metadata katalog dan mengembalikan daftar `FeedMovie` untuk ditampilkan oleh antarmuka native GENJUR STREAM.
 
-Setelah katalog diperbarui di branch `main`, pengguna dapat menekan **Muat repositori** di menu Sumber untuk mengambil daftar terbaru.
-```
+## Status tahap pertama
+
+Plugin Cmax adalah implementasi pertama. Plugin Klikxxi, LK21, dan Duta Movie akan dibuat satu per satu setelah pengujian Cmax selesai.
