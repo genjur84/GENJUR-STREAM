@@ -83,6 +83,7 @@ import androidx.work.NetworkType
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicLong
 import org.json.JSONObject
 import org.json.JSONArray
 import java.io.File
@@ -2035,6 +2036,7 @@ private fun SourceBrowser(
     var playbackNotificationSent by remember(initialUrl) { mutableStateOf(false) }
     var sitePlaybackStarted by remember(initialUrl) { mutableStateOf(false) }
     var autoPlayerOpened by remember(initialUrl) { mutableStateOf(false) }
+    val playbackGestureAt = remember(initialUrl) { AtomicLong(0L) }
     var address by remember(initialUrl) { mutableStateOf(initialUrl) }
     var currentUrl by remember(initialUrl) { mutableStateOf(initialUrl) }
     var pageTitle by remember { mutableStateOf("Masukkan alamat situs sumber video.") }
@@ -2166,6 +2168,14 @@ private fun SourceBrowser(
         AndroidView(
             factory = { context ->
                 WebView(context).apply {
+                    // Catat sentuhan pengguna di area WebView. Ini juga menangkap tombol
+                    // Play yang berada di iframe dan tidak bisa dijangkau JS halaman utama.
+                    setOnTouchListener { _, event ->
+                        if (event.action == android.view.MotionEvent.ACTION_UP) {
+                            playbackGestureAt.set(android.os.SystemClock.elapsedRealtime())
+                        }
+                        false
+                    }
                     settings.javaScriptEnabled = true
                     settings.domStorageEnabled = true
                     // Hilangkan penanda Android WebView agar Google tidak menyajikan
@@ -2245,7 +2255,9 @@ private fun SourceBrowser(
                                         playbackNotificationSent = true
                                         onPlaybackStarted(view.title?.takeIf { it.isNotBlank() } ?: "Video dari situs", view.url ?: currentUrl)
                                     }
-                                    if (sitePlaybackStarted && !autoPlayerOpened) {
+                                    val recentUserPlay = playbackGestureAt.get().let { it > 0L && android.os.SystemClock.elapsedRealtime() - it < 10000L }
+                                    if ((sitePlaybackStarted || recentUserPlay) && !autoPlayerOpened) {
+                                        sitePlaybackStarted = true
                                         autoPlayerOpened = true
                                         onPlayCandidate(
                                             view.title?.takeIf { it.isNotBlank() } ?: "Video dari situs",
@@ -2273,6 +2285,7 @@ private fun SourceBrowser(
                             playbackNotificationSent = false
                             sitePlaybackStarted = false
                             autoPlayerOpened = false
+                            playbackGestureAt.set(0L)
                             isLoading = true
                             view.removeCallbacks(loadingFallback)
                             // Pengaman: jangan biarkan overlay menutupi situs tanpa batas waktu.
