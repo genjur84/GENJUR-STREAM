@@ -2081,41 +2081,125 @@ private fun SourceCatalogScreen(
     onMessageChanged: (String?) -> Unit, onOpenMovie: (String) -> Unit, onOpenSource: () -> Unit
 ) {
     var reloadToken by remember(sourceUrl) { mutableIntStateOf(0) }
-    LaunchedEffect(sourceUrl, sourceName, reloadToken) {
-        if (sourceUrl.isBlank()) return@LaunchedEffect
-        onLoadingChanged(true)
-        onMessageChanged("Mengambil poster, judul, dan informasi dari " + sourceName + "…")
-        val result = withContext(Dispatchers.IO) {
-            runCatching {
-                val connection = (URL(sourceUrl).openConnection() as java.net.HttpURLConnection).apply {
-                    connectTimeout = 18000
-                    readTimeout = 30000
-                    instanceFollowRedirects = true
-                    useCaches = false
-                    setRequestProperty("Cache-Control", "no-cache")
-                    setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 11) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36")
-                    setRequestProperty("Accept", "text/html,application/xhtml+xml,application/json;q=0.9,*/*;q=0.8")
-                    setRequestProperty("Accept-Language", "id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7")
-                }
-                try {
-                    val status = connection.responseCode
-                    require(status in 200..299) { "Situs membalas HTTP " + status + "." }
-                    val html = connection.inputStream.bufferedReader().use { it.readText() }
-                    val parsed = loadGenericHtmlCatalog(connection.url.toString(), html, sourceName)
-                    require(parsed.isNotEmpty()) {
-                        "Situs " + sourceName + " belum mengirim data katalog yang bisa dibaca otomatis. Coba Muat Ulang; jika tetap kosong, situs mungkin membatasi akses aplikasi."
+    val context = LocalContext.current
+    if (sourceUrl.isNotBlank()) {
+        key(sourceUrl, reloadToken) {
+            AndroidView(
+                modifier = Modifier.size(1.dp),
+                factory = { viewContext ->
+                    WebView(viewContext).apply {
+                        alpha = 0f
+                        settings.javaScriptEnabled = true
+                        settings.domStorageEnabled = true
+                        settings.loadsImagesAutomatically = true
+                        settings.blockNetworkImage = false
+                        settings.userAgentString = "Mozilla/5.0 (Linux; Android 11) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36"
+                        val bridge = object {
+                            @JavascriptInterface
+                            fun onCatalogData(json: String) {
+                                (context as? MainActivity)?.runOnUiThread {
+                                    val parsed = runCatching {
+                                        val array = JSONArray(json)
+                                        (0 until array.length()).mapNotNull { index ->
+                                            val item = array.optJSONObject(index) ?: return@mapNotNull null
+                                            val title = item.optString("title").trim()
+                                            val href = item.optString("url").trim()
+                                            val poster = item.optString("poster").trim()
+                                            val host = Uri.parse(sourceUrl).host.orEmpty()
+                                            val itemHost = Uri.parse(href).host.orEmpty()
+                                            if (title.length !in 2..140 || href.isBlank() ||
+                                                Uri.parse(href).scheme != "https" ||
+                                                itemHost.removePrefix("www.") != host.removePrefix("www.") ||
+                                                poster.isBlank()) return@mapNotNull null
+                                            val description = item.optString("description").trim()
+                                            val year = Regex("\\b(?:19|20)\\d{2}\\b")
+                                                .find(title + " " + description)?.value.orEmpty()
+                                            FeedMovie(
+                                                title = title,
+                                                description = description.ifBlank { "Informasi film dari katalog $sourceName." }.take(700),
+                                                category = "Film",
+                                                videoUrl = href,
+                                                licenseId = "Metadata halaman sumber",
+                                                termsUrl = sourceUrl,
+                                                attribution = "Metadata katalog $sourceName",
+                                                posterUrl = poster,
+                                                releaseYear = year
+                                            )
+                                        }.distinctBy { it.videoUrl }.take(100)
+                                    }.getOrDefault(emptyList())
+                                    if (parsed.isNotEmpty()) {
+                                        onMoviesLoaded(parsed)
+                                        onMessageChanged(parsed.size.toString() + " judul berhasil dibaca dari halaman Cmax.")
+                                        onLoadingChanged(false)
+                                    }
+                                }
+                            }
+                        }
+                        addJavascriptInterface(bridge, "GenjurCatalogBridge")
+                        webViewClient = object : WebViewClient() {
+                            override fun onPageStarted(view: WebView?, url: String?, favicon: android.graphics.Bitmap?) {
+                                onLoadingChanged(true)
+                                onMessageChanged("Membaca katalog Cmax dan menunggu konten situs dimuat…")
+                            }
+                            override fun onPageFinished(view: WebView?, url: String?) {
+                                val script = """
+                                    (function() {
+                                      var attempts = 0;
+                                      function collect() {
+                                        var out = [], seen = {};
+                                        document.querySelectorAll('a[href]').forEach(function(a) {
+                                          var img = a.querySelector('img') || (a.closest('article,.item,.movie-item,.film-item,.ml-item,.poster,.thumb,.grid-item,.movie,.film') || {}).querySelector?.('img');
+                                          if (!img) return;
+                                          var href = a.href || '';
+                                          var u;
+                                          try { u = new URL(href); } catch(e) { return; }
+                                          if (u.origin !== location.origin || u.protocol !== 'https:' || u.pathname === '/') return;
+                                          if (/\\/(genre|category|tag|login|register|contact|about|privacy|dmca)(\\/|$)/i.test(u.pathname)) return;
+                                          var card = a.closest('article,.item,.movie-item,.film-item,.ml-item,.poster,.thumb,.grid-item,.movie,.film,.card') || a.parentElement?.parentElement || a;
+                                          var heading = card.querySelector('h1,h2,h3,h4,.title,.name,.film-title,.movie-title');
+                                          var title = (heading && heading.textContent || img.getAttribute('alt') || img.getAttribute('title') || a.getAttribute('title') || a.textContent || '').replace(/\\s+/g,' ').trim();
+                                          var poster = img.getAttribute('data-src') || img.getAttribute('data-lazy-src') || img.getAttribute('data-original') || img.getAttribute('data-original-src') || img.currentSrc || img.src || '';
+                                          try { poster = new URL(poster, location.href).href; } catch(e) { poster = ''; }
+                                          if (title.length < 2 || title.length > 140 || !poster.startsWith('https://') || seen[href]) return;
+                                          if (/^(watch now|watch movie|play|read more|lihat semua|more|trailer)$/i.test(title)) return;
+                                          seen[href] = true;
+                                          out.push({title:title,url:href,poster:poster,description:(card.innerText || '').replace(/\\s+/g,' ').trim().slice(0,700)});
+                                        });
+                                        return out;
+                                      }
+                                      var timer = setInterval(function() {
+                                        attempts++;
+                                        var items = collect();
+                                        if (items.length >= 3 || attempts >= 15) {
+                                          clearInterval(timer);
+                                          if (window.GenjurCatalogBridge) window.GenjurCatalogBridge.onCatalogData(JSON.stringify(items));
+                                        }
+                                      }, 1000);
+                                    })();
+                                """.trimIndent()
+                                view?.evaluateJavascript(script, null)
+                            }
+                            override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
+                                val target = request?.url ?: return false
+                                return target.host != Uri.parse(sourceUrl).host
+                            }
+                        }
+                        loadUrl(sourceUrl)
                     }
-                    parsed
-                } finally { connection.disconnect() }
-            }
+                },
+                update = {}
+            )
         }
-        onLoadingChanged(false)
-        result.onSuccess { found ->
-            onMoviesLoaded(found)
-            onMessageChanged(found.size.toString() + " judul berhasil dibaca dari katalog " + sourceName + ".")
-        }.onFailure { error ->
-            onMoviesLoaded(emptyList())
-            onMessageChanged(error.message ?: "Katalog " + sourceName + " tidak dapat dimuat otomatis.")
+    }
+    LaunchedEffect(sourceUrl, reloadToken) {
+        if (sourceUrl.isBlank()) return@LaunchedEffect
+        onMoviesLoaded(emptyList())
+        onLoadingChanged(true)
+        onMessageChanged("Mengambil katalog Cmax melalui pemuatan JavaScript situs…")
+        delay(22000)
+        if (loading) {
+            onLoadingChanged(false)
+            if (movies.isEmpty()) onMessageChanged("Cmax belum mengirim daftar film yang bisa dibaca. Tekan Muat Ulang atau Buka situs untuk memeriksa sumber.")
         }
     }
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
