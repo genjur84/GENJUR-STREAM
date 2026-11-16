@@ -2,5 +2,14 @@
   "schemaVersion": 1,
   "name": "GENJUR STREAM Source Repository",
   "updatedAt": "2026-11-16",
-  "sources": []
+  "sources": [
+    {
+      "id": "cmax",
+      "name": "Cmax",
+      "url": "https://cimax21.my/",
+      "category": "Film",
+      "description": "Situs Cmax",
+      "authorized": true
+    }
+  ]
 }
