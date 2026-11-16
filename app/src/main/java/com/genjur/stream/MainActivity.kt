@@ -1951,6 +1951,50 @@ private fun searchWebSources(query: String): List<SourceSearchResult> {
         else "Semua jalur pencarian gagal. " + errors.take(3).joinToString(" | ")
     )
 }
+private const val SOURCE_DOMAIN_REGISTRY_URL = "https://raw.githubusercontent.com/genjur84/GENJUR-STREAM/main/source-domains.json"
+
+private fun normalizeSourceIdentity(value: String): String =
+    value.lowercase(java.util.Locale.ROOT).filter { it.isLetterOrDigit() }
+
+private fun refreshSavedSourceDomains(activity: MainActivity): Int {
+    val connection = URL(SOURCE_DOMAIN_REGISTRY_URL).openConnection()
+    connection.connectTimeout = 10000
+    connection.readTimeout = 15000
+    connection.setRequestProperty("Cache-Control", "no-cache")
+    connection.setRequestProperty("User-Agent", "GENJUR-STREAM")
+    val root = JSONObject(connection.getInputStream().bufferedReader().use { it.readText() })
+    require(root.optInt("schemaVersion", 0) == 1) { "Format daftar domain tidak dikenal." }
+    val entries = root.optJSONArray("sources") ?: error("Daftar domain kosong atau tidak valid.")
+    val aliases = mutableMapOf<String, String>()
+    for (index in 0 until entries.length()) {
+        val item = entries.optJSONObject(index) ?: continue
+        val targetUrl = item.optString("url").trim()
+        val targetUri = Uri.parse(targetUrl)
+        if (targetUri.scheme != "https" || targetUri.host.isNullOrBlank()) continue
+        val identities = mutableListOf(item.optString("name"))
+        val names = item.optJSONArray("aliases")
+        if (names != null) for (aliasIndex in 0 until names.length()) identities.add(names.optString(aliasIndex))
+        identities.map(::normalizeSourceIdentity).filter { it.isNotBlank() }.forEach { identity ->
+            aliases[identity] = targetUrl
+        }
+    }
+    val prefs = activity.getSharedPreferences("genjur_stream_saved_links", 0)
+    val saved = JSONArray(prefs.getString("items", "[]"))
+    var changed = 0
+    for (index in 0 until saved.length()) {
+        val item = saved.optJSONObject(index) ?: continue
+        val identity = normalizeSourceIdentity(item.optString("name"))
+        val replacement = aliases[identity] ?: continue
+        val oldUrl = item.optString("url").trim()
+        if (oldUrl != replacement) {
+            item.put("url", replacement)
+            changed++
+        }
+    }
+    if (changed > 0) prefs.edit().putString("items", saved.toString()).apply()
+    return changed
+}
+
 private data class SavedSourceLink(val name: String, val url: String)
 
 @Composable
