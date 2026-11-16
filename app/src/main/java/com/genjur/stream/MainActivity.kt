@@ -1868,18 +1868,19 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
         )
     }
     playingMovie?.let { movie ->
-        InAppVideoPlayer(
-            activity,
-            movie,
-            onDownload = {
-                if (movie.downloadAllowed && movie.downloadUrl.isNotBlank()) {
-                    startDownload(movie)
-                } else {
-                    startWebVideoDownload(movie.title, movie.termsUrl, movie.videoUrl)
-                }
-            },
-            onClose = { playingMovie = null }
-        )
+        val closePlayback = { playingMovie = null }
+        val downloadPlayback = {
+            if (movie.downloadAllowed && movie.downloadUrl.isNotBlank()) {
+                startDownload(movie)
+            } else {
+                startWebVideoDownload(movie.title, movie.termsUrl, movie.videoUrl)
+            }
+        }
+        if (movie.licenseId == "Source page fallback") {
+            SourceFallbackPlayer(activity, movie, onDownload = downloadPlayback, onClose = closePlayback)
+        } else {
+            InAppVideoPlayer(activity, movie, onDownload = downloadPlayback, onClose = closePlayback)
+        }
     }
 }
 
@@ -1941,7 +1942,7 @@ private fun MovieDetailDialog(
 ) {
     val isSourceMetadataOnly = movie.licenseId == "Metadata halaman sumber"
     var selectedStreamUrl by remember(movie) {
-        mutableStateOf(if (isSourceMetadataOnly) movie.streamOptions.firstOrNull()?.videoUrl.orEmpty()
+        mutableStateOf(if (isSourceMetadataOnly) movie.streamOptions.firstOrNull()?.videoUrl ?: movie.termsUrl
             else movie.streamOptions.firstOrNull()?.videoUrl ?: movie.videoUrl)
     }
     Dialog(onDismissRequest = onClose, properties = DialogProperties(usePlatformDefaultWidth = false)) {
@@ -2030,7 +2031,16 @@ private fun MovieDetailDialog(
                         Text("Unduhan tidak diizinkan oleh sumber ini.", color = Muted, fontSize = 11.sp)
                     }
                     Spacer(Modifier.height(12.dp))
-                    Button(onClick = { onPlay(movie.copy(videoUrl = selectedStreamUrl)) }, enabled = selectedStreamUrl.isNotBlank(), modifier = Modifier.fillMaxWidth(),
+                    Button(
+                        onClick = {
+                            val useSitePlayer = isSourceMetadataOnly && movie.streamOptions.isEmpty()
+                            onPlay(movie.copy(
+                                videoUrl = selectedStreamUrl,
+                                licenseId = if (useSitePlayer) "Source page fallback" else movie.licenseId
+                            ))
+                        },
+                        enabled = selectedStreamUrl.isNotBlank(),
+                        modifier = Modifier.fillMaxWidth(),
                         colors = ButtonDefaults.buttonColors(containerColor = Green, contentColor = Color.White,
                             disabledContainerColor = Color(0xFF393344), disabledContentColor = Muted)) {
                         Text(if (selectedStreamUrl.isBlank()) "▶  PLAY — Stream belum tersedia" else "▶  PLAY sekarang")
@@ -3297,6 +3307,131 @@ private fun ProviderWebDialog(url: String, onClose: () -> Unit) {
                 Text(
                     "GENJUR STREAM tidak mengambil URL video, melewati login, atau membuka DRM. Jika penyedia mewajibkan aplikasi resminya, pemutaran di sini mungkin tidak tersedia.",
                     color = Muted, fontSize = 10.sp
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SourceFallbackPlayer(
+    activity: MainActivity,
+    movie: FeedMovie,
+    onDownload: () -> Unit,
+    onClose: () -> Unit
+) {
+    var fullscreenView by remember { mutableStateOf<android.view.View?>(null) }
+    var fullscreenCallback by remember { mutableStateOf<android.webkit.WebChromeClient.CustomViewCallback?>(null) }
+    val webViewRef = remember { mutableStateOf<android.webkit.WebView?>(null) }
+
+    BackHandler(enabled = fullscreenView != null) {
+        fullscreenCallback?.onCustomViewHidden()
+    }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            fullscreenCallback?.onCustomViewHidden()
+            webViewRef.value?.apply {
+                stopLoading()
+                loadUrl("about:blank")
+                removeAllViews()
+                destroy()
+            }
+            activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+            WindowInsetsControllerCompat(activity.window, activity.window.decorView)
+                .show(WindowInsetsCompat.Type.systemBars())
+        }
+    }
+
+    Dialog(
+        onDismissRequest = onClose,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Surface(
+            modifier = Modifier.fillMaxWidth().fillMaxHeight(0.94f).padding(8.dp),
+            shape = RoundedCornerShape(18.dp),
+            color = Color.Black
+        ) {
+            Column(Modifier.fillMaxSize().background(Color.Black)) {
+                Row(
+                    Modifier.fillMaxWidth().background(Panel).padding(horizontal = 8.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text(movie.title, color = Color.White, fontWeight = FontWeight.Bold, maxLines = 1)
+                        Text("Pemutar situs • KlikXXI", color = Green, fontSize = 10.sp)
+                    }
+                    IconButton(onClick = onDownload) {
+                        Icon(Icons.Filled.Download, contentDescription = "Unduh", tint = Green)
+                    }
+                    TextButton(onClick = onClose) { Text("Tutup", color = Green) }
+                }
+                AndroidView(
+                    factory = { context ->
+                        android.webkit.WebView(context).apply {
+                            webViewRef.value = this
+                            setBackgroundColor(android.graphics.Color.BLACK)
+                            settings.javaScriptEnabled = true
+                            settings.domStorageEnabled = true
+                            settings.loadsImagesAutomatically = true
+                            settings.mediaPlaybackRequiresUserGesture = true
+                            settings.javaScriptCanOpenWindowsAutomatically = false
+                            settings.setSupportMultipleWindows(false)
+                            settings.userAgentString = settings.userAgentString
+                                .replace("; wv)", ")")
+                                .replace(" Version/4.0", "")
+                            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP) {
+                                settings.mixedContentMode = android.webkit.WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
+                                android.webkit.CookieManager.getInstance().setAcceptThirdPartyCookies(this, true)
+                            }
+                            webViewClient = object : android.webkit.WebViewClient() {
+                                override fun shouldOverrideUrlLoading(
+                                    view: android.webkit.WebView,
+                                    request: android.webkit.WebResourceRequest
+                                ): Boolean {
+                                    val scheme = request.url.scheme.orEmpty()
+                                    return scheme != "https" && scheme != "http"
+                                }
+                            }
+                            webChromeClient = object : android.webkit.WebChromeClient() {
+                                override fun onShowCustomView(
+                                    view: android.view.View,
+                                    callback: android.webkit.WebChromeClient.CustomViewCallback
+                                ) {
+                                    val decor = activity.window.decorView as? android.view.ViewGroup
+                                    if (decor == null || fullscreenView != null) {
+                                        callback.onCustomViewHidden()
+                                        return
+                                    }
+                                    (view.parent as? android.view.ViewGroup)?.removeView(view)
+                                    fullscreenView = view
+                                    fullscreenCallback = callback
+                                    decor.addView(view, android.view.ViewGroup.LayoutParams(
+                                        android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                                        android.view.ViewGroup.LayoutParams.MATCH_PARENT
+                                    ))
+                                    activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+                                    WindowCompat.setDecorFitsSystemWindows(activity.window, false)
+                                    WindowInsetsControllerCompat(activity.window, decor)
+                                        .hide(WindowInsetsCompat.Type.systemBars())
+                                }
+
+                                override fun onHideCustomView() {
+                                    val decor = activity.window.decorView as? android.view.ViewGroup
+                                    fullscreenView?.let { view -> decor?.removeView(view) }
+                                    fullscreenView = null
+                                    fullscreenCallback = null
+                                    activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+                                    WindowCompat.setDecorFitsSystemWindows(activity.window, true)
+                                    WindowInsetsControllerCompat(activity.window, activity.window.decorView)
+                                        .show(WindowInsetsCompat.Type.systemBars())
+                                }
+                            }
+                            loadUrl(movie.termsUrl.ifBlank { movie.videoUrl })
+                        }
+                    },
+                    modifier = Modifier.fillMaxSize(),
+                    update = { webViewRef.value = it }
                 )
             }
         }
