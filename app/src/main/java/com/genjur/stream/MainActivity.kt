@@ -432,6 +432,36 @@ internal fun loadGenericHtmlCatalog(sourceUrl: String, html: String, sourceName:
     }
     return results.distinctBy { it.videoUrl }.take(120)
 }
+
+/** Ambil metadata halaman detail secara native; tidak mengekstrak stream dari situs. */
+private suspend fun loadSourceMovieDetails(movie: FeedMovie): FeedMovie = withContext(Dispatchers.IO) {
+    val document = Jsoup.connect(movie.videoUrl)
+        .userAgent("Mozilla/5.0 (Linux; Android 11) AppleWebKit/537.36 Chrome/131.0.0.0 Mobile Safari/537.36")
+        .timeout(15000).followRedirects(true).get()
+    fun meta(vararg selectors: String): String =
+        selectors.asSequence().mapNotNull { selector ->
+            document.selectFirst(selector)?.attr("content")?.trim()?.takeIf { it.isNotBlank() }
+        }.firstOrNull().orEmpty()
+    val title = meta("meta[property=og:title]", "meta[name=twitter:title]")
+        .ifBlank { document.selectFirst("h1")?.text()?.trim().orEmpty() }.ifBlank { movie.title }
+    val description = meta("meta[property=og:description]", "meta[name=description]", "meta[name=twitter:description]")
+        .ifBlank { document.selectFirst(".synopsis, .description, .desc, .movie-description, .entry-content, [itemprop=description]")?.text()?.trim()?.take(1200).orEmpty() }
+        .ifBlank { movie.description }
+    val rawPoster = meta("meta[property=og:image]", "meta[name=twitter:image]")
+    val poster = (if (rawPoster.startsWith("//")) "https:$rawPoster" else rawPoster)
+        .takeIf { it.startsWith("https://") } ?: movie.posterUrl
+    val pageText = document.text().take(12000)
+    val year = Regex("\\b(?:19|20)\\d{2}\\b").find(pageText)?.value ?: movie.releaseYear
+    val genreWords = listOf("Action", "Adventure", "Animation", "Anime", "Comedy", "Crime", "Documentary", "Drama", "Family", "Fantasy", "Horror", "Mystery", "Romance", "Sci-Fi", "Thriller", "Aksi", "Petualangan", "Animasi", "Komedi", "Kriminal", "Dokumenter", "Horor")
+    val genres = (document.select(".genre a, .genres a, [itemprop=genre], a[rel=tag]").map { it.text().trim() } +
+        genreWords.filter { pageText.contains(it, true) }).filter { it.isNotBlank() && it.length <= 32 }
+        .distinct().take(8).ifEmpty { movie.genres }
+    val duration = document.selectFirst("[itemprop=duration], .runtime, .duration, .movie-runtime")
+        ?.text()?.trim()?.takeIf { it.isNotBlank() } ?: movie.duration
+    movie.copy(title = title.take(140), description = description.take(1200), posterUrl = poster,
+        releaseYear = year, genres = genres, duration = duration)
+}
+
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -537,6 +567,17 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
     var feedLoading by remember { mutableStateOf(false) }
     var feedMessage by remember { mutableStateOf("Tambahkan sumber feed JSON, lalu muat katalog.") }
     var selectedMovie by remember { mutableStateOf<FeedMovie?>(null) }
+    var sourceDetailLoading by remember { mutableStateOf(false) }
+    LaunchedEffect(selectedMovie?.videoUrl) {
+        val current = selectedMovie ?: return@LaunchedEffect
+        if (current.licenseId != "Metadata halaman sumber" || current.videoUrl.isBlank()) return@LaunchedEffect
+        sourceDetailLoading = true
+        val result = runCatching { loadSourceMovieDetails(current) }
+        if (selectedMovie?.videoUrl == current.videoUrl) {
+            result.onSuccess { selectedMovie = it }
+            sourceDetailLoading = false
+        }
+    }
     var playingMovie by remember { mutableStateOf<FeedMovie?>(null) }
     var pendingPlaybackChoice by remember { mutableStateOf<FeedMovie?>(null) }
     BackHandler(enabled = selectedMovie != null || playingMovie != null || selectedTab != "Beranda") {
@@ -1342,9 +1383,8 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                                     onMoviesLoaded = { sourceCatalogMovies = it },
                                     onLoadingChanged = { sourceCatalogLoading = it },
                                     onMessageChanged = { sourceCatalogMessage = it },
-                                    onOpenMovie = { movieUrl ->
-                                        browserInitialUrl = movieUrl
-                                        selectedTab = "Browser Sumber"
+                                    onOpenMovie = { movie ->
+                                        selectedMovie = movie
                                     },
                                     onOpenSource = {
                                         browserInitialUrl = catalogSourceUrl
@@ -1760,6 +1800,7 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
     selectedMovie?.let { movie ->
         MovieDetailDialog(
             movie = movie,
+            detailLoading = sourceDetailLoading,
             isFavorite = favoriteMovies.any { movieKey(it) == movieKey(movie) },
             onToggleFavorite = { toggleFavorite(movie) },
             isDownloaded = downloads.any { movieKey(it.movie) == movieKey(movie) },
@@ -1838,6 +1879,7 @@ private fun MoviePoster(
 @Composable
 private fun MovieDetailDialog(
     movie: FeedMovie,
+    detailLoading: Boolean,
     isFavorite: Boolean,
     onToggleFavorite: () -> Unit,
     isDownloaded: Boolean,
@@ -1845,7 +1887,10 @@ private fun MovieDetailDialog(
     onClose: () -> Unit,
     onPlay: (FeedMovie) -> Unit
 ) {
-    var selectedStreamUrl by remember(movie) { mutableStateOf(movie.streamOptions.firstOrNull()?.videoUrl ?: movie.videoUrl) }
+    val isSourceMetadataOnly = movie.licenseId == "Metadata halaman sumber"
+    var selectedStreamUrl by remember(movie) {
+        mutableStateOf(if (isSourceMetadataOnly) "" else movie.streamOptions.firstOrNull()?.videoUrl ?: movie.videoUrl)
+    }
     Dialog(onDismissRequest = onClose, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Surface(Modifier.fillMaxWidth().fillMaxHeight(0.9f).padding(12.dp),
             shape = RoundedCornerShape(22.dp), color = Panel) {
@@ -1886,8 +1931,18 @@ private fun MovieDetailDialog(
                     Spacer(Modifier.height(8.dp))
                     Text(movie.description.ifBlank { "Sinopsis belum tersedia." },
                         color = Muted, fontSize = 14.sp, lineHeight = 22.sp)
-                    val availableStreams = movie.streamOptions.ifEmpty {
+                    val availableStreams = if (isSourceMetadataOnly) emptyList() else movie.streamOptions.ifEmpty {
                         if (movie.videoUrl.isNotBlank()) listOf(StreamOption("Otomatis", movie.videoUrl)) else emptyList()
+                    }
+                    if (detailLoading) {
+                        Spacer(Modifier.height(10.dp))
+                        LinearProgressIndicator(Modifier.fillMaxWidth(), color = Green)
+                        Text("Memuat detail film…", color = Muted, fontSize = 11.sp)
+                    }
+                    if (isSourceMetadataOnly) {
+                        Spacer(Modifier.height(12.dp))
+                        Text("Tombol PLAY memakai player GENJUR STREAM. Stream langsung belum tersedia dari metadata katalog ini, jadi film tidak akan dibuka melalui player situs.",
+                            color = Muted, fontSize = 11.sp, lineHeight = 17.sp)
                     }
                     if (availableStreams.isNotEmpty()) {
                         Spacer(Modifier.height(16.dp))
@@ -1922,7 +1977,7 @@ private fun MovieDetailDialog(
                     Button(onClick = { onPlay(movie.copy(videoUrl = selectedStreamUrl)) }, enabled = selectedStreamUrl.isNotBlank(), modifier = Modifier.fillMaxWidth(),
                         colors = ButtonDefaults.buttonColors(containerColor = Green, contentColor = Color.White,
                             disabledContainerColor = Color(0xFF393344), disabledContentColor = Muted)) {
-                        Text(if (selectedStreamUrl.isBlank()) "Video belum tersedia" else "▶  Putar ${availableStreams.firstOrNull { it.videoUrl == selectedStreamUrl }?.quality ?: "sekarang"}")
+                        Text(if (selectedStreamUrl.isBlank()) "▶  PLAY — Stream belum tersedia" else "▶  PLAY sekarang")
                     }
                     TextButton(onClick = onClose, modifier = Modifier.fillMaxWidth()) { Text("Kembali ke katalog", color = Green) }
                 }
@@ -2081,7 +2136,7 @@ private data class SavedSourceLink(val name: String, val url: String)
 private fun SourceCatalogScreen(
     sourceName: String, sourceUrl: String, movies: List<FeedMovie>, loading: Boolean, message: String?,
     onMoviesLoaded: (List<FeedMovie>) -> Unit, onLoadingChanged: (Boolean) -> Unit,
-    onMessageChanged: (String?) -> Unit, onOpenMovie: (String) -> Unit, onOpenSource: () -> Unit
+    onMessageChanged: (String?) -> Unit, onOpenMovie: (FeedMovie) -> Unit, onOpenSource: () -> Unit
 ) {
     var reloadToken by remember(sourceUrl) { mutableIntStateOf(0) }
     var gridColumns by remember(sourceUrl) { mutableIntStateOf(3) }
@@ -2213,7 +2268,7 @@ private fun SourceCatalogScreen(
                 ) {
                     rowMovies.forEach { movie ->
                         Card(
-                            Modifier.weight(1f).clickable { onOpenMovie(movie.videoUrl) },
+                            Modifier.weight(1f).clickable { onOpenMovie(movie) },
                             colors = CardDefaults.cardColors(containerColor = Panel),
                             shape = RoundedCornerShape(10.dp)
                         ) {
