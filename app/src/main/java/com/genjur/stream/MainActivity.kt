@@ -2084,6 +2084,7 @@ private fun SourceCatalogScreen(
     onMessageChanged: (String?) -> Unit, onOpenMovie: (String) -> Unit, onOpenSource: () -> Unit
 ) {
     var reloadToken by remember(sourceUrl) { mutableIntStateOf(0) }
+    var gridColumns by remember(sourceUrl) { mutableIntStateOf(3) }
     val plugin = remember(sourceUrl) { SourcePluginRegistry.resolve(sourceUrl) }
 
     LaunchedEffect(sourceUrl, reloadToken) {
@@ -2127,6 +2128,28 @@ private fun SourceCatalogScreen(
             else "Katalog native • Plugin ${plugin.displayName}",
             color = Muted, fontSize = 11.sp
         )
+        if (movies.isNotEmpty()) {
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("Tampilan poster", color = Muted, fontSize = 11.sp)
+                Spacer(Modifier.width(8.dp))
+                SingleChoiceSegmentedButtonRow {
+                    SegmentedButton(
+                        selected = gridColumns == 2,
+                        onClick = { gridColumns = 2 },
+                        shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
+                    ) { Text("2 kolom") }
+                    SegmentedButton(
+                        selected = gridColumns == 3,
+                        onClick = { gridColumns = 3 },
+                        shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
+                    ) { Text("3 kolom") }
+                }
+            }
+        }
         if (loading) LinearProgressIndicator(Modifier.fillMaxWidth(), color = Green)
         message?.let {
             Text(it, color = if (it.startsWith("Plugin") && (it.contains("gagal") || it.contains("belum tersedia"))) MaterialTheme.colorScheme.error else Muted, fontSize = 12.sp)
@@ -2136,25 +2159,41 @@ private fun SourceCatalogScreen(
                 "Belum ada judul yang dapat ditampilkan di katalog aplikasi.",
                 color = Muted, fontSize = 12.sp
             )
-        } else movies.forEach { movie ->
-            Card(
-                Modifier.fillMaxWidth().clickable { onOpenMovie(movie.videoUrl) },
-                colors = CardDefaults.cardColors(containerColor = Panel),
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Row(Modifier.fillMaxWidth().padding(9.dp), verticalAlignment = Alignment.CenterVertically) {
-                    MoviePoster(movie.posterUrl, movie.title, 104.dp, 76.dp)
-                    Spacer(Modifier.width(12.dp))
-                    Column(Modifier.weight(1f)) {
-                        Text(movie.title, color = Color.White, fontWeight = FontWeight.Bold, maxLines = 2)
-                        Text(
-                            listOfNotNull(movie.releaseYear.takeIf { it.isNotBlank() }, movie.category).joinToString(" • "),
-                            color = Green, fontSize = 11.sp
-                        )
-                        if (movie.description.isNotBlank()) {
-                            Text(movie.description, color = Muted, fontSize = 11.sp, maxLines = 2)
+        } else {
+            movies.chunked(gridColumns).forEach { rowMovies ->
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.Top
+                ) {
+                    rowMovies.forEach { movie ->
+                        Card(
+                            Modifier.weight(1f).clickable { onOpenMovie(movie.videoUrl) },
+                            colors = CardDefaults.cardColors(containerColor = Panel),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Column(Modifier.fillMaxWidth().padding(6.dp)) {
+                                MoviePoster(movie.posterUrl, movie.title, 164.dp)
+                                Spacer(Modifier.height(6.dp))
+                                Text(
+                                    movie.title,
+                                    color = Color.White,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 12.sp,
+                                    maxLines = 2,
+                                    minLines = 2
+                                )
+                                Text(
+                                    listOfNotNull(movie.releaseYear.takeIf { it.isNotBlank() }, movie.category.takeIf { it.isNotBlank() }).joinToString(" • "),
+                                    color = Green,
+                                    fontSize = 9.sp,
+                                    maxLines = 1
+                                )
+                            }
                         }
-                        Text("Buka detail film  ›", color = Muted, fontSize = 11.sp)
+                    }
+                    repeat(gridColumns - rowMovies.size) {
+                        Spacer(Modifier.weight(1f))
                     }
                 }
             }
