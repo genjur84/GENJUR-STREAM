@@ -2085,6 +2085,7 @@ private fun SourceCatalogScreen(
 ) {
     var reloadToken by remember(sourceUrl) { mutableIntStateOf(0) }
     var gridColumns by remember(sourceUrl) { mutableIntStateOf(3) }
+    var selectedGenre by remember(sourceUrl) { mutableStateOf("Semua") }
     val plugin = remember(sourceUrl) { SourcePluginRegistry.resolve(sourceUrl) }
 
     LaunchedEffect(sourceUrl, reloadToken) {
@@ -2111,6 +2112,38 @@ private fun SourceCatalogScreen(
         }
     }
 
+    fun normalizeGenre(raw: String): String {
+        val value = raw.trim().lowercase()
+        return when {
+            value in listOf("action", "aksi") -> "Action"
+            value in listOf("adventure", "petualangan") -> "Adventure"
+            value in listOf("comedy", "komedi") -> "Comedy"
+            value in listOf("crime", "kriminal") -> "Crime"
+            value in listOf("documentary", "dokumenter") -> "Documentary"
+            value == "drama" -> "Drama"
+            value in listOf("family", "keluarga") -> "Family"
+            value in listOf("fantasy", "fantasi") -> "Fantasy"
+            value in listOf("horror", "horor") -> "Horror"
+            value in listOf("mystery", "misteri") -> "Mystery"
+            value in listOf("romance", "romantis") -> "Romance"
+            value in listOf("sci-fi", "science fiction", "science-fiction", "fiksi ilmiah") -> "Sci-Fi"
+            value in listOf("thriller", "seru") -> "Thriller"
+            value in listOf("animation", "animasi", "anime") -> "Animation"
+            else -> raw.trim().replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
+        }
+    }
+    val genreOptions = remember(movies) {
+        movies.flatMap { movie -> (movie.genres + movie.category.split(",", "/", "|", "•")).map(::normalizeGenre) }
+            .filter { it.isNotBlank() && it != "Film" && it != "Serial" && it != "Series" }
+            .distinct().sorted()
+    }
+    val visibleMovies = remember(movies, selectedGenre) {
+        if (selectedGenre == "Semua") movies else movies.filter { movie ->
+            (movie.genres + movie.category.split(",", "/", "|", "•")).map(::normalizeGenre)
+                .any { it.equals(selectedGenre, ignoreCase = true) }
+        }
+    }
+
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             TextButton(onClick = { onMessageChanged(null); onMoviesLoaded(emptyList()) }) {
@@ -2129,6 +2162,17 @@ private fun SourceCatalogScreen(
             color = Muted, fontSize = 11.sp
         )
         if (movies.isNotEmpty()) {
+            if (genreOptions.isNotEmpty()) {
+                Row(
+                    Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    FilterChip(selected = selectedGenre == "Semua", onClick = { selectedGenre = "Semua" }, label = { Text("Semua") })
+                    genreOptions.forEach { genre ->
+                        FilterChip(selected = selectedGenre == genre, onClick = { selectedGenre = genre }, label = { Text(genre) })
+                    }
+                }
+            }
             Row(
                 Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.End,
@@ -2160,7 +2204,8 @@ private fun SourceCatalogScreen(
                 color = Muted, fontSize = 12.sp
             )
         } else {
-            movies.chunked(gridColumns).forEach { rowMovies ->
+            if (visibleMovies.isEmpty()) Text("Belum ada film dalam kategori $selectedGenre.", color = Muted, fontSize = 12.sp)
+            visibleMovies.chunked(gridColumns).forEach { rowMovies ->
                 Row(
                     Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
