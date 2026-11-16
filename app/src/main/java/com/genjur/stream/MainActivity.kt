@@ -1419,7 +1419,7 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                         SourceBrowser(
                             initialUrl = browserInitialUrl,
                             fullScreen = true,
-                            active = sourceVisible,
+                            active = sourceVisible && playingMovie == null,
                             onPlaybackStarted = { pageTitle, pageUrl ->
                                 val safeTitle = pageTitle.trim().takeIf { it.isNotBlank() }
                                     ?: Uri.parse(pageUrl).host.orEmpty().ifBlank { "Video dari situs" }
@@ -2048,6 +2048,25 @@ private fun SourceBrowser(
     var isLoading by remember(initialUrl) { mutableStateOf(initialUrl.isNotBlank()) }
     var webView by remember { mutableStateOf<WebView?>(null) }
     val loadingFallback = remember { Runnable { isLoading = false } }
+    fun pauseSiteMedia() {
+        webView?.evaluateJavascript(
+            """(function(){
+                try {
+                    document.querySelectorAll('video,audio').forEach(function(media) {
+                        try { media.pause(); media.muted = true; media.volume = 0; } catch(e) {}
+                    });
+                    document.querySelectorAll('iframe').forEach(function(frame) {
+                        try { frame.contentWindow.postMessage({type:'pause'}, '*'); } catch(e) {}
+                    });
+                } catch(e) {}
+            })();""",
+            null
+        )
+        webView?.onPause()
+    }
+    LaunchedEffect(active) {
+        if (active) webView?.onResume() else webView?.onPause()
+    }
     BackHandler(enabled = active && webView?.canGoBack() == true) {
         webView?.goBack()
     }
@@ -2087,6 +2106,7 @@ private fun SourceBrowser(
                     Column(horizontalAlignment = Alignment.End) {
                         Button(onClick = {
                             detectedVideoOptions.firstOrNull()?.let {
+                                pauseSiteMedia()
                                 onPlayCandidate(detectedVideoTitle, detectedVideoPage, it.videoUrl)
                             }
                         }, colors = ButtonDefaults.buttonColors(containerColor = Green, contentColor = Color.White)) {
@@ -2214,6 +2234,7 @@ private fun SourceBrowser(
                             if (!autoPlayerOpened && uri.scheme in listOf("http", "https") && !uri.host.isNullOrBlank()) {
                                 autoPlayerOpened = true
                                 val safeTitle = title.ifBlank { "Video dari situs" }
+                                pauseSiteMedia()
                                 onPlayCandidate(safeTitle, pageUrl, mediaUrl)
                             }
                         } },
@@ -2225,6 +2246,7 @@ private fun SourceBrowser(
                                 if (uri.scheme in listOf("http", "https") && !uri.host.isNullOrBlank()) {
                                     if (sitePlaybackStarted && !autoPlayerOpened) {
                                         autoPlayerOpened = true
+                                        pauseSiteMedia()
                                         onPlayCandidate(title.ifBlank { "Video dari situs" }, pageUrl, videoUrl)
                                     }
                                     if (!adaptiveStream) {
@@ -2259,6 +2281,7 @@ private fun SourceBrowser(
                                     if ((sitePlaybackStarted || recentUserPlay) && !autoPlayerOpened) {
                                         sitePlaybackStarted = true
                                         autoPlayerOpened = true
+                                        pauseSiteMedia()
                                         onPlayCandidate(
                                             view.title?.takeIf { it.isNotBlank() } ?: "Video dari situs",
                                             view.url ?: currentUrl,
