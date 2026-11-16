@@ -2161,15 +2161,6 @@ private fun SourceBrowser(
                         Text(detectedVideoTitle.ifBlank { "Video dari situs" }, color = Muted, fontSize = 10.sp, maxLines = 2)
                     }
                     Column(horizontalAlignment = Alignment.End) {
-                        Button(onClick = {
-                            detectedVideoOptions.firstOrNull()?.let {
-                                onPlayCandidate(detectedVideoTitle, detectedVideoPage, it.videoUrl)
-                            }
-                        }, colors = ButtonDefaults.buttonColors(containerColor = Green, contentColor = Color.White)) {
-                            Icon(Icons.Filled.PlayArrow, contentDescription = null)
-                            Spacer(Modifier.width(4.dp))
-                            Text("Putar")
-                        }
                         TextButton(onClick = {
             selectedDownloadOption = detectedVideoOptions.firstOrNull()
             showDownloadChoices = true
