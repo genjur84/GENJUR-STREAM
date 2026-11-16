@@ -3322,6 +3322,7 @@ private fun SourceFallbackPlayer(
 ) {
     var fullscreenView by remember { mutableStateOf<android.view.View?>(null) }
     var fullscreenCallback by remember { mutableStateOf<android.webkit.WebChromeClient.CustomViewCallback?>(null) }
+    var detectedDirectUrl by remember(movie) { mutableStateOf("") }
     val webViewRef = remember { mutableStateOf<android.webkit.WebView?>(null) }
 
     BackHandler(enabled = fullscreenView != null) {
@@ -3343,96 +3344,150 @@ private fun SourceFallbackPlayer(
         }
     }
 
-    Dialog(
-        onDismissRequest = onClose,
-        properties = DialogProperties(usePlatformDefaultWidth = false)
-    ) {
-        Surface(
-            modifier = Modifier.fillMaxWidth().fillMaxHeight(0.94f).padding(8.dp),
-            shape = RoundedCornerShape(18.dp),
-            color = Color.Black
+    // Jika halaman sumber menyediakan URL media HTML5 biasa yang dapat diakses,
+    // pindahkan pemutaran ke ExoPlayer GENJUR. Jika tidak, tetap gunakan player situs.
+    if (detectedDirectUrl.isNotBlank()) {
+        InAppVideoPlayer(
+            activity,
+            movie.copy(videoUrl = detectedDirectUrl, licenseId = "Direct source media"),
+            onDownload = onDownload,
+            onClose = onClose
+        )
+    } else {
+        Dialog(
+            onDismissRequest = onClose,
+            properties = DialogProperties(usePlatformDefaultWidth = false)
         ) {
-            Column(Modifier.fillMaxSize().background(Color.Black)) {
-                Row(
-                    Modifier.fillMaxWidth().background(Panel).padding(horizontal = 8.dp, vertical = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(Modifier.weight(1f)) {
-                        Text(movie.title, color = Color.White, fontWeight = FontWeight.Bold, maxLines = 1)
-                        Text("Pemutar situs • KlikXXI", color = Green, fontSize = 10.sp)
-                    }
-                    IconButton(onClick = onDownload) {
-                        Icon(Icons.Filled.Download, contentDescription = "Unduh", tint = Green)
-                    }
-                    TextButton(onClick = onClose) { Text("Tutup", color = Green) }
-                }
-                AndroidView(
-                    factory = { context ->
-                        android.webkit.WebView(context).apply {
-                            webViewRef.value = this
-                            setBackgroundColor(android.graphics.Color.BLACK)
-                            settings.javaScriptEnabled = true
-                            settings.domStorageEnabled = true
-                            settings.loadsImagesAutomatically = true
-                            settings.mediaPlaybackRequiresUserGesture = true
-                            settings.javaScriptCanOpenWindowsAutomatically = false
-                            settings.setSupportMultipleWindows(false)
-                            settings.userAgentString = settings.userAgentString
-                                .replace("; wv)", ")")
-                                .replace(" Version/4.0", "")
-                            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP) {
-                                settings.mixedContentMode = android.webkit.WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
-                                android.webkit.CookieManager.getInstance().setAcceptThirdPartyCookies(this, true)
-                            }
-                            webViewClient = object : android.webkit.WebViewClient() {
-                                override fun shouldOverrideUrlLoading(
-                                    view: android.webkit.WebView,
-                                    request: android.webkit.WebResourceRequest
-                                ): Boolean {
-                                    val scheme = request.url.scheme.orEmpty()
-                                    return scheme != "https" && scheme != "http"
-                                }
-                            }
-                            webChromeClient = object : android.webkit.WebChromeClient() {
-                                override fun onShowCustomView(
-                                    view: android.view.View,
-                                    callback: android.webkit.WebChromeClient.CustomViewCallback
-                                ) {
-                                    val decor = view.rootView as? android.view.ViewGroup
-                                    if (decor == null || fullscreenView != null) {
-                                        callback.onCustomViewHidden()
-                                        return
-                                    }
-                                    (view.parent as? android.view.ViewGroup)?.removeView(view)
-                                    fullscreenView = view
-                                    fullscreenCallback = callback
-                                    decor.addView(view, android.view.ViewGroup.LayoutParams(
-                                        android.view.ViewGroup.LayoutParams.MATCH_PARENT,
-                                        android.view.ViewGroup.LayoutParams.MATCH_PARENT
-                                    ))
-                                    activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
-                                    WindowCompat.setDecorFitsSystemWindows(activity.window, false)
-                                    WindowInsetsControllerCompat(activity.window, decor)
-                                        .hide(WindowInsetsCompat.Type.systemBars())
-                                }
-
-                                override fun onHideCustomView() {
-                                    val decor = fullscreenView?.rootView as? android.view.ViewGroup
-                                    fullscreenView?.let { view -> decor?.removeView(view) }
-                                    fullscreenView = null
-                                    fullscreenCallback = null
-                                    activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
-                                    WindowCompat.setDecorFitsSystemWindows(activity.window, true)
-                                    WindowInsetsControllerCompat(activity.window, activity.window.decorView)
-                                        .show(WindowInsetsCompat.Type.systemBars())
-                                }
-                            }
-                            loadUrl(movie.termsUrl.ifBlank { movie.videoUrl })
+            Surface(
+                modifier = Modifier.fillMaxWidth().fillMaxHeight(0.94f).padding(8.dp),
+                shape = RoundedCornerShape(18.dp),
+                color = Color.Black
+            ) {
+                Column(Modifier.fillMaxSize().background(Color.Black)) {
+                    Row(
+                        Modifier.fillMaxWidth().background(Panel).padding(horizontal = 8.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            Text(movie.title, color = Color.White, fontWeight = FontWeight.Bold, maxLines = 1)
+                            Text("Player GENJUR • player situs sebagai cadangan", color = Green, fontSize = 10.sp)
                         }
-                    },
-                    modifier = Modifier.fillMaxWidth().weight(1f),
-                    update = { webViewRef.value = it }
-                )
+                        IconButton(onClick = onDownload) {
+                            Icon(Icons.Filled.Download, contentDescription = "Unduh", tint = Green)
+                        }
+                        TextButton(onClick = onClose) { Text("Tutup", color = Green) }
+                    }
+                    AndroidView(
+                        factory = { context ->
+                            android.webkit.WebView(context).apply {
+                                webViewRef.value = this
+                                setBackgroundColor(android.graphics.Color.BLACK)
+                                settings.javaScriptEnabled = true
+                                settings.domStorageEnabled = true
+                                settings.loadsImagesAutomatically = true
+                                settings.mediaPlaybackRequiresUserGesture = true
+                                settings.javaScriptCanOpenWindowsAutomatically = false
+                                settings.setSupportMultipleWindows(false)
+                                settings.userAgentString = settings.userAgentString
+                                    .replace("; wv)", ")")
+                                    .replace(" Version/4.0", "")
+                                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP) {
+                                    settings.mixedContentMode = android.webkit.WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
+                                    android.webkit.CookieManager.getInstance().setAcceptThirdPartyCookies(this, true)
+                                }
+                                addJavascriptInterface(object {
+                                    @JavascriptInterface
+                                    fun onPlayableMedia(url: String) {
+                                        val uri = Uri.parse(url)
+                                        val path = uri.path.orEmpty().lowercase()
+                                        val isDirectMedia = path.endsWith(".mp4") || path.endsWith(".m4v") ||
+                                            path.endsWith(".webm") || path.endsWith(".m3u8")
+                                        if (uri.scheme in listOf("https", "http") && !uri.host.isNullOrBlank() &&
+                                            isDirectMedia && !isGenjurAdHost(uri.host)) {
+                                            post {
+                                                if (detectedDirectUrl.isBlank()) detectedDirectUrl = url
+                                            }
+                                        }
+                                    }
+                                }, "GenjurMediaBridge")
+                                webViewClient = object : android.webkit.WebViewClient() {
+                                    override fun shouldOverrideUrlLoading(
+                                        view: android.webkit.WebView,
+                                        request: android.webkit.WebResourceRequest
+                                    ): Boolean {
+                                        val scheme = request.url.scheme.orEmpty()
+                                        return scheme != "https" && scheme != "http"
+                                    }
+
+                                    override fun onPageFinished(view: android.webkit.WebView, url: String) {
+                                        super.onPageFinished(view, url)
+                                        val script = """
+                                            (function() {
+                                              function attach(media) {
+                                                if (!media || media.dataset.genjurBridge === '1') return;
+                                                media.dataset.genjurBridge = '1';
+                                                function report() {
+                                                  var source = media.currentSrc || media.src ||
+                                                    (media.querySelector('source') && media.querySelector('source').src) || '';
+                                                  if (source && /^https?:/i.test(source) &&
+                                                      /\.(mp4|m4v|webm|m3u8)(?:$|[?#])/i.test(source)) {
+                                                    try { GenjurMediaBridge.onPlayableMedia(source); } catch(e) {}
+                                                  }
+                                                }
+                                                media.addEventListener('play', report, { once: true });
+                                                media.addEventListener('playing', report, { once: true });
+                                                report();
+                                              }
+                                              document.querySelectorAll('video,audio').forEach(attach);
+                                              new MutationObserver(function() {
+                                                document.querySelectorAll('video,audio').forEach(attach);
+                                              }).observe(document.documentElement || document, {childList:true,subtree:true});
+                                            })();
+                                        """.trimIndent()
+                                        view.evaluateJavascript(script, null)
+                                    }
+                                }
+                                webChromeClient = object : android.webkit.WebChromeClient() {
+                                    override fun onShowCustomView(
+                                        view: android.view.View,
+                                        callback: android.webkit.WebChromeClient.CustomViewCallback
+                                    ) {
+                                        val decor = view.rootView as? android.view.ViewGroup
+                                        if (decor == null || fullscreenView != null) {
+                                            callback.onCustomViewHidden()
+                                            return
+                                        }
+                                        (view.parent as? android.view.ViewGroup)?.removeView(view)
+                                        fullscreenView = view
+                                        fullscreenCallback = callback
+                                        decor.addView(view, android.view.ViewGroup.LayoutParams(
+                                            android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                                            android.view.ViewGroup.LayoutParams.MATCH_PARENT
+                                        ))
+                                        activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+                                        WindowCompat.setDecorFitsSystemWindows(activity.window, false)
+                                        WindowInsetsControllerCompat(activity.window, decor)
+                                            .hide(WindowInsetsCompat.Type.systemBars())
+                                    }
+
+                                    override fun onHideCustomView() {
+                                        val decor = fullscreenView?.rootView as? android.view.ViewGroup
+                                        fullscreenView?.let { view -> decor?.removeView(view) }
+                                        fullscreenView = null
+                                        fullscreenCallback = null
+                                        activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+                                        WindowCompat.setDecorFitsSystemWindows(activity.window, true)
+                                        WindowInsetsControllerCompat(activity.window, activity.window.decorView)
+                                            .show(WindowInsetsCompat.Type.systemBars())
+                                    }
+                                }
+                                loadUrl(movie.termsUrl.ifBlank { movie.videoUrl })
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth().weight(1f),
+                        update = { webViewRef.value = it }
+                    )
+                }
             }
         }
     }
