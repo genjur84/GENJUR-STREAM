@@ -2159,6 +2159,7 @@ private fun SourceCatalogScreen(
     }
 }
 
+@Composable
 private fun SourceLinksScreen(activity: MainActivity, onOpenLink: (String) -> Unit) {
     val prefs = remember { activity.getSharedPreferences("genjur_stream_saved_links", 0) }
     fun readLinks(): List<SavedSourceLink> = runCatching {
