@@ -9,14 +9,14 @@ import java.net.URL
  * Plugin hanya dipilih dari daftar bawaan aplikasi; repositori jarak jauh
  * tidak dapat mengirim atau mengeksekusi kode Kotlin.
  */
-interface SourcePlugin {
+internal interface SourcePlugin {
     val id: String
     val displayName: String
     fun supports(sourceUrl: String): Boolean
     suspend fun loadCatalog(sourceName: String, sourceUrl: String): List<FeedMovie>
 }
 
-class CmaxSourcePlugin : SourcePlugin {
+internal class CmaxSourcePlugin : SourcePlugin {
     override val id: String = "cmax"
     override val displayName: String = "Cmax"
 
@@ -43,7 +43,7 @@ class CmaxSourcePlugin : SourcePlugin {
 }
 
 /** Daftar plugin yang benar-benar tersedia di APK. */
-object SourcePluginRegistry {
+internal object SourcePluginRegistry {
     private val installedPlugins: List<SourcePlugin> = listOf(CmaxSourcePlugin())
 
     fun resolve(sourceUrl: String): SourcePlugin? =
