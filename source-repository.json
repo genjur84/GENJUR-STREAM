@@ -10,6 +10,30 @@
       "category": "Film",
       "description": "Situs Cmax",
       "authorized": true
+    },
+    {
+      "id": "klikxxi",
+      "name": "Klikxxi",
+      "url": "https://klikxxi.shop/",
+      "category": "Film",
+      "description": "Situs Klikxxi",
+      "authorized": true
+    },
+    {
+      "id": "lk21",
+      "name": "LK21",
+      "url": "https://tv12.lk21official.cc/",
+      "category": "Film",
+      "description": "Situs LK21",
+      "authorized": true
+    },
+    {
+      "id": "duta-movie",
+      "name": "Duta Movie",
+      "url": "https://geeknotdead.com/",
+      "category": "Film",
+      "description": "Situs Duta Movie",
+      "authorized": true
     }
   ]
 }
