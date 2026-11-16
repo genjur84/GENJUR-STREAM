@@ -2201,7 +2201,8 @@ private fun SourceBrowser(
                         } },
                         onAutoPlay = { title, pageUrl, mediaUrl -> post {
                             val uri = Uri.parse(mediaUrl)
-                            if (uri.scheme in listOf("http", "https") && !uri.host.isNullOrBlank()) {
+                            if (!autoPlayerOpened && uri.scheme in listOf("http", "https") && !uri.host.isNullOrBlank()) {
+                                autoPlayerOpened = true
                                 val safeTitle = title.ifBlank { "Video dari situs" }
                                 onPlayCandidate(safeTitle, pageUrl, mediaUrl)
                             }
