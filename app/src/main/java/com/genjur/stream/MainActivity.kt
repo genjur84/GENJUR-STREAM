@@ -612,7 +612,7 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
         // membuat proses native berhenti pada sebagian perangkat; durasi tidak wajib
         // untuk mengukur byte dan Mbps karena ukuran file dipantau dari output MP4.
         val args = mutableListOf(
-            "-y", "-hide_banner", "-loglevel", "warning",
+            "-y", "-hide_banner", "-loglevel", "verbose",
             "-headers", headers,
             // Izinkan protokol HTTPS dan protokol turunan yang dipakai playlist HLS
             // untuk mengambil playlist, key, dan segmen video.
@@ -639,10 +639,22 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                             downloadMessage = "MP4 selesai dibuat: ${formatVideoSize(outputFile.length())}."
                         } else {
                             outputFile.delete()
-                            val detail = session.failStackTrace.orEmpty().ifBlank { session.output.orEmpty() }
-                                .lineSequence().lastOrNull { it.isNotBlank() }?.take(140)
+                            val fullLog = buildString {
+                                append(session.failStackTrace.orEmpty())
+                                append("\n")
+                                append(session.output.orEmpty())
+                            }.trim()
+                            val diagnosticLines = fullLog.lineSequence()
+                                .map { it.trim() }
+                                .filter { it.isNotBlank() && !it.startsWith("frame=") }
+                                .toList()
+                            val detail = diagnosticLines.takeLast(8).joinToString(" | ").take(1800)
+                            android.util.Log.e(
+                                "GENJUR_DOWNLOAD",
+                                "FFmpeg HLS gagal. URL=${mediaUrl.take(500)}\nLog lengkap:\n${fullLog.takeLast(12000)}"
+                            )
                             downloadStates = downloadStates + (id to (0 to "Gagal"))
-                            downloadMessage = "Gagal membuat MP4. ${detail ?: "Sumber tidak didukung atau memerlukan DRM."}"
+                            downloadMessage = "Gagal membuka streaming. ${detail.ifBlank { "Log FFmpeg kosong; periksa dukungan protokol HTTPS pada APK." }}"
                         }
                     }
                 },
