@@ -21,6 +21,11 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -2300,7 +2305,7 @@ private fun SourceLinksScreen(activity: MainActivity, onOpenLink: (String) -> Un
             Text("Belum ada link tersimpan.", color = Color(0xFFCBD2E0), fontSize = 12.sp)
         } else {
             val selectedIndex = selectedSavedSourceIndex?.takeIf { it in links.indices }
-            Box {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 OutlinedButton(
                     onClick = { savedSourcesDropdownExpanded = !savedSourcesDropdownExpanded },
                     modifier = Modifier.fillMaxWidth(),
@@ -2313,11 +2318,18 @@ private fun SourceLinksScreen(activity: MainActivity, onOpenLink: (String) -> Un
                         textAlign = TextAlign.Start,
                         maxLines = 1
                     )
-                    Icon(Icons.Filled.ArrowDropDown, contentDescription = "Tampilkan daftar sumber")
+                    Icon(
+                        Icons.Filled.ArrowDropDown,
+                        contentDescription = if (savedSourcesDropdownExpanded) "Tutup daftar sumber" else "Tampilkan daftar sumber"
+                    )
                 }
-                if (savedSourcesDropdownExpanded) {
+                AnimatedVisibility(
+                    visible = savedSourcesDropdownExpanded,
+                    enter = slideInVertically(initialOffsetY = { -it / 2 }) + fadeIn(),
+                    exit = slideOutVertically(targetOffsetY = { -it / 2 }) + fadeOut()
+                ) {
                     Card(
-                        modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
+                        modifier = Modifier.fillMaxWidth(),
                         colors = CardDefaults.cardColors(containerColor = Panel),
                         shape = RoundedCornerShape(10.dp)
                     ) {
