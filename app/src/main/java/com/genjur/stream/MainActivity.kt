@@ -2154,16 +2154,16 @@ private fun SourceCatalogScreen(
                                           var u;
                                           try { u = new URL(href); } catch(e) { return; }
                                           if (u.origin !== location.origin || u.protocol !== 'https:' || u.pathname === '/') return;
-                                          if (/\\/(genre|category|tag|login|register|contact|about|privacy|dmca)(\\/|$)/i.test(u.pathname)) return;
+                                          if (/\/(genre|category|tag|login|register|contact|about|privacy|dmca)(\/|$)/i.test(u.pathname)) return;
                                           var card = a.closest('article,.item,.movie-item,.film-item,.ml-item,.poster,.thumb,.grid-item,.movie,.film,.card') || a.parentElement?.parentElement || a;
                                           var heading = card.querySelector('h1,h2,h3,h4,.title,.name,.film-title,.movie-title');
-                                          var title = (heading && heading.textContent || img.getAttribute('alt') || img.getAttribute('title') || a.getAttribute('title') || a.textContent || '').replace(/\\s+/g,' ').trim();
+                                          var title = (heading && heading.textContent || img.getAttribute('alt') || img.getAttribute('title') || a.getAttribute('title') || a.textContent || '').replace(/\s+/g,' ').trim();
                                           var poster = img.getAttribute('data-src') || img.getAttribute('data-lazy-src') || img.getAttribute('data-original') || img.getAttribute('data-original-src') || img.currentSrc || img.src || '';
                                           try { poster = new URL(poster, location.href).href; } catch(e) { poster = ''; }
                                           if (title.length < 2 || title.length > 140 || !poster.startsWith('https://') || seen[href]) return;
                                           if (/^(watch now|watch movie|play|read more|lihat semua|more|trailer)$/i.test(title)) return;
                                           seen[href] = true;
-                                          out.push({title:title,url:href,poster:poster,description:(card.innerText || '').replace(/\\s+/g,' ').trim().slice(0,700)});
+                                          out.push({title:title,url:href,poster:poster,description:(card.innerText || '').replace(/\s+/g,' ').trim().slice(0,700)});
                                         });
                                         return out;
                                       }
