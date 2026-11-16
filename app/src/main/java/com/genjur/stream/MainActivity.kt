@@ -2051,13 +2051,16 @@ private fun SourceLinksScreen(activity: MainActivity, onOpenLink: (String) -> Un
                         setRequestProperty("Cache-Control", "no-cache")
                         setRequestProperty("User-Agent", "GENJUR-STREAM")
                     }
-                    val root = JSONObject(connection.getInputStream().bufferedReader().use { it.readText() })
+                    val jsonText = connection.getInputStream().bufferedReader().use { it.readText() }.removePrefix("\uFEFF").trim()
+                    val root = JSONObject(jsonText)
                     require(root.optInt("schemaVersion", 0) == 1) { "Versi format repositori tidak didukung." }
                     val entries = root.optJSONArray("sources") ?: error("Repositori tidak memiliki daftar sources.")
                     val parsed = mutableListOf<SourceRepositoryEntry>()
                     for (index in 0 until entries.length()) {
                         val item = entries.optJSONObject(index) ?: continue
-                        if (!item.optBoolean("authorized", false)) continue
+                        val authorizedValue = item.opt("authorized")
+                        val isAuthorized = authorizedValue == true || authorizedValue?.toString()?.equals("true", ignoreCase = true) == true
+                        if (!isAuthorized) continue
                         val sourceName = item.optString("name").trim()
                         val sourceUrl = item.optString("url").trim()
                         val sourceUri = Uri.parse(sourceUrl)
