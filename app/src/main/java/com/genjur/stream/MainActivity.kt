@@ -764,7 +764,6 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                                 DownloadManager.ERROR_INSUFFICIENT_SPACE -> "Ruang penyimpanan tidak cukup"
                                 DownloadManager.ERROR_TOO_MANY_REDIRECTS -> "Terlalu banyak pengalihan"
                                 DownloadManager.ERROR_UNHANDLED_HTTP_CODE -> "Kode HTTP tidak didukung"
-                                DownloadManager.ERROR_BLOCKED -> "Unduhan diblokir sistem"
                                 DownloadManager.ERROR_UNKNOWN -> "Kesalahan jaringan tidak diketahui"
                                 in 400..599 -> "Server menolak (HTTP $failureReason)"
                                 else -> if (failureReason != 0) "Kode gagal $failureReason" else "Penyebab tidak diberikan sistem"
