@@ -2614,6 +2614,15 @@ private fun InAppVideoPlayer(activity: MainActivity, movie: FeedMovie, onDownloa
                 .show(WindowInsetsCompat.Type.systemBars())
         }
     }
+    fun requestPlayerDownload() {
+        // Hentikan sementara pemutaran sebelum mesin unduhan mengambil stream yang sama.
+        // Ini mencegah dua proses media mengakses sumber secara bersamaan pada perangkat
+        // dengan memori terbatas; pemutaran dapat dilanjutkan dari kontrol player.
+        player.pause()
+        runCatching { onDownload() }.onFailure { error ->
+            android.util.Log.e("GENJUR_DOWNLOAD", "Tombol unduh di player gagal", error)
+        }
+    }
     fun setFullscreen(enabled: Boolean) {
         isFullscreen = enabled
         activity.requestedOrientation = if (enabled) {
@@ -2660,7 +2669,7 @@ private fun InAppVideoPlayer(activity: MainActivity, movie: FeedMovie, onDownloa
                         horizontalArrangement = Arrangement.spacedBy(4.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        IconButton(onClick = onDownload) {
+                        IconButton(onClick = { requestPlayerDownload() }) {
                             Icon(Icons.Filled.Download, contentDescription = "Unduh video", tint = Color.White)
                         }
                         IconButton(onClick = { setFullscreen(false) }) {
