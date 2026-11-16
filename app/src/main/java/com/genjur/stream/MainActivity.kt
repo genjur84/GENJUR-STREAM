@@ -455,17 +455,8 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
     var search by remember { mutableStateOf("") }
     var category by remember { mutableStateOf("Semua") }
     var selectedTab by remember { mutableStateOf("Beranda") }
-    var downloadMenuBlink by remember { mutableStateOf(false) }
-    var downloadMenuBlinkTrigger by remember { mutableIntStateOf(0) }
-    LaunchedEffect(downloadMenuBlinkTrigger) {
-        if (downloadMenuBlinkTrigger > 0) {
-            repeat(8) { index ->
-                downloadMenuBlink = index % 2 == 0
-                delay(300)
-            }
-            downloadMenuBlink = false
-        }
-    }
+    var downloadIconBlink by remember { mutableStateOf(false) }
+    var downloadBlinkTargetId by remember { mutableStateOf<Long?>(null) }
     var savedSourceMenu by remember { mutableStateOf(emptyList<SavedSourceLink>()) }
     var selectedSearchSourceUrl by remember { mutableStateOf<String?>(null) }
     var searchSourceDropdownExpanded by remember { mutableStateOf(false) }
@@ -782,6 +773,25 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
         persistMovies("history", watchHistory)
     }
     val scope = rememberCoroutineScope()
+
+    val downloadBlinkStatus = downloadBlinkTargetId?.let { downloadStates[it]?.second }
+    LaunchedEffect(downloadBlinkTargetId, downloadBlinkStatus) {
+        val targetId = downloadBlinkTargetId
+        if (targetId == null) {
+            downloadIconBlink = false
+            return@LaunchedEffect
+        }
+        if (downloadBlinkStatus == "Selesai" || downloadBlinkStatus?.startsWith("Gagal") == true ||
+            downloadBlinkStatus?.startsWith("Terhenti") == true || downloadBlinkStatus == "Tidak ditemukan") {
+            downloadIconBlink = false
+            downloadBlinkTargetId = null
+            return@LaunchedEffect
+        }
+        while (downloadBlinkTargetId == targetId) {
+            downloadIconBlink = !downloadIconBlink
+            delay(350)
+        }
+    }
 
     LaunchedEffect(downloads, selectedTab) {
         val previousSamples = mutableMapOf<Long, Pair<Long, Long>>()
@@ -1504,7 +1514,6 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                         val isSelected = selectedTab == tab
                         Column(
                             modifier = Modifier.width(if (tvLayout) 104.dp else 56.dp)
-                                .background(if (tab == "Unduhan" && downloadMenuBlink) Green.copy(alpha = 0.55f) else Color.Transparent, RoundedCornerShape(10.dp))
                                 .clickable {
                                 selectedTab = tab
                             }.padding(vertical = 8.dp),
@@ -1514,7 +1523,7 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                             Icon(
                                 imageVector = navIcon,
                                 contentDescription = tab,
-                                tint = if (isSelected) Green else Muted,
+                                tint = if (tab == "Unduhan" && downloadBlinkTargetId != null) { if (downloadIconBlink) Green else Muted } else if (isSelected) Green else Muted,
                                 modifier = Modifier.size(if (tvLayout) 27.dp else 25.dp)
                             )
                         }
@@ -1567,8 +1576,8 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                             },
                             onDownloadCandidate = { title, pageUrl, mediaUrl ->
                                 startWebVideoDownload(title, pageUrl, mediaUrl)
-                            },
-                            onDownloadButtonPressed = { downloadMenuBlinkTrigger++ }
+                                downloadBlinkTargetId = downloads.firstOrNull()?.id
+                            }
                         )
                     }
                 }
@@ -2180,8 +2189,7 @@ private fun SourceBrowser(
     active: Boolean = true,
     onPlaybackStarted: (String, String) -> Unit,
     onPlayCandidate: (String, String, String) -> Unit,
-    onDownloadCandidate: (String, String, String) -> Unit,
-    onDownloadButtonPressed: () -> Unit
+    onDownloadCandidate: (String, String, String) -> Unit
 ) {
     val context = LocalContext.current
     val hostActivity = context as? ComponentActivity
@@ -2678,7 +2686,6 @@ private fun SourceBrowser(
         if (sitePlaybackStarted && detectedVideoOptions.isNotEmpty()) {
             Button(
                 onClick = {
-                    onDownloadButtonPressed()
                     selectedDownloadOption = detectedVideoOptions.firstOrNull()
                     showDownloadChoices = true
                 },
