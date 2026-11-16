@@ -352,48 +352,86 @@ private fun savedFeedUrls(activity: MainActivity): List<String> = runCatching {
     }.distinct()
 }.getOrDefault(emptyList())
 
-private fun loadGenericHtmlCatalog(sourceUrl: String, html: String): List<FeedMovie> {
+private fun loadGenericHtmlCatalog(sourceUrl: String, html: String, sourceName: String = ""): List<FeedMovie> {
     val document = Jsoup.parse(html, sourceUrl)
-    val pageDescription = document.selectFirst("meta[name=description]")?.attr("content").orEmpty()
-    val categoryWords = listOf(
-        "Action", "Adventure", "Animasi", "Animation", "Anime", "Comedy", "Komedi",
-        "Crime", "Dokumenter", "Documentary", "Drama", "Family", "Fantasy", "Horor",
-        "Horror", "Mystery", "Romance", "Sci-Fi", "Thriller", "Serial", "Series"
-    )
-    val results = mutableListOf<FeedMovie>()
-    document.select("a[href]").forEach { link ->
+    val sourceHost = Uri.parse(sourceUrl).host.orEmpty().removePrefix("www.").lowercase()
+    val sourceLabel = sourceName.ifBlank { sourceHost }
+    val pageDescription = document.selectFirst("meta[name=description], meta[property=og:description], meta[name=twitter:description]")?.attr("content").orEmpty().trim()
+    val categoryWords = listOf("Action", "Adventure", "Animasi", "Animation", "Anime", "Comedy", "Komedi", "Crime", "Dokumenter", "Documentary", "Drama", "Family", "Fantasy", "Horor", "Horror", "Mystery", "Romance", "Sci-Fi", "Thriller", "Serial", "Series")
+    val siteKey = when {
+        sourceHost.contains("cimax21") || sourceLabel.contains("cmax", true) -> "cmax"
+        sourceHost.contains("klikxxi") || sourceLabel.contains("klikxxi", true) -> "klikxxi"
+        sourceHost.contains("lk21") || sourceLabel.contains("lk21", true) -> "lk21"
+        sourceHost.contains("geeknotdead") || sourceLabel.contains("duta", true) -> "duta"
+        else -> "generic"
+    }
+    val cardSelector = when (siteKey) {
+        "cmax" -> "article, .item, .movie-item, .film-item, .ml-item, .poster, .thumb, .grid-item, .movie"
+        "klikxxi" -> "article, .item, .movie-item, .film-item, .ml-item, .poster, .thumb, .grid-item, .movie, .series"
+        "lk21" -> "article, .item, .movie-item, .film-item, .ml-item, .poster, .thumb, .grid-item, .movie, .film"
+        "duta" -> "article, .item, .movie-item, .film-item, .ml-item, .poster, .thumb, .grid-item, .movie, .film"
+        else -> "article, .item, .movie-item, .film-item, .ml-item, .poster, .thumb, .grid-item"
+    }
+    val candidateLinks = LinkedHashMap<String, org.jsoup.nodes.Element>()
+    fun addLink(link: org.jsoup.nodes.Element) {
         val href = link.absUrl("href").trim()
+        if (href.isBlank()) return
         val uri = Uri.parse(href)
-        if (uri.scheme != "https" || uri.host.isNullOrBlank()) return@forEach
-        if (uri.host != Uri.parse(sourceUrl).host) return@forEach
+        val host = uri.host.orEmpty().removePrefix("www.").lowercase()
+        if (uri.scheme != "https" || host != sourceHost) return
         val path = uri.path.orEmpty().lowercase()
-        if (path.isBlank() || path == "/" || path in setOf("/login", "/register", "/contact", "/about", "/genre")) return@forEach
-        val image = link.selectFirst("img")
-        val looksLikeMoviePath = Regex("/(film|movie|watch|title|series|serial|episode|drama)(/|$|-|_)").containsMatchIn(path)
-        if (image == null && !looksLikeMoviePath) return@forEach
-        val title = link.text().trim().ifBlank { image?.attr("alt").orEmpty().trim() }
-            .replace(Regex("\\s+"), " ")
-        if (title.length !in 2..100) return@forEach
-        if (title.lowercase() in setOf("watch now", "play", "read more", "lihat semua", "more")) return@forEach
-        val contextText = link.parent()?.parent()?.text().orEmpty().take(500)
-        val category = categoryWords.firstOrNull { contextText.contains(it, true) } ?: "Sumber Web"
-        val poster = image?.absUrl("src")?.takeIf { it.startsWith("https://") }.orEmpty()
-        val description = link.attr("title").ifBlank { pageDescription }
-            .ifBlank { "Judul ditemukan otomatis dari halaman sumber. Buka situs sumber untuk detail dan pemutaran." }
+        if (path.isBlank() || path == "/" || path in setOf("/login", "/register", "/contact", "/about", "/genre", "/privacy-policy", "/dmca")) return
+        candidateLinks.putIfAbsent(href, link)
+    }
+    document.select(cardSelector).forEach { card ->
+        card.select("a[href]").forEach { link -> if (link.selectFirst("img") != null) addLink(link) }
+    }
+    document.select("a[href]").forEach { link -> if (link.selectFirst("img") != null) addLink(link) }
+
+    val results = mutableListOf<FeedMovie>()
+    candidateLinks.forEach { (href, link) ->
+        val card = link.closest("article, .item, .movie-item, .film-item, .ml-item, .poster, .thumb, .grid-item, .movie, .film")
+            ?: link.parent()?.parent() ?: link.parent() ?: link
+        val image = link.selectFirst("img") ?: card.selectFirst("img")
+        val imageTitle = image?.let { img ->
+            sequenceOf("alt", "title", "data-title", "aria-label")
+                .map { attr -> img.attr(attr).trim() }.firstOrNull { it.length in 2..120 }
+        }.orEmpty()
+        val heading = card.selectFirst("h1, h2, h3, h4, .title, .name, .film-title, .movie-title")?.text()?.trim().orEmpty()
+        val dataTitle = sequenceOf("data-title", "title", "aria-label")
+            .map { attr -> link.attr(attr).trim() }.firstOrNull { it.length in 2..120 }.orEmpty()
+        val title = sequenceOf(heading, imageTitle, dataTitle, link.text().trim())
+            .firstOrNull { it.length in 2..120 }?.replace(Regex("\\s+"), " ").orEmpty()
+        if (title.length !in 2..120) return@forEach
+        if (title.lowercase() in setOf("watch now", "watch movie", "tonton film", "play", "read more", "lihat semua", "more", "hd", "trailer")) return@forEach
+        val cardText = card.text().replace(Regex("\\s+"), " ").trim().take(900)
+        val year = Regex("\\b(?:19|20)\\d{2}\\b").find("$title $cardText")?.value.orEmpty()
+        val category = categoryWords.firstOrNull { cardText.contains(it, true) } ?: "Film"
+        val poster = image?.let { img ->
+            sequenceOf("data-src", "data-lazy-src", "data-original", "data-original-src", "src", "srcset")
+                .map { attr -> img.attr(attr).substringBefore(",").substringBefore(" ").trim() }
+                .mapNotNull { value ->
+                    when {
+                        value.startsWith("https://") -> value
+                        value.startsWith("http://") -> value.replaceFirst("http://", "https://")
+                        value.startsWith("//") -> "https:$value"
+                        value.isNotBlank() -> runCatching { Uri.parse(sourceUrl).resolve(value).toString() }.getOrNull()
+                        else -> null
+                    }
+                }.firstOrNull { it.startsWith("https://") }.orEmpty()
+        }.orEmpty()
+        val description = card.selectFirst(".description, .desc, .synopsis, .overview, [itemprop=description]")?.text()?.trim()?.take(700)
+            ?.ifBlank { null } ?: link.attr("title").ifBlank { pageDescription }
+                .ifBlank { "Informasi film diambil otomatis dari katalog $sourceLabel." }
         results.add(FeedMovie(
-            title = title,
-            description = description,
-            category = category,
-            videoUrl = href,
-            licenseId = "Metadata halaman sumber",
-            termsUrl = sourceUrl,
-            attribution = "Metadata ditemukan di $sourceUrl",
-            posterUrl = poster
+            title = title, description = description, category = category, videoUrl = href,
+            licenseId = "Metadata halaman sumber", termsUrl = sourceUrl,
+            attribution = "Metadata katalog $sourceLabel", posterUrl = poster,
+            releaseYear = year, genres = categoryWords.filter { cardText.contains(it, true) }.distinct().take(5)
         ))
     }
-    return results.distinctBy { it.videoUrl }.take(100)
+    return results.distinctBy { it.videoUrl }.take(120)
 }
-
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -2042,44 +2080,57 @@ private fun SourceCatalogScreen(
     onMoviesLoaded: (List<FeedMovie>) -> Unit, onLoadingChanged: (Boolean) -> Unit,
     onMessageChanged: (String?) -> Unit, onOpenMovie: (String) -> Unit, onOpenSource: () -> Unit
 ) {
-    LaunchedEffect(sourceUrl) {
+    var reloadToken by remember(sourceUrl) { mutableIntStateOf(0) }
+    LaunchedEffect(sourceUrl, sourceName, reloadToken) {
         if (sourceUrl.isBlank()) return@LaunchedEffect
         onLoadingChanged(true)
-        onMessageChanged("Mengambil daftar film dari $sourceName…")
+        onMessageChanged("Mengambil poster, judul, dan informasi dari " + sourceName + "…")
         val result = withContext(Dispatchers.IO) {
             runCatching {
                 val connection = (URL(sourceUrl).openConnection() as java.net.HttpURLConnection).apply {
-                    connectTimeout = 15000; readTimeout = 25000; instanceFollowRedirects = true
-                    setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 11) AppleWebKit/537.36 Chrome/120.0.0.0 Mobile Safari/537.36")
+                    connectTimeout = 18000
+                    readTimeout = 30000
+                    instanceFollowRedirects = true
+                    useCaches = false
+                    setRequestProperty("Cache-Control", "no-cache")
+                    setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 11) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36")
                     setRequestProperty("Accept", "text/html,application/xhtml+xml,application/json;q=0.9,*/*;q=0.8")
-                    setRequestProperty("Accept-Language", "id-ID,id;q=0.9,en-US;q=0.8")
+                    setRequestProperty("Accept-Language", "id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7")
                 }
                 try {
                     val status = connection.responseCode
-                    require(status in 200..299) { "Situs membalas HTTP $status." }
+                    require(status in 200..299) { "Situs membalas HTTP " + status + "." }
                     val html = connection.inputStream.bufferedReader().use { it.readText() }
-                    val parsed = loadGenericHtmlCatalog(connection.url.toString(), html)
-                    require(parsed.isNotEmpty()) { "Halaman terbuka, tetapi daftar film belum bisa dikenali. Situs mungkin memakai JavaScript atau perlindungan anti-bot." }
+                    val parsed = loadGenericHtmlCatalog(connection.url.toString(), html, sourceName)
+                    require(parsed.isNotEmpty()) {
+                        "Situs " + sourceName + " belum mengirim data katalog yang bisa dibaca otomatis. Coba Muat Ulang; jika tetap kosong, situs mungkin membatasi akses aplikasi."
+                    }
                     parsed
                 } finally { connection.disconnect() }
             }
         }
         onLoadingChanged(false)
-        result.onSuccess { found -> onMoviesLoaded(found); onMessageChanged("${found.size} judul ditemukan dari halaman $sourceName.") }
-            .onFailure { error -> onMoviesLoaded(emptyList()); onMessageChanged(error.message ?: "Katalog tidak dapat dimuat otomatis.") }
+        result.onSuccess { found ->
+            onMoviesLoaded(found)
+            onMessageChanged(found.size.toString() + " judul berhasil dibaca dari katalog " + sourceName + ".")
+        }.onFailure { error ->
+            onMoviesLoaded(emptyList())
+            onMessageChanged(error.message ?: "Katalog " + sourceName + " tidak dapat dimuat otomatis.")
+        }
     }
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             TextButton(onClick = { onMessageChanged(null); onMoviesLoaded(emptyList()) }) { Text("‹ Daftar Sumber", color = Green) }
             Spacer(Modifier.weight(1f))
+            TextButton(onClick = { onMoviesLoaded(emptyList()); reloadToken++ }) { Text("Muat Ulang", color = Green) }
             TextButton(onClick = onOpenSource) { Text("Buka situs", color = Green) }
         }
         Text(sourceName, color = Color.White, fontSize = 23.sp, fontWeight = FontWeight.ExtraBold)
-        Text(sourceUrl, color = Muted, fontSize = 10.sp, maxLines = 1)
+        Text("Katalog otomatis dari " + sourceName, color = Muted, fontSize = 11.sp)
         if (loading) LinearProgressIndicator(Modifier.fillMaxWidth(), color = Green)
-        message?.let { Text(it, color = if (it.startsWith("Gagal")) MaterialTheme.colorScheme.error else Muted, fontSize = 12.sp) }
+        message?.let { Text(it, color = if (it.startsWith("Gagal") || it.contains("belum mengirim")) MaterialTheme.colorScheme.error else Muted, fontSize = 12.sp) }
         if (movies.isEmpty() && !loading) {
-            Text("Jika katalog otomatis tidak tersedia, tekan Buka situs untuk melihat daftar film langsung dari sumber.", color = Muted, fontSize = 12.sp)
+            Text("Belum ada judul yang berhasil dibaca. Periksa koneksi atau coba muat ulang.", color = Muted, fontSize = 12.sp)
         } else movies.forEach { movie ->
             Card(Modifier.fillMaxWidth().clickable { onOpenMovie(movie.videoUrl) }, colors = CardDefaults.cardColors(containerColor = Panel), shape = RoundedCornerShape(12.dp)) {
                 Row(Modifier.fillMaxWidth().padding(9.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -2087,7 +2138,8 @@ private fun SourceCatalogScreen(
                     Spacer(Modifier.width(12.dp))
                     Column(Modifier.weight(1f)) {
                         Text(movie.title, color = Color.White, fontWeight = FontWeight.Bold, maxLines = 2)
-                        Text(movie.category, color = Green, fontSize = 11.sp)
+                        Text(listOfNotNull(movie.releaseYear.takeIf { it.isNotBlank() }, movie.category).joinToString(" • "), color = Green, fontSize = 11.sp)
+                        if (movie.description.isNotBlank()) Text(movie.description, color = Muted, fontSize = 11.sp, maxLines = 2)
                         Text("Buka halaman film  ›", color = Muted, fontSize = 11.sp)
                     }
                 }
@@ -2095,7 +2147,6 @@ private fun SourceCatalogScreen(
         }
     }
 }
-
 @Composable
 private fun SourceLinksScreen(activity: MainActivity, onOpenLink: (String) -> Unit) {
     val prefs = remember { activity.getSharedPreferences("genjur_stream_saved_links", 0) }
