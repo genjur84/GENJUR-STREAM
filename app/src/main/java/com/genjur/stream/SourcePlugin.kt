@@ -42,9 +42,36 @@ internal class CmaxSourcePlugin : SourcePlugin {
         }
 }
 
+
+internal class KlikXxiSourcePlugin : SourcePlugin {
+    override val id: String = "klikxxi"
+    override val displayName: String = "KlikXXI"
+
+    override fun supports(sourceUrl: String): Boolean {
+        val host = android.net.Uri.parse(sourceUrl).host.orEmpty().removePrefix("www.")
+        return host.equals("klikxxi.shop", ignoreCase = true) ||
+            host.endsWith(".klikxxi.shop", ignoreCase = true)
+    }
+
+    override suspend fun loadCatalog(sourceName: String, sourceUrl: String): List<FeedMovie> =
+        withContext(Dispatchers.IO) {
+            val connection = URL(sourceUrl).openConnection().apply {
+                connectTimeout = 15000
+                readTimeout = 20000
+                useCaches = false
+                setRequestProperty("Cache-Control", "no-cache")
+                setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 11) AppleWebKit/537.36 Chrome/131.0.0.0 Mobile Safari/537.36")
+                setRequestProperty("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
+                setRequestProperty("Accept-Language", "id-ID,id;q=0.9,en;q=0.8")
+            }
+            val html = connection.getInputStream().bufferedReader().use { it.readText() }
+            loadGenericHtmlCatalog(sourceUrl, html, sourceName)
+        }
+}
+
 /** Daftar plugin yang benar-benar tersedia di APK. */
 internal object SourcePluginRegistry {
-    private val installedPlugins: List<SourcePlugin> = listOf(CmaxSourcePlugin())
+    private val installedPlugins: List<SourcePlugin> = listOf(CmaxSourcePlugin(), KlikXxiSourcePlugin())
 
     fun resolve(sourceUrl: String): SourcePlugin? =
         installedPlugins.firstOrNull { it.supports(sourceUrl) }
