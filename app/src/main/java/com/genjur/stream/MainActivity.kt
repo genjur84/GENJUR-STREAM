@@ -2059,24 +2059,40 @@ private fun SourceBrowser(
     var isLoading by remember(initialUrl) { mutableStateOf(initialUrl.isNotBlank()) }
     var webView by remember { mutableStateOf<WebView?>(null) }
     val loadingFallback = remember { Runnable { isLoading = false } }
-    fun pauseSiteMedia() {
+    fun stopSitePlayback() {
         webView?.evaluateJavascript(
             """(function(){
                 try {
                     document.querySelectorAll('video,audio').forEach(function(media) {
-                        try { media.pause(); media.muted = true; media.volume = 0; } catch(e) {}
+                        try {
+                            media.pause();
+                            media.muted = true;
+                            media.volume = 0;
+                            media.removeAttribute('src');
+                            media.querySelectorAll('source').forEach(function(source) { source.removeAttribute('src'); });
+                            media.load();
+                        } catch(e) {}
                     });
                     document.querySelectorAll('iframe').forEach(function(frame) {
-                        try { frame.contentWindow.postMessage({type:'pause'}, '*'); } catch(e) {}
+                        try { frame.src = 'about:blank'; } catch(e) {}
                     });
                 } catch(e) {}
             })();""",
             null
         )
+        webView?.stopLoading()
+        runCatching { webView?.settings?.blockNetworkLoads = true }
         webView?.onPause()
+        webView?.pauseTimers()
     }
     LaunchedEffect(active) {
-        if (active) webView?.onResume() else webView?.onPause()
+        if (active) {
+            runCatching { webView?.settings?.blockNetworkLoads = false }
+            webView?.resumeTimers()
+            webView?.onResume()
+        } else {
+            stopSitePlayback()
+        }
     }
     BackHandler(enabled = active && webView?.canGoBack() == true) {
         webView?.goBack()
@@ -2117,7 +2133,7 @@ private fun SourceBrowser(
                     Column(horizontalAlignment = Alignment.End) {
                         Button(onClick = {
                             detectedVideoOptions.firstOrNull()?.let {
-                                pauseSiteMedia()
+                                stopSitePlayback()
                                 onPlayCandidate(detectedVideoTitle, detectedVideoPage, it.videoUrl)
                             }
                         }, colors = ButtonDefaults.buttonColors(containerColor = Green, contentColor = Color.White)) {
@@ -2245,7 +2261,7 @@ private fun SourceBrowser(
                             if (!autoPlayerOpened && uri.scheme in listOf("http", "https") && !uri.host.isNullOrBlank()) {
                                 autoPlayerOpened = true
                                 val safeTitle = title.ifBlank { "Video dari situs" }
-                                pauseSiteMedia()
+                                stopSitePlayback()
                                 onPlayCandidate(safeTitle, pageUrl, mediaUrl)
                             }
                         } },
@@ -2257,7 +2273,7 @@ private fun SourceBrowser(
                                 if (uri.scheme in listOf("http", "https") && !uri.host.isNullOrBlank()) {
                                     if (sitePlaybackStarted && !autoPlayerOpened) {
                                         autoPlayerOpened = true
-                                        pauseSiteMedia()
+                                        stopSitePlayback()
                                         onPlayCandidate(title.ifBlank { "Video dari situs" }, pageUrl, videoUrl)
                                     }
                                     if (!adaptiveStream) {
@@ -2292,7 +2308,7 @@ private fun SourceBrowser(
                                     if ((sitePlaybackStarted || recentUserPlay) && !autoPlayerOpened) {
                                         sitePlaybackStarted = true
                                         autoPlayerOpened = true
-                                        pauseSiteMedia()
+                                        stopSitePlayback()
                                         onPlayCandidate(
                                             view.title?.takeIf { it.isNotBlank() } ?: "Video dari situs",
                                             view.url ?: currentUrl,
