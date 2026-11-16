@@ -2197,7 +2197,7 @@ private fun SourceLinksScreen(activity: MainActivity, onOpenLink: (String) -> Un
             ) { Text("Tambahkan pilihan ke Daftar Sumber") }
         }
         Divider(color = Muted.copy(alpha = 0.25f))
-        Text("Cari alamat situs di internet. Hasil disaring dengan pemeriksaan dasar sebelum dipilih.", Hasil disaring dengan pemeriksaan dasar sebelum dipilih.",
+        Text("Cari alamat situs di internet. Hasil disaring dengan pemeriksaan dasar sebelum dipilih.",
             color = Color(0xFFCBD2E0), fontSize = 12.sp)
         OutlinedTextField(
             value = sourceSearch, onValueChange = { sourceSearch = it },
