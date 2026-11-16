@@ -614,6 +614,10 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
         val args = mutableListOf(
             "-y", "-hide_banner", "-loglevel", "warning",
             "-headers", headers,
+            // Izinkan protokol HTTPS dan protokol turunan yang dipakai playlist HLS
+            // untuk mengambil playlist, key, dan segmen video.
+            "-protocol_whitelist", "file,http,https,tcp,tls,crypto,data",
+            "-allowed_extensions", "ALL",
             "-i", mediaUrl,
             "-map", "0:v:0",
             "-map", "0:a:0?",
