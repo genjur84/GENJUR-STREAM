@@ -544,6 +544,7 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
         }
     }
     fun startAdaptiveDownload(title: String, pageUrl: String, mediaUrl: String, retryId: Long? = null) {
+        downloadMessage = null
         val uri = Uri.parse(mediaUrl)
         if (uri.scheme !in listOf("http", "https") || uri.host.isNullOrBlank()) {
             downloadMessage = "Alamat streaming tidak valid."
@@ -618,6 +619,9 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
             // untuk mengambil playlist, key, dan segmen video.
             "-protocol_whitelist", "file,http,https,tcp,tls,crypto,data",
             "-allowed_extensions", "ALL",
+            // Beberapa CDN memberi segmen HLS dengan ekstensi non-standar .pict.
+            // Izinkan ekstensi itu secara eksplisit tanpa mematikan pemeriksaan ekstensi lain.
+            "-allowed_segment_extensions", "3gp,aac,avi,ac3,eac3,flac,mkv,m3u8,m4a,m4s,m4v,mpg,mov,mp2,mp3,mp4,mpeg,mpegts,ogg,ogv,oga,ts,vob,vtt,wav,webvtt,cmfv,cmfa,ec3,fmp4,pict",
             "-i", mediaUrl,
             "-map", "0:v:0",
             "-map", "0:a:0?",
@@ -1553,7 +1557,7 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                     downloads = emptyList()
                     downloadStates = emptyMap()
                     persistDownloads(emptyList())
-                    downloadMessage = "Riwayat unduhan sudah dikosongkan. Silakan coba download lagi untuk menguji pesan terbaru."
+                    downloadMessage = null
                     confirmClearDownloads = false
                 }) { Text("Hapus semua", color = MaterialTheme.colorScheme.error) }
             },
