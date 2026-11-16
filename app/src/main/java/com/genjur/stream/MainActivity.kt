@@ -2246,6 +2246,29 @@ private fun SourceBrowser(
                             address = url
                             view.evaluateJavascript(
                                 """(function(){
+                                    // Coba lewati hanya tombol iklan yang jelas; jangan klik tombol play/download situs.
+                                    if (!window.__genjurAdSkipTimer) {
+                                        function trySkipAd() {
+                                            try {
+                                                var candidates = document.querySelectorAll(
+                                                    'button, a, [role="button"], input[type="button"], input[type="submit"]'
+                                                );
+                                                candidates.forEach(function(el) {
+                                                    if (!el || el.disabled || el.getAttribute('aria-hidden') === 'true') return;
+                                                    var label = [
+                                                        el.innerText, el.textContent, el.getAttribute('aria-label'),
+                                                        el.getAttribute('title'), el.value
+                                                    ].filter(Boolean).join(' ').replace(/\\s+/g, ' ').trim().toLowerCase();
+                                                    if (!label || label.length > 45) return;
+                                                    if (/^(skip ad|skip ads|lewati iklan|lewati iklannya|close ad|tutup iklan|skip advertisement)$/.test(label)) {
+                                                        el.click();
+                                                    }
+                                                });
+                                            } catch(e) {}
+                                        }
+                                        trySkipAd();
+                                        window.__genjurAdSkipTimer = window.setInterval(trySkipAd, 800);
+                                    }
                                     if (window.__genjurPlaybackHooked) return;
                                     window.__genjurPlaybackHooked = true;
                                     function reportMedia(title, url, quality) {
