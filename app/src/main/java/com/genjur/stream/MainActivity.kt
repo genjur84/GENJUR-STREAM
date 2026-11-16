@@ -470,9 +470,10 @@ private suspend fun loadSourceMovieDetails(movie: FeedMovie): FeedMovie = withCo
             val value = if (element.hasAttr("src")) element.attr("src") else element.attr("href")
             add(value)
         }
-        val mediaPattern = Regex("""(?i)(?:https?:)?(?:\\?/\\?/)[^"'\\s<>]+?\\.(?:m3u8|mp4)(?:\\?[^"'\\s<>]*)?|(?:/|\\./)[^"'\\s<>]+?\\.(?:m3u8|mp4)(?:\\?[^"'\\s<>]*)?""")
+        val mediaPattern = Regex("""(?i)(?:https?://[^"'\s<>]+?\.(?:m3u8|mp4)(?:\?[^"'\s<>]*)?|(?:/|\./)[^"'\s<>]+?\.(?:m3u8|mp4)(?:\?[^"'\s<>]*)?)""")
         doc.select("script").forEach { script ->
-            mediaPattern.findAll(script.data() + " " + script.html()).forEach { add(it.value) }
+            val scriptText = (script.data() + " " + script.html()).replace("\\/", "/").replace("\u0026", "&")
+            mediaPattern.findAll(scriptText).forEach { add(it.value) }
         }
         return found.toList()
     }
