@@ -137,7 +137,7 @@ private class PlaybackStartedBridge(
     }
 }
 
-private data class StreamOption(val quality: String, val videoUrl: String, val sizeBytes: Long = 0L)
+internal data class StreamOption(val quality: String, val videoUrl: String, val sizeBytes: Long = 0L)
 
 private fun detectedQualityLabel(label: String, videoUrl: String): String {
     val source = "$label $videoUrl"
@@ -2070,7 +2070,7 @@ private fun refreshSavedSourceDomains(activity: MainActivity): Int {
     return changed
 }
 
-private data class SourceRepositoryEntry(val id: String, val name: String, val url: String, val category: String = "", val description: String = "")
+private data class SourceRepositoryEntry(val id: String, val name: String, val url: String, val category: String = "", val description: String = "", val pluginId: String = "")
 
 private data class SavedSourceLink(val name: String, val url: String)
 
@@ -2225,7 +2225,7 @@ private fun SourceLinksScreen(activity: MainActivity, onOpenLink: (String) -> Un
                         if (sourceName.isBlank() || sourceUri.scheme != "https" || sourceUri.host.isNullOrBlank()) continue
                         val sourceId = item.optString("id").trim().ifBlank { sourceUri.host.orEmpty() }
                         parsed.add(SourceRepositoryEntry(sourceId, sourceName, sourceUrl,
-                            item.optString("category").trim(), item.optString("description").trim()))
+                            item.optString("category").trim(), item.optString("description").trim(), item.optString("pluginId").trim()))
                     }
                     parsed.distinctBy { it.id.lowercase() }
                 }
