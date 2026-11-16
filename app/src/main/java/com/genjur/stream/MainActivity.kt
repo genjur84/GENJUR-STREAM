@@ -2260,7 +2260,12 @@ private fun SourceBrowser(
                     // Tangkap unduhan dari situs di dalam aplikasi, bukan melemparkannya
                     // ke browser atau aplikasi unduhan eksternal.
                     setDownloadListener(DownloadListener { url, _, _, _, _ ->
-                        if (url.isNotBlank()) {
+                        val downloadUri = Uri.parse(url)
+                        val downloadPath = url.lowercase()
+                        val isVideoFile = Regex("""(?i)\\.(m3u8|mpd|mp4|m4v|webm|mov|mkv)(?:$|[?#&])""").containsMatchIn(downloadPath)
+                        val looksLikeAd = isGenjurAdHost(downloadUri.host) ||
+                            Regex("""(?i)(/ads?/|advert|doubleclick|popunder|banner|tracking|analytics)""").containsMatchIn(downloadPath)
+                        if (sitePlaybackStarted && url.isNotBlank() && isVideoFile && !looksLikeAd) {
                             onDownloadCandidate(
                                 this.title?.takeIf { it.isNotBlank() } ?: "Video dari situs",
                                 this.url?.takeIf { it.startsWith("http") } ?: currentUrl,
@@ -2289,8 +2294,11 @@ private fun SourceBrowser(
                                 val uri = Uri.parse(videoUrl)
                                 val path = uri.path.orEmpty().lowercase()
                                 val adaptiveStream = uri.path.orEmpty().lowercase().let { it.endsWith(".m3u8") || it.endsWith(".mpd") }
-                                if (uri.scheme in listOf("http", "https") && !uri.host.isNullOrBlank()) {
-                                    if (sitePlaybackStarted && !autoPlayerOpened) {
+                                if (uri.scheme in listOf("http", "https") && !uri.host.isNullOrBlank() &&
+                                    !isGenjurAdHost(uri.host) &&
+                                    !Regex("""(?i)(/ads?/|advert|doubleclick|popunder|banner|tracking|analytics)""").containsMatchIn(videoUrl)) {
+                                    if (!sitePlaybackStarted) return@post
+                                    if (!autoPlayerOpened) {
                                         autoPlayerOpened = true
                                         onPlayCandidate(title.ifBlank { "Video dari situs" }, pageUrl, videoUrl)
                                     }
@@ -2314,7 +2322,9 @@ private fun SourceBrowser(
                             val mediaUrlLower = requestedUri.toString().lowercase()
                             val mediaMatch = Regex("""\.(m3u8|mpd|mp4|m4v|webm|mov|mkv)(?:$|[?#&])""").containsMatchIn(mediaUrlLower)
                             if (requestedUri.scheme in listOf("http", "https") &&
-                                !requestedUri.host.isNullOrBlank() && mediaMatch) {
+                                !requestedUri.host.isNullOrBlank() && mediaMatch &&
+                                !isGenjurAdHost(requestedUri.host) &&
+                                !Regex("""(?i)(/ads?/|advert|doubleclick|popunder|banner|tracking|analytics)""").containsMatchIn(mediaUrlLower)) {
                                 val label = detectedQualityLabel("", mediaUrlLower)
                                 view.post {
                                     val mediaUrl = requestedUri.toString()
@@ -2332,7 +2342,7 @@ private fun SourceBrowser(
                                             mediaUrl
                                         )
                                     }
-                                    if (detectedVideoOptions.none { it.videoUrl == mediaUrl }) {
+                                    if (sitePlaybackStarted && detectedVideoOptions.none { it.videoUrl == mediaUrl }) {
                                         detectedVideoTitle = view.title?.takeIf { it.isNotBlank() } ?: "Video dari situs"
                                         detectedVideoPage = view.url ?: currentUrl
                                         detectedVideoOptions = (detectedVideoOptions.filterNot {
