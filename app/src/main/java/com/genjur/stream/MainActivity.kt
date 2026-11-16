@@ -456,6 +456,7 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
     var feedMessage by remember { mutableStateOf("Tambahkan sumber feed JSON, lalu muat katalog.") }
     var selectedMovie by remember { mutableStateOf<FeedMovie?>(null) }
     var playingMovie by remember { mutableStateOf<FeedMovie?>(null) }
+    var pendingPlaybackChoice by remember { mutableStateOf<FeedMovie?>(null) }
     BackHandler(enabled = selectedMovie != null || playingMovie != null || selectedTab != "Beranda") {
         when {
             playingMovie != null -> playingMovie = null
@@ -1439,7 +1440,7 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                             },
                             onPlayCandidate = { title, pageUrl, mediaUrl ->
                                 val safeTitle = title.ifBlank { "Video dari situs" }
-                                playingMovie = FeedMovie(
+                                pendingPlaybackChoice = FeedMovie(
                                     title = safeTitle,
                                     description = "Video terdeteksi dari pemutar situs.",
                                     category = "Sumber Web",
@@ -1525,6 +1526,32 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
             dismissButton = {
                 TextButton(onClick = { confirmClearDownloads = false }) { Text("Batal") }
             }
+        )
+    }
+
+    pendingPlaybackChoice?.let { candidate ->
+        AlertDialog(
+            onDismissRequest = { pendingPlaybackChoice = null },
+            title = { Text("Pilih cara memutar", color = Color.White) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(candidate.title, color = Color.White, fontWeight = FontWeight.Bold)
+                    Text("Bagaimana Anda ingin menonton film ini?", color = Muted)
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    pendingPlaybackChoice = null
+                    recordWatch(candidate)
+                    playingMovie = candidate
+                }) { Text("Player GENJUR STREAM", color = Green) }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingPlaybackChoice = null }) { Text("Player Situs", color = Color.White) }
+            },
+            containerColor = Panel,
+            titleContentColor = Color.White,
+            textContentColor = Color.White
         )
     }
 
@@ -2136,7 +2163,6 @@ private fun SourceBrowser(
                     Column(horizontalAlignment = Alignment.End) {
                         Button(onClick = {
                             detectedVideoOptions.firstOrNull()?.let {
-                                stopSitePlayback()
                                 onPlayCandidate(detectedVideoTitle, detectedVideoPage, it.videoUrl)
                             }
                         }, colors = ButtonDefaults.buttonColors(containerColor = Green, contentColor = Color.White)) {
@@ -2264,7 +2290,6 @@ private fun SourceBrowser(
                             if (!autoPlayerOpened && uri.scheme in listOf("http", "https") && !uri.host.isNullOrBlank()) {
                                 autoPlayerOpened = true
                                 val safeTitle = title.ifBlank { "Video dari situs" }
-                                stopSitePlayback()
                                 onPlayCandidate(safeTitle, pageUrl, mediaUrl)
                             }
                         } },
@@ -2276,7 +2301,6 @@ private fun SourceBrowser(
                                 if (uri.scheme in listOf("http", "https") && !uri.host.isNullOrBlank()) {
                                     if (sitePlaybackStarted && !autoPlayerOpened) {
                                         autoPlayerOpened = true
-                                        stopSitePlayback()
                                         onPlayCandidate(title.ifBlank { "Video dari situs" }, pageUrl, videoUrl)
                                     }
                                     if (!adaptiveStream) {
@@ -2311,7 +2335,6 @@ private fun SourceBrowser(
                                     if ((sitePlaybackStarted || recentUserPlay) && !autoPlayerOpened) {
                                         sitePlaybackStarted = true
                                         autoPlayerOpened = true
-                                        stopSitePlayback()
                                         onPlayCandidate(
                                             view.title?.takeIf { it.isNotBlank() } ?: "Video dari situs",
                                             view.url ?: currentUrl,
