@@ -291,6 +291,36 @@ private fun loadWikimediaPublicDomainMovies(): List<FeedMovie> {
     return movies.distinctBy { it.videoUrl }.sortedBy { it.title.lowercase() }
 }
 
+private fun publishMp4ToPublicMovies(activity: MainActivity, source: File, title: String): Uri {
+    require(source.exists() && source.length() > 0L) { "File MP4 sementara kosong." }
+    val fileName = downloadFileName(title, "", "mp4")
+    val resolver = activity.contentResolver
+    val values = android.content.ContentValues().apply {
+        put(android.provider.MediaStore.MediaColumns.DISPLAY_NAME, fileName)
+        put(android.provider.MediaStore.MediaColumns.MIME_TYPE, "video/mp4")
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            put(android.provider.MediaStore.MediaColumns.RELATIVE_PATH, "${D}Environment.DIRECTORY_MOVIES}/GENJUR STREAM")
+            put(android.provider.MediaStore.MediaColumns.IS_PENDING, 1)
+        } else {
+            val dir = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MOVIES), "GENJUR STREAM")
+            if (!dir.exists()) dir.mkdirs()
+            put(android.provider.MediaStore.Video.Media.DATA, File(dir, fileName).absolutePath)
+        }
+    }
+    val uri = resolver.insert(android.provider.MediaStore.Video.Media.EXTERNAL_CONTENT_URI, values) ?: error("Gagal membuat file di Movies/GENJUR STREAM.")
+    try {
+        resolver.openOutputStream(uri, "w")?.use { output -> source.inputStream().use { it.copyTo(output) } } ?: error("Tidak dapat membuka file tujuan.")
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val ready = android.content.ContentValues().apply { put(android.provider.MediaStore.MediaColumns.IS_PENDING, 0) }
+            resolver.update(uri, ready, null, null)
+        }
+        source.delete()
+        return uri
+    } catch (error: Throwable) { runCatching { resolver.delete(uri, null, null) }; throw error }
+}
+private fun deleteDownloadedUri(activity: MainActivity, value: String) {
+    runCatching { val uri = Uri.parse(value); if (uri.scheme == "content") activity.contentResolver.delete(uri, null, null) else uri.path?.let { File(it).delete() } }
+}
 private data class DownloadEntry(val id: Long, val movie: FeedMovie)
 
 private fun readDownloads(activity: MainActivity): List<DownloadEntry> = runCatching {
@@ -641,8 +671,21 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                     activity.runOnUiThread {
                         adaptiveSessions.remove(id)
                         if (ReturnCode.isSuccess(session.returnCode) && outputFile.exists() && outputFile.length() > 0L) {
-                            downloadStates = downloadStates + (id to (100 to "Selesai"))
-                            downloadMessage = "MP4 selesai dibuat: ${formatVideoSize(outputFile.length())}."
+                            val completedSize = outputFile.length()
+                            Thread {
+                                runCatching { publishMp4ToPublicMovies(activity, outputFile, safeTitle) }
+                                    .onSuccess { publicUri -> activity.runOnUiThread {
+                                        downloads = downloads.map { entry -> if (entry.id == id) entry.copy(movie = entry.movie.copy(videoUrl = publicUri.toString())) else entry }
+                                        persistDownloads(downloads)
+                                        downloadStates = downloadStates + (id to (100 to "Selesai"))
+                                        downloadMessage = "MP4 tersimpan di Movies/GENJUR STREAM (" + formatVideoSize(completedSize) + ")."
+                                    } }
+                                    .onFailure { error -> activity.runOnUiThread {
+                                        downloadStates = downloadStates + (id to (0 to "Gagal"))
+                                        downloadMessage = "MP4 selesai tetapi gagal disimpan ke folder publik: " + (error.message ?: error.javaClass.simpleName)
+                                        android.util.Log.e("GENJUR_DOWNLOAD", "Gagal menyalin MP4 ke MediaStore", error)
+                                    } }
+                            }.start()
                         } else {
                             outputFile.delete()
                             val fullLog = buildString {
@@ -746,6 +789,7 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                     states[entry.id] = when {
                         adaptiveSessions.containsKey(entry.id) -> downloadStates[entry.id] ?: (0 to "Mengunduh")
                         downloadStates[entry.id]?.second == "Gagal" -> downloadStates[entry.id]!!
+                        downloadStates[entry.id]?.second == "Selesai" -> downloadStates[entry.id]!!
                         file.exists() && currentBytes > 0L -> 100 to "Selesai"
                         else -> 0 to "Terhenti — mulai ulang unduhan"
                     }
@@ -1255,8 +1299,12 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                                         val state = downloadStates[entry.id] ?: (0 to "Menyiapkan")
                                         var completedUri: Uri? = null
                                         if (entry.id < 0L) {
-                                            val localFile = File(Uri.parse(entry.movie.videoUrl).path.orEmpty())
-                                            if (localFile.exists() && localFile.length() > 0L) completedUri = Uri.fromFile(localFile)
+                                            val savedUri = Uri.parse(entry.movie.videoUrl)
+                                            if (savedUri.scheme == "content") completedUri = savedUri
+                                            else {
+                                                val localFile = File(savedUri.path.orEmpty())
+                                                if (localFile.exists() && localFile.length() > 0L) completedUri = Uri.fromFile(localFile)
+                                            }
                                         } else {
                                             val query = DownloadManager.Query().setFilterById(entry.id)
                                             downloadManager.query(query)?.use { cursor ->
@@ -1334,7 +1382,7 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                                                     TextButton(onClick = {
                                                         if (entry.id < 0L) {
                                                             adaptiveSessions[entry.id]?.let { FFmpegKit.cancel(it) }
-                                                            File(Uri.parse(entry.movie.videoUrl).path.orEmpty()).delete()
+                                                            deleteDownloadedUri(activity, entry.movie.videoUrl)
                                                         } else {
                                                             downloadManager.remove(entry.id)
                                                         }
