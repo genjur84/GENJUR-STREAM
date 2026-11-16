@@ -77,7 +77,7 @@ dependencies {
 
     implementation("androidx.media3:media3-exoplayer:1.5.1")
     implementation("androidx.media3:media3-exoplayer-hls:1.5.1")
-    implementation("dev.ffmpegkit-maintained:ffmpeg-kit-full:8.1.7")
+    implementation("dev.ffmpegkit-maintained:ffmpeg-kit-full:8.1.9")
     implementation("androidx.media3:media3-ui:1.5.1")
 
     debugImplementation("androidx.compose.ui:ui-tooling")
