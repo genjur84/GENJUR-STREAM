@@ -2457,7 +2457,6 @@ private fun SourceBrowser(
                                         autoPlayerOpened = true
                                         onPlayCandidate(title.ifBlank { "Video dari situs" }, pageUrl, videoUrl)
                                     }
-                                    if (!adaptiveStream) {
                                     detectedVideoTitle = title
                                     detectedVideoPage = pageUrl
                                     val label = detectedQualityLabel(quality, videoUrl)
@@ -2465,7 +2464,6 @@ private fun SourceBrowser(
                                     detectedVideoOptions = (detectedVideoOptions.filterNot {
                                         it.quality == label || it.videoUrl == videoUrl
                                     } + item)
-                                    }
                                 }
                             }
                         }
@@ -2673,6 +2671,22 @@ private fun SourceBrowser(
             },
             modifier = Modifier.fillMaxSize()
         )
+        // Floating download action over the source-site video player.
+        if (sitePlaybackStarted && detectedVideoOptions.isNotEmpty()) {
+            Button(
+                onClick = {
+                    selectedDownloadOption = detectedVideoOptions.firstOrNull()
+                    showDownloadChoices = true
+                },
+                modifier = Modifier.align(Alignment.BottomEnd).padding(12.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Green, contentColor = Color.White),
+                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 9.dp)
+            ) {
+                Icon(Icons.Filled.Download, contentDescription = "Unduh video situs")
+                Spacer(Modifier.width(6.dp))
+                Text("Unduh")
+            }
+        }
         if (isLoading) {
             Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 CircularProgressIndicator(color = Green)
