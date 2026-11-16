@@ -619,8 +619,10 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
             // untuk mengambil playlist, key, dan segmen video.
             "-protocol_whitelist", "file,http,https,tcp,tls,crypto,data",
             "-allowed_extensions", "ALL",
-            // Beberapa CDN memberi segmen HLS dengan ekstensi non-standar .pict.
-            // Izinkan ekstensi itu secara eksplisit tanpa mematikan pemeriksaan ekstensi lain.
+            // FFmpeg baru memeriksa kecocokan ekstensi URL dengan format segmen HLS.
+            // CDN ini mengirim MPEG-TS memakai akhiran .pict; nonaktifkan pemeriksaan
+            // kecocokan ketat untuk stream yang dipilih pengguna agar segmen tetap terbaca.
+            "-extension_picky", "0",
             "-allowed_segment_extensions", "3gp,aac,avi,ac3,eac3,flac,mkv,m3u8,m4a,m4s,m4v,mpg,mov,mp2,mp3,mp4,mpeg,mpegts,ogg,ogv,oga,ts,vob,vtt,wav,webvtt,cmfv,cmfa,ec3,fmp4,pict",
             "-i", mediaUrl,
             "-map", "0:v:0",
