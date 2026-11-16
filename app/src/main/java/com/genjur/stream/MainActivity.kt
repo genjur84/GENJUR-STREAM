@@ -2021,6 +2021,23 @@ private fun SourceLinksScreen(activity: MainActivity, onOpenLink: (String) -> Un
     var searchResults by remember { mutableStateOf<List<SourceSearchResult>>(emptyList()) }
     var searching by remember { mutableStateOf(false) }
     var searchError by remember { mutableStateOf<String?>(null) }
+    var domainRefreshMessage by remember { mutableStateOf("Memeriksa pembaruan alamat sumber…") }
+
+    LaunchedEffect(Unit) {
+        val result = withContext(Dispatchers.IO) {
+            runCatching { refreshSavedSourceDomains(activity) }
+        }
+        result.onSuccess { changed ->
+            links = readLinks()
+            domainRefreshMessage = if (changed > 0) {
+                "$changed alamat sumber berhasil diperbarui otomatis."
+            } else {
+                "Pemeriksaan domain otomatis selesai."
+            }
+        }.onFailure {
+            domainRefreshMessage = "Pembaruan domain belum tersedia. Daftar sumber yang tersimpan tetap aman."
+        }
+    }
 
     LaunchedEffect(sourceSearch) {
         val term = sourceSearch.trim()
@@ -2150,6 +2167,7 @@ private fun SourceLinksScreen(activity: MainActivity, onOpenLink: (String) -> Un
                 }
             }
         }
+        Text(domainRefreshMessage, color = Muted, fontSize = 10.sp)
         Text("Daftar sumber (${links.size})", color = Color.White, fontWeight = FontWeight.Bold)
         if (links.isEmpty()) {
             Text("Belum ada link tersimpan.", color = Color(0xFFCBD2E0), fontSize = 12.sp)
