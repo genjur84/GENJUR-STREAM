@@ -1952,6 +1952,7 @@ private fun searchWebSources(query: String): List<SourceSearchResult> {
     )
 }
 private const val SOURCE_DOMAIN_REGISTRY_URL = "https://raw.githubusercontent.com/genjur84/GENJUR-STREAM/main/source-domains.json"
+private const val SOURCE_REPOSITORY_URL = "https://raw.githubusercontent.com/genjur84/GENJUR-STREAM/main/source-repository.json"
 
 private fun normalizeSourceIdentity(value: String): String =
     value.lowercase(java.util.Locale.ROOT).filter { it.isLetterOrDigit() }
@@ -1995,6 +1996,8 @@ private fun refreshSavedSourceDomains(activity: MainActivity): Int {
     return changed
 }
 
+private data class SourceRepositoryEntry(val id: String, val name: String, val url: String, val category: String = "", val description: String = "")
+
 private data class SavedSourceLink(val name: String, val url: String)
 
 @Composable
@@ -2022,6 +2025,63 @@ private fun SourceLinksScreen(activity: MainActivity, onOpenLink: (String) -> Un
     var searching by remember { mutableStateOf(false) }
     var searchError by remember { mutableStateOf<String?>(null) }
     var domainRefreshMessage by remember { mutableStateOf("Memeriksa pembaruan alamat sumber…") }
+    val repositoryScope = rememberCoroutineScope()
+    var repositoryUrl by remember { mutableStateOf(prefs.getString("source_repository_url", SOURCE_REPOSITORY_URL) ?: SOURCE_REPOSITORY_URL) }
+    var repositoryEntries by remember { mutableStateOf<List<SourceRepositoryEntry>>(emptyList()) }
+    var selectedRepositoryIds by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var repositoryLoading by remember { mutableStateOf(false) }
+    var repositoryMessage by remember { mutableStateOf<String?>(null) }
+
+    fun loadSourceRepository() {
+        val requestedUrl = repositoryUrl.trim()
+        val requestedUri = Uri.parse(requestedUrl)
+        if (requestedUri.scheme != "https" || requestedUri.host.isNullOrBlank()) {
+            repositoryMessage = "Link repositori harus menggunakan HTTPS."
+            return
+        }
+        repositoryScope.launch {
+            repositoryLoading = true
+            repositoryMessage = "Mengambil katalog repositori…"
+            val result = withContext(Dispatchers.IO) {
+                runCatching {
+                    val connection = URL(requestedUrl).openConnection().apply {
+                        connectTimeout = 12000
+                        readTimeout = 20000
+                        useCaches = false
+                        setRequestProperty("Cache-Control", "no-cache")
+                        setRequestProperty("User-Agent", "GENJUR-STREAM")
+                    }
+                    val root = JSONObject(connection.getInputStream().bufferedReader().use { it.readText() })
+                    require(root.optInt("schemaVersion", 0) == 1) { "Versi format repositori tidak didukung." }
+                    val entries = root.optJSONArray("sources") ?: error("Repositori tidak memiliki daftar sources.")
+                    val parsed = mutableListOf<SourceRepositoryEntry>()
+                    for (index in 0 until entries.length()) {
+                        val item = entries.optJSONObject(index) ?: continue
+                        if (!item.optBoolean("authorized", false)) continue
+                        val sourceName = item.optString("name").trim()
+                        val sourceUrl = item.optString("url").trim()
+                        val sourceUri = Uri.parse(sourceUrl)
+                        if (sourceName.isBlank() || sourceUri.scheme != "https" || sourceUri.host.isNullOrBlank()) continue
+                        val sourceId = item.optString("id").trim().ifBlank { sourceUri.host.orEmpty() }
+                        parsed.add(SourceRepositoryEntry(sourceId, sourceName, sourceUrl,
+                            item.optString("category").trim(), item.optString("description").trim()))
+                    }
+                    parsed.distinctBy { it.id.lowercase() }
+                }
+            }
+            repositoryLoading = false
+            result.onSuccess { entries ->
+                repositoryEntries = entries
+                selectedRepositoryIds = emptySet()
+                prefs.edit().putString("source_repository_url", requestedUrl).apply()
+                repositoryMessage = if (entries.isEmpty()) {
+                    "Repositori berhasil dibaca, tetapi belum berisi sumber yang disetujui."
+                } else "${entries.size} sumber tersedia. Pilih yang ingin ditambahkan."
+            }.onFailure { error ->
+                repositoryMessage = "Gagal membaca repositori: ${error.message ?: error.javaClass.simpleName}"
+            }
+        }
+    }
 
     LaunchedEffect(Unit) {
         val result = withContext(Dispatchers.IO) {
@@ -2073,7 +2133,71 @@ private fun SourceLinksScreen(activity: MainActivity, onOpenLink: (String) -> Un
     )
 
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Text("Cari alamat situs di internet. Hasil disaring dengan pemeriksaan dasar sebelum dipilih.",
+        Text("REPOSITORI SUMBER", color = Color.White, fontWeight = FontWeight.Bold)
+        Text("Masukkan satu link katalog untuk melihat kumpulan sumber. Pilih sumber yang diizinkan untuk ditambahkan ke daftar APK.",
+            color = Color(0xFFCBD2E0), fontSize = 12.sp)
+        OutlinedTextField(
+            value = repositoryUrl, onValueChange = { repositoryUrl = it },
+            modifier = Modifier.fillMaxWidth(), singleLine = true,
+            label = { Text("Link repositori sumber (HTTPS)") },
+            colors = readableFieldColors
+        )
+        Button(onClick = { loadSourceRepository() }, enabled = !repositoryLoading,
+            colors = ButtonDefaults.buttonColors(containerColor = Green)) {
+            Text(if (repositoryLoading) "Memuat repositori…" else "Muat repositori")
+        }
+        repositoryMessage?.let {
+            Text(it, color = if (it.startsWith("Gagal") || it.startsWith("Link")) MaterialTheme.colorScheme.error else Muted, fontSize = 11.sp)
+        }
+        if (repositoryEntries.isNotEmpty()) {
+            Text("Pilih sumber (${selectedRepositoryIds.size}/${repositoryEntries.size})",
+                color = Color.White, fontWeight = FontWeight.Bold)
+            repositoryEntries.forEach { entry ->
+                val alreadySaved = links.any { it.url.equals(entry.url, true) }
+                Row(
+                    modifier = Modifier.fillMaxWidth().clickable(enabled = !alreadySaved) {
+                        selectedRepositoryIds = if (entry.id in selectedRepositoryIds) selectedRepositoryIds - entry.id
+                            else selectedRepositoryIds + entry.id
+                    }.padding(vertical = 5.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Checkbox(
+                        checked = entry.id in selectedRepositoryIds || alreadySaved,
+                        enabled = !alreadySaved,
+                        onCheckedChange = { checked ->
+                            selectedRepositoryIds = if (checked) selectedRepositoryIds + entry.id
+                                else selectedRepositoryIds - entry.id
+                        },
+                        colors = CheckboxDefaults.colors(checkedColor = Green)
+                    )
+                    Column(Modifier.weight(1f)) {
+                        Text(entry.name, color = Color.White, fontWeight = FontWeight.SemiBold)
+                        Text(entry.url, color = Muted, fontSize = 10.sp, maxLines = 1)
+                        if (entry.category.isNotBlank() || entry.description.isNotBlank()) {
+                            Text(listOf(entry.category, entry.description).filter { it.isNotBlank() }.joinToString(" • "),
+                                color = Muted, fontSize = 10.sp, maxLines = 2)
+                        }
+                    }
+                    if (alreadySaved) Text("Sudah ada", color = Green, fontSize = 10.sp)
+                }
+            }
+            Button(
+                onClick = {
+                    val chosen = repositoryEntries.filter { it.id in selectedRepositoryIds }
+                    val additions = chosen.filterNot { item -> links.any { it.url.equals(item.url, true) } }
+                    if (additions.isNotEmpty()) {
+                        links = links + additions.map { SavedSourceLink(it.name, it.url) }
+                        persist(links)
+                        repositoryMessage = "${additions.size} sumber berhasil ditambahkan ke Daftar Sumber."
+                    } else repositoryMessage = "Pilih sumber yang belum ada di Daftar Sumber."
+                    selectedRepositoryIds = emptySet()
+                },
+                enabled = selectedRepositoryIds.isNotEmpty(),
+                colors = ButtonDefaults.buttonColors(containerColor = Green)
+            ) { Text("Tambahkan pilihan ke Daftar Sumber") }
+        }
+        Divider(color = Muted.copy(alpha = 0.25f))
+        Text("Cari alamat situs di internet. Hasil disaring dengan pemeriksaan dasar sebelum dipilih.", Hasil disaring dengan pemeriksaan dasar sebelum dipilih.",
             color = Color(0xFFCBD2E0), fontSize = 12.sp)
         OutlinedTextField(
             value = sourceSearch, onValueChange = { sourceSearch = it },
