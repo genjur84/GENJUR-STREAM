@@ -2686,7 +2686,7 @@ private fun InAppVideoPlayer(activity: MainActivity, movie: FeedMovie, onDownloa
                     ) {
                         Text(movie.title, color = Color.White, fontWeight = FontWeight.Bold,
                             modifier = Modifier.weight(1f), maxLines = 1)
-                        IconButton(onClick = onDownload) {
+                        IconButton(onClick = { requestPlayerDownload() }) {
                             Icon(Icons.Filled.Download, contentDescription = "Unduh video", tint = Green)
                         }
                         IconButton(onClick = { setFullscreen(true) }) {
