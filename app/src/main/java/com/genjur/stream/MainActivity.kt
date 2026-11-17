@@ -2367,6 +2367,18 @@ private fun SourceCatalogScreen(
                 .any { it.equals(selectedGenre, ignoreCase = true) }
         }
     }
+    val featuredMovies = remember(visibleMovies) {
+        visibleMovies.filter { it.posterUrl.isNotBlank() }.take(12)
+    }
+    var featuredIndex by remember(sourceUrl) { mutableIntStateOf(0) }
+    LaunchedEffect(featuredMovies) {
+        featuredIndex = 0
+        while (featuredMovies.size > 1) {
+            delay(4000)
+            featuredIndex = (featuredIndex + 1) % featuredMovies.size
+        }
+    }
+    val featuredMovie = featuredMovies.getOrNull(featuredIndex)
 
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -2387,6 +2399,35 @@ private fun SourceCatalogScreen(
             else "Katalog native • Plugin ${plugin.displayName}",
             color = Muted, fontSize = 11.sp
         )
+        if (featuredMovie != null) {
+            androidx.compose.animation.Crossfade(targetState = featuredMovie) { movie ->
+                Card(
+                    Modifier.fillMaxWidth().height(205.dp).clickable { onOpenMovie(movie) },
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(containerColor = Panel)
+                ) {
+                    Box(Modifier.fillMaxSize()) {
+                        MoviePoster(movie.posterUrl, movie.title, 205.dp)
+                        Column(
+                            Modifier.align(Alignment.BottomStart).fillMaxWidth()
+                                .background(Color.Black.copy(alpha = 0.68f)).padding(12.dp)
+                        ) {
+                            Text("FILM PILIHAN", color = Green, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                            Text(movie.title, color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1)
+                            Text("Ketuk untuk melihat detail", color = Color.White.copy(alpha = 0.8f), fontSize = 10.sp)
+                        }
+                    }
+                }
+            }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
+                featuredMovies.forEachIndexed { index, _ ->
+                    Box(
+                        Modifier.padding(horizontal = 3.dp).size(if (index == featuredIndex) 8.dp else 6.dp)
+                            .background(if (index == featuredIndex) Green else Muted.copy(alpha = 0.5f), RoundedCornerShape(50))
+                    )
+                }
+            }
+        }
         if (movies.isNotEmpty()) {
             Row(
                 Modifier.fillMaxWidth(),
