@@ -4172,23 +4172,46 @@ private fun InAppVideoPlayer(
         // Jika server aktif gagal, coba URL media alternatif yang ditemukan
         // langsung dari player situs. Setiap kandidat hanya dicoba satu kali.
         val attemptedServerUrls = mutableSetOf(movie.videoUrl)
+        val shortAdSkippedUrls = mutableSetOf<String>()
+        fun tryNextServer(reason: String): Boolean {
+            val nextServer = fallbackVideoUrls.firstOrNull {
+                it.isNotBlank() && it !in attemptedServerUrls
+            } ?: return false
+            attemptedServerUrls.add(nextServer)
+            android.util.Log.w("GENJUR_PLAYER", "$reason; otomatis mencoba server alternatif nomor " + attemptedServerUrls.size)
+            player.setMediaItem(MediaItem.fromUri(nextServer))
+            player.prepare()
+            player.playWhenReady = true
+            return true
+        }
+        fun skipShortPreRollIfNeeded() {
+            val durationMs = player.duration
+            val currentUrl = player.currentMediaItem?.localConfiguration?.uri?.toString().orEmpty()
+            // Iklan pembuka LK21 umumnya berdurasi sekitar 5–25 detik.
+            // Periksa lagi di ExoPlayer karena metadata HTML kadang belum tersedia
+            // saat URL pertama kali terdeteksi dari permintaan jaringan.
+            if (durationMs in 1L..25_000L && currentUrl.isNotBlank() &&
+                currentUrl !in shortAdSkippedUrls) {
+                shortAdSkippedUrls.add(currentUrl)
+                if (!tryNextServer("Terdeteksi klip pendek ${durationMs / 1000} detik (kemungkinan iklan)")) {
+                    android.util.Log.w("GENJUR_PLAYER", "Klip pendek terdeteksi tetapi tidak ada server alternatif.")
+                }
+            }
+        }
         val fallbackListener = object : Player.Listener {
             override fun onVideoSizeChanged(videoSize: androidx.media3.common.VideoSize) {
                 if (videoSize.height > 0) {
                     videoAspectRatio = videoSize.width * videoSize.pixelWidthHeightRatio / videoSize.height
                 }
             }
+            override fun onTimelineChanged(timeline: androidx.media3.common.Timeline, reason: Int) {
+                skipShortPreRollIfNeeded()
+            }
+            override fun onPlaybackStateChanged(playbackState: Int) {
+                if (playbackState == Player.STATE_READY) skipShortPreRollIfNeeded()
+            }
             override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
-                val nextServer = fallbackVideoUrls.firstOrNull {
-                    it.isNotBlank() && it !in attemptedServerUrls
-                }
-                if (nextServer != null) {
-                    attemptedServerUrls.add(nextServer)
-                    android.util.Log.w("GENJUR_PLAYER", "Server gagal; mencoba server alternatif nomor " + attemptedServerUrls.size)
-                    player.setMediaItem(MediaItem.fromUri(nextServer))
-                    player.prepare()
-                    player.playWhenReady = true
-                } else {
+                if (!tryNextServer("Server gagal")) {
                     android.util.Log.e("GENJUR_PLAYER", "Semua server langsung yang terdeteksi gagal diputar", error)
                 }
             }
