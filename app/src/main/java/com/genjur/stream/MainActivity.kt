@@ -3554,6 +3554,7 @@ private fun SourceBrowser(
                                             if (!url || !/^https?:\/\//i.test(url)) return;
                                             // Abaikan video pendek (umumnya iklan pre-roll 5–20 detik).
                                             if (typeof duration === 'number' && isFinite(duration) && duration > 0 && duration <= 25) return;
+                                            window.__genjurMediaFound = true;
                                             var entry = performance.getEntriesByName(url).slice(-1)[0];
                                             var size = entry ? (entry.encodedBodySize || entry.transferSize || 0) : 0;
                                             GenjurPlayback.onVideoAvailable(title || document.title || 'Video dari situs', location.href, url, quality || 'Kualitas tersedia', size);
@@ -3611,6 +3612,39 @@ private fun SourceBrowser(
                                         } catch(e) {}
                                     }
                                     scanPage();
+                                    // LK21: coba server/player berikutnya otomatis bila player aktif
+                                    // belum memberikan URL media yang dapat diputar oleh GENJUR.
+                                    (function autoTryNextLk21Server() {
+                                        if ((location.hostname || '').toLowerCase().indexOf('lk21') === -1) return;
+                                        var selector = 'button,a,[role="button"],input[type="button"],input[type="submit"],[data-server],[data-player]';
+                                        function collect() {
+                                            var result = [];
+                                            document.querySelectorAll(selector).forEach(function(el) {
+                                                var label = [el.innerText, el.textContent, el.getAttribute('aria-label'),
+                                                    el.getAttribute('title'), el.value, el.getAttribute('data-server'),
+                                                    el.getAttribute('data-player')].filter(Boolean).join(' ')
+                                                    .replace(/\\s+/g, ' ').trim();
+                                                if (!label || !/(player\\s*[1-9]|p2p|cast|hydrax|server\\s*[1-9])/i.test(label)) return;
+                                                if (el.disabled || el.getAttribute('aria-hidden') === 'true') return;
+                                                if (result.every(function(x) { return x.el !== el; })) result.push({el:el,label:label});
+                                            });
+                                            return result;
+                                        }
+                                        var options = collect();
+                                        var index = 0;
+                                        function tryNext() {
+                                            if (window.__genjurMediaFound || index >= options.length) return;
+                                            var option = options[index++];
+                                            try { option.el.click(); } catch(e) {}
+                                            setTimeout(function() {
+                                                if (!window.__genjurMediaFound) tryNext();
+                                            }, 6500);
+                                        }
+                                        if (options.length > 1) setTimeout(tryNext, 6500);
+                                        new MutationObserver(function() {
+                                            if (!window.__genjurMediaFound) options = collect();
+                                        }).observe(document.documentElement, {childList:true,subtree:true});
+                                    })();
                                     var scanTimer = null;
                                     new MutationObserver(function(records) {
                                         var needsScan = false;
@@ -3743,12 +3777,6 @@ private fun SourceFallbackPlayer(
     var fullscreenCallback by remember { mutableStateOf<android.webkit.WebChromeClient.CustomViewCallback?>(null) }
     var detectedDirectUrl by remember(movie) { mutableStateOf("") }
     var showSourcePlayer by remember(movie) { mutableStateOf(false) }
-    // LK21 menyediakan beberapa server yang perlu bisa dipilih langsung oleh pengguna.
-    // Jangan mengambil alih WebView ke ExoPlayer otomatis pada sumber LK21.
-    val isLk21Source = remember(movie) {
-        val page = movie.termsUrl.ifBlank { movie.videoUrl }
-        Uri.parse(page).host.orEmpty().lowercase().contains("lk21")
-    }
     val detectedServerUrls = remember(movie) { mutableStateListOf<String>() }
     val webViewRef = remember { mutableStateOf<android.webkit.WebView?>(null) }
     val isLandscape = LocalContext.current.resources.configuration.orientation ==
@@ -3769,7 +3797,7 @@ private fun SourceFallbackPlayer(
         if (uri.scheme !in listOf("https", "http") || uri.host.isNullOrBlank() ||
             !isPlayableMedia || isGenjurAdHost(uri.host) || adPath) return
         if (detectedServerUrls.none { it == candidate }) detectedServerUrls.add(candidate)
-        if (!isLk21Source) showSourcePlayer = false
+        showSourcePlayer = false
     }
 
     // Hentikan player situs sebelum beralih ke ExoPlayer agar tidak ada dua
@@ -3796,8 +3824,8 @@ private fun SourceFallbackPlayer(
     // Beri waktu bagi pre-roll singkat untuk selesai dan stream film utama
     // untuk terdeteksi. Kandidat terbaru lebih mungkin merupakan stream film,
     // sedangkan URL media pertama sering kali hanya video iklan pembuka.
-    LaunchedEffect(detectedServerUrls.size, isLk21Source) {
-        if (!isLk21Source && detectedServerUrls.isNotEmpty() && detectedDirectUrl.isBlank()) {
+    LaunchedEffect(detectedServerUrls.size) {
+        if (detectedServerUrls.isNotEmpty() && detectedDirectUrl.isBlank()) {
             delay(6500)
             val selected = detectedServerUrls.lastOrNull()
             val sourceView = webViewRef.value
@@ -3809,15 +3837,9 @@ private fun SourceFallbackPlayer(
 
     // Beri waktu player situs memuat sumber media di belakang layar.
     // Jika sumber langsung belum ditemukan, tampilkan situs sebagai cadangan.
-    LaunchedEffect(movie, isLk21Source) {
-        if (isLk21Source) {
-            // Tampilkan halaman LK21 dari awal agar tombol P2P/CAST/HYDRAX
-            // dapat dipilih manual, termasuk saat player pertama gagal.
-            showSourcePlayer = true
-        } else {
-            delay(18_000)
-            if (detectedDirectUrl.isBlank()) showSourcePlayer = true
-        }
+    LaunchedEffect(movie) {
+        delay(18_000)
+        if (detectedDirectUrl.isBlank()) showSourcePlayer = true
     }
 
     BackHandler(enabled = fullscreenView != null) {
