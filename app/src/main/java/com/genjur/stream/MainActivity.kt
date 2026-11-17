@@ -3337,6 +3337,9 @@ private fun SourceFallbackPlayer(
         if (uri.scheme !in listOf("https", "http") || uri.host.isNullOrBlank() ||
             !isPlayableMedia || isGenjurAdHost(uri.host)) return
         if (detectedServerUrls.none { it == candidate }) detectedServerUrls.add(candidate)
+        // Sembunyikan halaman situs seketika saat media ditemukan agar iklan situs
+        // tidak sempat terlihat selama pengumpulan kandidat dan perpindahan player.
+        showSourcePlayer = false
     }
 
     // Hentikan player situs sebelum beralih ke ExoPlayer agar tidak ada dua
