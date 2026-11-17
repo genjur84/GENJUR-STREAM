@@ -3330,6 +3330,8 @@ private fun SourceFallbackPlayer(
     var showSourcePlayer by remember(movie) { mutableStateOf(false) }
     val detectedServerUrls = remember(movie) { mutableStateListOf<String>() }
     val webViewRef = remember { mutableStateOf<android.webkit.WebView?>(null) }
+    val isLandscape = LocalContext.current.resources.configuration.orientation ==
+        android.content.res.Configuration.ORIENTATION_LANDSCAPE
 
     // Simpan URL media langsung yang benar-benar diminta player situs.
     // Halaman server/iframe biasa tidak diperlakukan sebagai URL video.
@@ -3429,10 +3431,12 @@ private fun SourceFallbackPlayer(
             properties = DialogProperties(usePlatformDefaultWidth = false)
         ) {
             Surface(
-                // Tampilan pencarian sumber dan player situs memakai seluruh area
-                // portrait/landscape, tanpa margin dialog yang menyisakan ruang kosong.
-                modifier = Modifier.fillMaxSize(),
-                shape = RoundedCornerShape(0.dp),
+                // Portrait tetap memakai ukuran dan sudut dialog semula.
+                // Hanya landscape yang diperluas memenuhi layar.
+                modifier = if (isLandscape) Modifier.fillMaxSize()
+                    else Modifier.fillMaxWidth().fillMaxHeight(0.94f).padding(8.dp),
+                shape = if (isLandscape) RoundedCornerShape(0.dp)
+                    else RoundedCornerShape(18.dp),
                 color = Color.Black
             ) {
                 Column(Modifier.fillMaxSize().background(Color.Black)) {
