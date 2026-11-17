@@ -3624,6 +3624,12 @@ private fun InAppVideoPlayer(
     fallbackVideoUrls: List<String> = emptyList()
 ) {
     var isFullscreen by remember { mutableStateOf(false) }
+    var videoResizeMode by remember { mutableStateOf(AspectRatioFrameLayout.RESIZE_MODE_ZOOM) }
+    val videoResizeLabel = when (videoResizeMode) {
+        AspectRatioFrameLayout.RESIZE_MODE_FIT -> "Pas"
+        AspectRatioFrameLayout.RESIZE_MODE_FILL -> "Regang"
+        else -> "Penuh"
+    }
     val player = remember(movie.videoUrl) {
         val requestHeaders = buildMap {
             put("User-Agent", "Mozilla/5.0 (Linux; Android 11) AppleWebKit/537.36 Chrome/131.0.0.0 Mobile Safari/537.36")
@@ -3791,11 +3797,14 @@ private fun InAppVideoPlayer(
                                 useController = true
                                 // Perbesar video agar memenuhi layar landscape; sisi video
                                 // yang terpotong mengikuti rasio layar, tanpa meregangkan gambar.
-                                resizeMode = AspectRatioFrameLayout.RESIZE_MODE_ZOOM
+                                resizeMode = videoResizeMode
                                 setShowBuffering(PlayerView.SHOW_BUFFERING_WHEN_PLAYING)
                             }
                         },
-                        update = { it.player = player },
+                        update = {
+                            it.player = player
+                            it.resizeMode = videoResizeMode
+                        },
                         modifier = Modifier.fillMaxSize()
                     )
                     Row(
@@ -3803,6 +3812,15 @@ private fun InAppVideoPlayer(
                         horizontalArrangement = Arrangement.spacedBy(4.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
+                        TextButton(onClick = {
+                            videoResizeMode = when (videoResizeMode) {
+                                AspectRatioFrameLayout.RESIZE_MODE_ZOOM -> AspectRatioFrameLayout.RESIZE_MODE_FIT
+                                AspectRatioFrameLayout.RESIZE_MODE_FIT -> AspectRatioFrameLayout.RESIZE_MODE_FILL
+                                else -> AspectRatioFrameLayout.RESIZE_MODE_ZOOM
+                            }
+                        }) {
+                            Text(videoResizeLabel, color = Color.White)
+                        }
                         IconButton(onClick = { requestPlayerDownload() }) {
                             Icon(Icons.Filled.Download, contentDescription = "Unduh video", tint = Color.White)
                         }
