@@ -128,6 +128,35 @@ private const val UPDATE_INFO_URL = "https://raw.githubusercontent.com/genjur84/
 private const val PLAYBACK_NOTIFICATION_CHANNEL = "genjur_playback"
 private const val PLAYBACK_NOTIFICATION_ID = 8401
 
+private val VIDEO_FILTER_CATEGORIES = listOf("Animasi", "Drama", "Action", "Adventure", "Comedy", "Crime", "Documentary", "Family", "Fantasy", "Horror", "Mystery", "Romance", "Sci-Fi", "Thriller", "Adult 18+")
+private val DEFAULT_VIDEO_FILTERS = VIDEO_FILTER_CATEGORIES.filterNot { it == "Adult 18+" }.toSet()
+
+private fun matchesVideoFilters(movie: FeedMovie, enabled: Set<String>): Boolean {
+    val text = (movie.title + " " + movie.category + " " + movie.genres.joinToString(" ") + " " + movie.description).lowercase()
+    val adult = Regex("""(?i)(\badult\b|18\s*\+|xxx|hentai|pornographic|porn\b)""").containsMatchIn(text)
+    if (adult) return "Adult 18+" in enabled
+    val tags = (movie.genres + movie.category.split(",", "/", "|", "•")).map { raw ->
+        when (raw.trim().lowercase()) {
+            "animation", "animasi", "anime", "cartoon" -> "Animasi"
+            "drama" -> "Drama"
+            "action", "aksi" -> "Action"
+            "adventure", "petualangan" -> "Adventure"
+            "comedy", "komedi" -> "Comedy"
+            "crime", "kriminal" -> "Crime"
+            "documentary", "dokumenter" -> "Documentary"
+            "family", "keluarga" -> "Family"
+            "fantasy", "fantasi" -> "Fantasy"
+            "horror", "horor" -> "Horror"
+            "mystery", "misteri" -> "Mystery"
+            "romance", "romantis" -> "Romance"
+            "sci-fi", "science fiction", "science-fiction", "fiksi ilmiah" -> "Sci-Fi"
+            "thriller", "seru" -> "Thriller"
+            else -> ""
+        }
+    }.filter { it.isNotBlank() }.toSet()
+    return tags.isEmpty() || tags.any { it in enabled }
+}
+
 /** Domain iklan dan pelacak umum untuk pemblokiran dasar di WebView. */
 private val GENJUR_AD_HOSTS = setOf(
     "doubleclick.net", "googlesyndication.com", "googleadservices.com",
@@ -677,6 +706,25 @@ class MainActivity : ComponentActivity() {
 fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
     var search by remember { mutableStateOf("") }
     var category by remember { mutableStateOf("Semua") }
+    var enabledVideoFilters by remember { mutableStateOf(DEFAULT_VIDEO_FILTERS) }
+    var videoFiltersLoaded by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        val prefs = activity.getSharedPreferences("genjur_stream_video_filters", 0)
+        val saved = prefs.getString("enabled", null)
+        if (saved != null) runCatching { JSONArray(saved) }.getOrNull()?.let { array ->
+            enabledVideoFilters = (0 until array.length()).map { array.optString(it) }
+                .filter { it in VIDEO_FILTER_CATEGORIES }.toSet()
+        }
+        videoFiltersLoaded = true
+    }
+    LaunchedEffect(enabledVideoFilters, videoFiltersLoaded) {
+        if (videoFiltersLoaded) {
+            val array = JSONArray()
+            enabledVideoFilters.forEach { array.put(it) }
+            activity.getSharedPreferences("genjur_stream_video_filters", 0).edit()
+                .putString("enabled", array.toString()).apply()
+        }
+    }
     var selectedTab by remember { mutableStateOf("Beranda") }
     var downloadIconBlink by remember { mutableStateOf(false) }
     var downloadBlinkTargetId by remember { mutableStateOf<Long?>(null) }
@@ -1617,6 +1665,29 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                                         Text("Pengaturan aplikasi", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
                                         Spacer(Modifier.height(6.dp))
                                         Text("Kelola sumber situs yang tersimpan di GENJUR STREAM.", color = Muted, fontSize = 13.sp)
+                                        Spacer(Modifier.height(14.dp))
+                                        HorizontalDivider(color = Color(0xFF393344))
+                                        Spacer(Modifier.height(12.dp))
+                                        Text("Filter Video", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                                        Text("Centang kategori video yang ingin ditampilkan.", color = Muted, fontSize = 12.sp)
+                                        Spacer(Modifier.height(8.dp))
+                                        VIDEO_FILTER_CATEGORIES.forEach { filter ->
+                                            Row(Modifier.fillMaxWidth().clickable {
+                                                enabledVideoFilters = if (filter in enabledVideoFilters) enabledVideoFilters - filter else enabledVideoFilters + filter
+                                            }.padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                                                Checkbox(checked = filter in enabledVideoFilters, onCheckedChange = { checked ->
+                                                    enabledVideoFilters = if (checked) enabledVideoFilters + filter else enabledVideoFilters - filter
+                                                }, colors = CheckboxDefaults.colors(checkedColor = Green))
+                                                Text(filter, color = if (filter == "Adult 18+") Color(0xFFFF8A8A) else Color.White, fontSize = 14.sp)
+                                                if (filter == "Adult 18+") {
+                                                    Spacer(Modifier.weight(1f))
+                                                    Text("Mati secara default", color = Muted, fontSize = 10.sp)
+                                                }
+                                            }
+                                        }
+                                        TextButton(onClick = { enabledVideoFilters = DEFAULT_VIDEO_FILTERS }) {
+                                            Text("Atur ulang filter default", color = Green)
+                                        }
                                         Spacer(Modifier.height(10.dp))
                                         TextButton(onClick = { selectedTab = "Sumber Link" }) {
                                             Text("Kelola Sumber Link  ›", color = Green)
@@ -1798,6 +1869,7 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                                 val movieHost = listOf(movie.videoUrl, movie.termsUrl).mapNotNull { candidate ->
                                     runCatching { Uri.parse(candidate).host?.lowercase()?.removePrefix("www.") }.getOrNull()
                                 }.firstOrNull()
+                                matchesVideoFilters(movie, enabledVideoFilters) &&
                                 (selectedTab != "Cari" || !movie.title.equals("Drama", true)) &&
                                     (selectedTab != "Cari" || selectedHost == null || movieHost == selectedHost || movieHost?.endsWith(".$selectedHost") == true) &&
                                     (category == "Semua" || selectedTab != "Kategori" || movie.category.equals(category, true)) &&
@@ -2449,7 +2521,8 @@ private data class SavedSourceLink(val name: String, val url: String)
 
 @Composable
 private fun SourceCatalogScreen(
-    sourceName: String, sourceUrl: String, movies: List<FeedMovie>, loading: Boolean, message: String?,
+    sourceName: String, sourceUrl: String, movies: List<FeedMovie>, enabledVideoFilters: Set<String>,
+    loading: Boolean, message: String?,
     onMoviesLoaded: (List<FeedMovie>) -> Unit, onLoadingChanged: (Boolean) -> Unit,
     onMessageChanged: (String?) -> Unit, onOpenMovie: (FeedMovie) -> Unit, onOpenSource: () -> Unit
 ) {
@@ -2508,11 +2581,11 @@ private fun SourceCatalogScreen(
             .filter { it.isNotBlank() && it != "Film" && it != "Serial" && it != "Series" }
             .distinct().sorted()
     }
-    val visibleMovies = remember(movies, selectedGenre) {
+    val visibleMovies = remember(movies, selectedGenre, enabledVideoFilters) {
         movies.filter { movie ->
-            selectedGenre == "Semua" ||
+            matchesVideoFilters(movie, enabledVideoFilters) && (selectedGenre == "Semua" ||
                 (movie.genres + movie.category.split(",", "/", "|", "•")).map(::normalizeGenre)
-                    .any { it.equals(selectedGenre, ignoreCase = true) }
+                    .any { it.equals(selectedGenre, ignoreCase = true) })
         }
     }
     val featuredMovies = remember(visibleMovies) {
