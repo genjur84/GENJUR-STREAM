@@ -1430,23 +1430,40 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                                 })
                             }
                             "Katalog Sumber" -> {
-                                SourceCatalogScreen(
-                                    sourceName = catalogSourceName,
-                                    sourceUrl = catalogSourceUrl,
-                                    movies = sourceCatalogMovies,
-                                    loading = sourceCatalogLoading,
-                                    message = sourceCatalogMessage,
-                                    onMoviesLoaded = { sourceCatalogMovies = it },
-                                    onLoadingChanged = { sourceCatalogLoading = it },
-                                    onMessageChanged = { sourceCatalogMessage = it },
-                                    onOpenMovie = { movie ->
-                                        selectedMovie = movie
-                                    },
-                                    onOpenSource = {
-                                        browserInitialUrl = catalogSourceUrl
-                                        selectedTab = "Browser Sumber"
+                                // Katalog tampil sebagai lapisan penuh di atas halaman utama,
+                                // termasuk menutupi header dan navigasi bawah.
+                                Dialog(
+                                    onDismissRequest = { selectedTab = "Sumber Link" },
+                                    properties = DialogProperties(usePlatformDefaultWidth = false)
+                                ) {
+                                    Surface(
+                                        modifier = Modifier.fillMaxSize(),
+                                        color = Bg,
+                                        shape = RoundedCornerShape(0.dp)
+                                    ) {
+                                        Column(
+                                            Modifier.fillMaxSize()
+                                                .verticalScroll(rememberScrollState())
+                                                .padding(horizontal = horizontal, vertical = 10.dp)
+                                        ) {
+                                            SourceCatalogScreen(
+                                                sourceName = catalogSourceName,
+                                                sourceUrl = catalogSourceUrl,
+                                                movies = sourceCatalogMovies,
+                                                loading = sourceCatalogLoading,
+                                                message = sourceCatalogMessage,
+                                                onMoviesLoaded = { sourceCatalogMovies = it },
+                                                onLoadingChanged = { sourceCatalogLoading = it },
+                                                onMessageChanged = { sourceCatalogMessage = it },
+                                                onOpenMovie = { movie -> selectedMovie = movie },
+                                                onOpenSource = {
+                                                    browserInitialUrl = catalogSourceUrl
+                                                    selectedTab = "Browser Sumber"
+                                                }
+                                            )
+                                        }
                                     }
-                                )
+                                }
                             }
                             "Pengaturan" -> {
                                 Card(
