@@ -3324,7 +3324,20 @@ private fun SourceFallbackPlayer(
     var fullscreenCallback by remember { mutableStateOf<android.webkit.WebChromeClient.CustomViewCallback?>(null) }
     var detectedDirectUrl by remember(movie) { mutableStateOf("") }
     var showSourcePlayer by remember(movie) { mutableStateOf(false) }
+    val detectedServerUrls = remember(movie) { mutableStateListOf<String>() }
     val webViewRef = remember { mutableStateOf<android.webkit.WebView?>(null) }
+
+    // Simpan URL media langsung yang benar-benar diminta player situs.
+    // Halaman server/iframe biasa tidak diperlakukan sebagai URL video.
+    fun addServerCandidate(candidate: String) {
+        val uri = Uri.parse(candidate)
+        val path = uri.path.orEmpty().lowercase()
+        val isPlayableMedia = path.endsWith(".m3u8") || path.endsWith(".mpd") ||
+            path.endsWith(".mp4") || path.endsWith(".m4v") || path.endsWith(".webm")
+        if (uri.scheme !in listOf("https", "http") || uri.host.isNullOrBlank() ||
+            !isPlayableMedia || isGenjurAdHost(uri.host)) return
+        if (detectedServerUrls.none { it == candidate }) detectedServerUrls.add(candidate)
+    }
 
     // Hentikan player situs sebelum beralih ke ExoPlayer agar tidak ada dua
     // pemutar yang terus mengambil data secara bersamaan.
@@ -3344,6 +3357,19 @@ private fun SourceFallbackPlayer(
             webViewRef.value = null
             runCatching { view.destroy() }
             detectedDirectUrl = mediaUrl
+        }
+    }
+
+    // Kumpulkan beberapa URL server yang diekspos player situs sebelum mencoba
+    // server pertama. Player internal akan mencoba kandidat berikutnya jika gagal.
+    LaunchedEffect(detectedServerUrls.firstOrNull()) {
+        if (detectedServerUrls.isNotEmpty() && detectedDirectUrl.isBlank()) {
+            delay(2200)
+            val selected = detectedServerUrls.firstOrNull()
+            val sourceView = webViewRef.value
+            if (!selected.isNullOrBlank() && sourceView != null && detectedDirectUrl.isBlank()) {
+                stopSourceAndUseInternalPlayer(sourceView, selected)
+            }
         }
     }
 
@@ -3380,7 +3406,8 @@ private fun SourceFallbackPlayer(
             activity,
             movie.copy(videoUrl = detectedDirectUrl, licenseId = "Direct source media"),
             onDownload = onDownload,
-            onClose = onClose
+            onClose = onClose,
+            fallbackVideoUrls = detectedServerUrls.toList().filterNot { it == detectedDirectUrl }
         )
     } else {
         Dialog(
@@ -3428,14 +3455,8 @@ private fun SourceFallbackPlayer(
                                 addJavascriptInterface(object {
                                     @JavascriptInterface
                                     fun onPlayableMedia(url: String) {
-                                        val uri = Uri.parse(url)
-                                        val path = uri.path.orEmpty().lowercase()
-                                        val isDirectMedia = path.endsWith(".mp4") || path.endsWith(".m4v") ||
-                                            path.endsWith(".webm") || path.endsWith(".m3u8")
-                                        if (uri.scheme in listOf("https", "http") && !uri.host.isNullOrBlank() &&
-                                            isDirectMedia && !isGenjurAdHost(uri.host)) {
-                                            stopSourceAndUseInternalPlayer(this@apply, url)
-                                        }
+                                        // Bridge dipanggil dari thread JavaScript WebView.
+                                        this@apply.post { addServerCandidate(url) }
                                     }
                                 }, "GenjurMediaBridge")
                                 webViewClient = object : android.webkit.WebViewClient() {
@@ -3453,13 +3474,15 @@ private fun SourceFallbackPlayer(
                                             ?.value.orEmpty().lowercase()
                                         val directMedia = path.endsWith(".mp4") || path.endsWith(".m4v") ||
                                             path.endsWith(".webm") || path.endsWith(".m3u8") ||
+                                            path.endsWith(".mpd") ||
                                             accept.contains("video/") || accept.contains("application/vnd.apple.mpegurl")
                                         val looksLikeAd = isGenjurAdHost(uri.host) ||
                                             Regex("""(?i)(/ads?/|advert|doubleclick|popunder|banner|tracking|analytics)""")
                                                 .containsMatchIn(fullUrl)
                                         if (directMedia && !looksLikeAd &&
                                             uri.scheme in listOf("https", "http") && !uri.host.isNullOrBlank()) {
-                                            stopSourceAndUseInternalPlayer(view, fullUrl)
+                                            // Tetap biarkan WebView mengumpulkan kandidat server lain.
+                                            view.post { addServerCandidate(fullUrl) }
                                         }
                                         return super.shouldInterceptRequest(view, request)
                                     }
@@ -3578,7 +3601,13 @@ private fun SourceFallbackPlayer(
 }
 
 @Composable
-private fun InAppVideoPlayer(activity: MainActivity, movie: FeedMovie, onDownload: () -> Unit, onClose: () -> Unit) {
+private fun InAppVideoPlayer(
+    activity: MainActivity,
+    movie: FeedMovie,
+    onDownload: () -> Unit,
+    onClose: () -> Unit,
+    fallbackVideoUrls: List<String> = emptyList()
+) {
     var isFullscreen by remember { mutableStateOf(false) }
     val player = remember(movie.videoUrl) {
         val requestHeaders = buildMap {
@@ -3620,7 +3649,27 @@ private fun InAppVideoPlayer(activity: MainActivity, movie: FeedMovie, onDownloa
             playWhenReady = true
         }
     }
-    DisposableEffect(player) {
+    DisposableEffect(player, fallbackVideoUrls) {
+        // Jika server aktif gagal, coba URL media alternatif yang ditemukan
+        // langsung dari player situs. Setiap kandidat hanya dicoba satu kali.
+        val attemptedServerUrls = mutableSetOf(movie.videoUrl)
+        val fallbackListener = object : Player.Listener {
+            override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
+                val nextServer = fallbackVideoUrls.firstOrNull {
+                    it.isNotBlank() && it !in attemptedServerUrls
+                }
+                if (nextServer != null) {
+                    attemptedServerUrls.add(nextServer)
+                    android.util.Log.w("GENJUR_PLAYER", "Server gagal; mencoba server alternatif nomor " + attemptedServerUrls.size)
+                    player.setMediaItem(MediaItem.fromUri(nextServer))
+                    player.prepare()
+                    player.playWhenReady = true
+                } else {
+                    android.util.Log.e("GENJUR_PLAYER", "Semua server langsung yang terdeteksi gagal diputar", error)
+                }
+            }
+        }
+        player.addListener(fallbackListener)
         if (Build.VERSION.SDK_INT >= 33 &&
             ContextCompat.checkSelfPermission(activity, android.Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
         ) {
@@ -3652,6 +3701,7 @@ private fun InAppVideoPlayer(activity: MainActivity, movie: FeedMovie, onDownloa
                 setPlayer(player)
             }
         onDispose {
+            player.removeListener(fallbackListener)
             playbackNotification.setPlayer(null)
             player.release()
             activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
