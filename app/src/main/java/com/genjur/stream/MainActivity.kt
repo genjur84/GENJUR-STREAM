@@ -3326,6 +3326,27 @@ private fun SourceFallbackPlayer(
     var showSourcePlayer by remember(movie) { mutableStateOf(false) }
     val webViewRef = remember { mutableStateOf<android.webkit.WebView?>(null) }
 
+    // Hentikan player situs sebelum beralih ke ExoPlayer agar tidak ada dua
+    // pemutar yang terus mengambil data secara bersamaan.
+    fun stopSourceAndUseInternalPlayer(view: android.webkit.WebView, mediaUrl: String) {
+        view.post {
+            if (detectedDirectUrl.isNotBlank()) return@post
+            runCatching {
+                view.evaluateJavascript(
+                    "(function(){document.querySelectorAll('video,audio').forEach(function(m){try{m.pause();m.removeAttribute('src');m.querySelectorAll('source').forEach(function(s){s.removeAttribute('src');});m.load();}catch(e){}});})();",
+                    null
+                )
+            }
+            runCatching { view.stopLoading() }
+            runCatching { view.onPause() }
+            runCatching { view.loadUrl("about:blank") }
+            runCatching { view.removeAllViews() }
+            webViewRef.value = null
+            runCatching { view.destroy() }
+            detectedDirectUrl = mediaUrl
+        }
+    }
+
     // Beri waktu player situs memuat sumber media di belakang layar.
     // Jika sumber langsung belum ditemukan, tampilkan situs sebagai cadangan.
     LaunchedEffect(movie) {
@@ -3413,9 +3434,7 @@ private fun SourceFallbackPlayer(
                                             path.endsWith(".webm") || path.endsWith(".m3u8")
                                         if (uri.scheme in listOf("https", "http") && !uri.host.isNullOrBlank() &&
                                             isDirectMedia && !isGenjurAdHost(uri.host)) {
-                                            post {
-                                                if (detectedDirectUrl.isBlank()) detectedDirectUrl = url
-                                            }
+                                            stopSourceAndUseInternalPlayer(this@apply, url)
                                         }
                                     }
                                 }, "GenjurMediaBridge")
@@ -3440,9 +3459,7 @@ private fun SourceFallbackPlayer(
                                                 .containsMatchIn(fullUrl)
                                         if (directMedia && !looksLikeAd &&
                                             uri.scheme in listOf("https", "http") && !uri.host.isNullOrBlank()) {
-                                            view.post {
-                                                if (detectedDirectUrl.isBlank()) detectedDirectUrl = fullUrl
-                                            }
+                                            stopSourceAndUseInternalPlayer(view, fullUrl)
                                         }
                                         return super.shouldInterceptRequest(view, request)
                                     }
@@ -3669,6 +3686,12 @@ private fun InAppVideoPlayer(activity: MainActivity, movie: FeedMovie, onDownloa
             WindowCompat.setDecorFitsSystemWindows(activity.window, true)
         }
     }
+
+    // Tombol kembali Android keluar dari mode layar penuh terlebih dahulu.
+    BackHandler(enabled = isFullscreen) {
+        setFullscreen(false)
+    }
+
     Dialog(
         onDismissRequest = onClose,
         properties = DialogProperties(usePlatformDefaultWidth = false)
