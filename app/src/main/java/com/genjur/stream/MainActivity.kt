@@ -64,6 +64,9 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalDensity
 import coil.request.ImageRequest
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -2333,6 +2336,14 @@ private fun SourceCatalogScreen(
     var selectedGenre by remember(sourceUrl) { mutableStateOf("Semua") }
     var catalogSearch by remember(sourceUrl) { mutableStateOf("") }
     var categoryMenuExpanded by remember(sourceUrl) { mutableStateOf(false) }
+    val keyboardController = LocalSoftwareKeyboardController.current
+    val focusManager = LocalFocusManager.current
+    val density = LocalDensity.current
+    val keyboardVisible = WindowInsets.ime.getBottom(density) > 0
+    BackHandler(enabled = keyboardVisible) {
+        keyboardController?.hide()
+        focusManager.clearFocus()
+    }
     val plugin = remember(sourceUrl) { SourcePluginRegistry.resolve(sourceUrl) }
 
     LaunchedEffect(sourceUrl, reloadToken) {
