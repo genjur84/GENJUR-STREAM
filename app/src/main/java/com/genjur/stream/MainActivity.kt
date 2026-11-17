@@ -3429,8 +3429,10 @@ private fun SourceFallbackPlayer(
             properties = DialogProperties(usePlatformDefaultWidth = false)
         ) {
             Surface(
-                modifier = Modifier.fillMaxWidth().fillMaxHeight(0.94f).padding(8.dp),
-                shape = RoundedCornerShape(18.dp),
+                // Tampilan pencarian sumber dan player situs memakai seluruh area
+                // portrait/landscape, tanpa margin dialog yang menyisakan ruang kosong.
+                modifier = Modifier.fillMaxSize(),
+                shape = RoundedCornerShape(0.dp),
                 color = Color.Black
             ) {
                 Column(Modifier.fillMaxSize().background(Color.Black)) {
