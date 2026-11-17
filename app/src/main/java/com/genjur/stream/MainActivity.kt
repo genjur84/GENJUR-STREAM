@@ -3743,6 +3743,12 @@ private fun SourceFallbackPlayer(
     var fullscreenCallback by remember { mutableStateOf<android.webkit.WebChromeClient.CustomViewCallback?>(null) }
     var detectedDirectUrl by remember(movie) { mutableStateOf("") }
     var showSourcePlayer by remember(movie) { mutableStateOf(false) }
+    // LK21 menyediakan beberapa server yang perlu bisa dipilih langsung oleh pengguna.
+    // Jangan mengambil alih WebView ke ExoPlayer otomatis pada sumber LK21.
+    val isLk21Source = remember(movie) {
+        val page = movie.termsUrl.ifBlank { movie.videoUrl }
+        Uri.parse(page).host.orEmpty().lowercase().contains("lk21")
+    }
     val detectedServerUrls = remember(movie) { mutableStateListOf<String>() }
     val webViewRef = remember { mutableStateOf<android.webkit.WebView?>(null) }
     val isLandscape = LocalContext.current.resources.configuration.orientation ==
@@ -3763,7 +3769,7 @@ private fun SourceFallbackPlayer(
         if (uri.scheme !in listOf("https", "http") || uri.host.isNullOrBlank() ||
             !isPlayableMedia || isGenjurAdHost(uri.host) || adPath) return
         if (detectedServerUrls.none { it == candidate }) detectedServerUrls.add(candidate)
-        showSourcePlayer = false
+        if (!isLk21Source) showSourcePlayer = false
     }
 
     // Hentikan player situs sebelum beralih ke ExoPlayer agar tidak ada dua
@@ -3790,8 +3796,8 @@ private fun SourceFallbackPlayer(
     // Beri waktu bagi pre-roll singkat untuk selesai dan stream film utama
     // untuk terdeteksi. Kandidat terbaru lebih mungkin merupakan stream film,
     // sedangkan URL media pertama sering kali hanya video iklan pembuka.
-    LaunchedEffect(detectedServerUrls.size) {
-        if (detectedServerUrls.isNotEmpty() && detectedDirectUrl.isBlank()) {
+    LaunchedEffect(detectedServerUrls.size, isLk21Source) {
+        if (!isLk21Source && detectedServerUrls.isNotEmpty() && detectedDirectUrl.isBlank()) {
             delay(6500)
             val selected = detectedServerUrls.lastOrNull()
             val sourceView = webViewRef.value
@@ -3803,9 +3809,15 @@ private fun SourceFallbackPlayer(
 
     // Beri waktu player situs memuat sumber media di belakang layar.
     // Jika sumber langsung belum ditemukan, tampilkan situs sebagai cadangan.
-    LaunchedEffect(movie) {
-        delay(18_000)
-        if (detectedDirectUrl.isBlank()) showSourcePlayer = true
+    LaunchedEffect(movie, isLk21Source) {
+        if (isLk21Source) {
+            // Tampilkan halaman LK21 dari awal agar tombol P2P/CAST/HYDRAX
+            // dapat dipilih manual, termasuk saat player pertama gagal.
+            showSourcePlayer = true
+        } else {
+            delay(18_000)
+            if (detectedDirectUrl.isBlank()) showSourcePlayer = true
+        }
     }
 
     BackHandler(enabled = fullscreenView != null) {
