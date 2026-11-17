@@ -3779,7 +3779,6 @@ private fun SourceFallbackPlayer(
     var fullscreenView by remember { mutableStateOf<android.view.View?>(null) }
     var fullscreenCallback by remember { mutableStateOf<android.webkit.WebChromeClient.CustomViewCallback?>(null) }
     var detectedDirectUrl by remember(movie) { mutableStateOf("") }
-    var showSourcePlayer by remember(movie) { mutableStateOf(false) }
     val detectedServerUrls = remember(movie) { mutableStateListOf<String>() }
     val webViewRef = remember { mutableStateOf<android.webkit.WebView?>(null) }
     val isLandscape = LocalContext.current.resources.configuration.orientation ==
@@ -3800,7 +3799,6 @@ private fun SourceFallbackPlayer(
         if (uri.scheme !in listOf("https", "http") || uri.host.isNullOrBlank() ||
             !isPlayableMedia || isGenjurAdHost(uri.host) || adPath) return
         if (detectedServerUrls.none { it == candidate }) detectedServerUrls.add(candidate)
-        showSourcePlayer = false
     }
 
     // Hentikan player situs sebelum beralih ke ExoPlayer agar tidak ada dua
@@ -3836,13 +3834,6 @@ private fun SourceFallbackPlayer(
                 stopSourceAndUseInternalPlayer(sourceView, selected)
             }
         }
-    }
-
-    // Beri waktu player situs memuat sumber media di belakang layar.
-    // Jika sumber langsung belum ditemukan, tampilkan situs sebagai cadangan.
-    LaunchedEffect(movie) {
-        delay(18_000)
-        if (detectedDirectUrl.isBlank()) showSourcePlayer = true
     }
 
     BackHandler(enabled = fullscreenView != null) {
@@ -4113,8 +4104,7 @@ private fun SourceFallbackPlayer(
                         modifier = Modifier.fillMaxSize(),
                         update = { webViewRef.value = it }
                     )
-                    if (!showSourcePlayer) {
-                        Box(
+                    Box(
                             Modifier.fillMaxSize().background(Color.Black),
                             contentAlignment = Alignment.Center
                         ) {
@@ -4132,17 +4122,12 @@ private fun SourceFallbackPlayer(
                                 )
                                 Spacer(Modifier.height(7.dp))
                                 Text(
-                                    "Player situs disiapkan di belakang layar.",
+                                    "Mengambil stream film untuk diputar di GENJUR STREAM.",
                                     color = Muted,
                                     fontSize = 11.sp
                                 )
-                                Spacer(Modifier.height(18.dp))
-                                TextButton(onClick = { showSourcePlayer = true }) {
-                                    Text("Tampilkan player situs", color = Green)
-                                }
                             }
                         }
-                    }
                     }
                 }
             }
