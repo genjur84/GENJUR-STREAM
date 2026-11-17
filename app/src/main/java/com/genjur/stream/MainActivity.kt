@@ -4368,112 +4368,83 @@ private fun GenjurSplashScreen() {
         ),
         contentAlignment = Alignment.Center
     ) {
-        // Klise film bergerak berulang di belakang logo.
-        Canvas(
-            modifier = Modifier.fillMaxWidth().height(164.dp)
+        // Poster film sungguhan bergerak di dalam pita klise.
+        val moviePosters = listOf(
+            "https://image.tmdb.org/t/p/w342/or06FN3Dka5tukK1e9sl16pB3iy.jpg", // Avengers: Endgame
+            "https://image.tmdb.org/t/p/w342/1g0dhYtq4irTY1GPXvft6k4YLjm.jpg", // Spider-Man: No Way Home
+            "https://image.tmdb.org/t/p/w342/ombsmhYUqR4qqOLOxAyr5V8hbyv.jpg", // Superman
+            "https://image.tmdb.org/t/p/w342/74xTEgt7R36Fpooo50r9T25onhq.jpg", // The Batman
+            "https://image.tmdb.org/t/p/w342/7WsyChQLEftFiDOVTGkum3p6vs.jpg" // Avengers: Infinity War
+        )
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(164.dp)
+                .background(Color(0xFF080D1B))
         ) {
-            val frameWidth = size.width / 5.2f
-            val frameHeight = size.height * 0.66f
-            val top = (size.height - frameHeight) / 2f
-            val travel = filmProgress * frameWidth
-            for (i in -1..7) {
-                val x = i * frameWidth - travel
-                drawRoundRect(
-                    color = Color(0xFF11182B),
-                    topLeft = Offset(x + 4f, top),
-                    size = Size(frameWidth - 8f, frameHeight),
-                    cornerRadius = CornerRadius(9f)
-                )
-                // Setiap bingkai berisi ilustrasi poster film mini yang berbeda.
-                val posterTop = top + 14f
-                val posterHeight = frameHeight - 28f
-                val posterLeft = x + 9f
-                val posterWidth = frameWidth - 18f
-                val posterPalettes = listOf(
-                    listOf(Color(0xFF071B3A), Color(0xFF168AAD), Color(0xFFF4A261)),
-                    listOf(Color(0xFF280B36), Color(0xFF9D174D), Color(0xFFF9C74F)),
-                    listOf(Color(0xFF101820), Color(0xFF386641), Color(0xFFA7C957)),
-                    listOf(Color(0xFF160F29), Color(0xFF4A4E9B), Color(0xFFB8C0FF)),
-                    listOf(Color(0xFF351C12), Color(0xFFBB4D00), Color(0xFFFFD166))
-                )
-                val palette = posterPalettes[Math.floorMod(i, posterPalettes.size)]
-                drawRoundRect(
-                    brush = Brush.verticalGradient(palette),
-                    topLeft = Offset(posterLeft, posterTop),
-                    size = Size(posterWidth, posterHeight),
-                    cornerRadius = CornerRadius(4f)
-                )
-                // Matahari/bulan dan siluet pegunungan atau gedung memberi kesan artwork poster.
-                drawCircle(
-                    color = palette[2].copy(alpha = 0.9f),
-                    radius = posterWidth * 0.17f,
-                    center = Offset(posterLeft + posterWidth * 0.68f, posterTop + posterHeight * 0.30f)
-                )
-                val posterScene = androidx.compose.ui.graphics.Path().apply {
-                    moveTo(posterLeft, posterTop + posterHeight * 0.72f)
-                    lineTo(posterLeft + posterWidth * 0.28f, posterTop + posterHeight * 0.43f)
-                    lineTo(posterLeft + posterWidth * 0.48f, posterTop + posterHeight * 0.68f)
-                    lineTo(posterLeft + posterWidth * 0.72f, posterTop + posterHeight * 0.40f)
-                    lineTo(posterLeft + posterWidth, posterTop + posterHeight * 0.70f)
-                    lineTo(posterLeft + posterWidth, posterTop + posterHeight)
-                    lineTo(posterLeft, posterTop + posterHeight)
-                    close()
-                }
-                drawPath(posterScene, color = palette[0].copy(alpha = 0.88f))
-                // Siluet karakter di tengah poster.
-                drawCircle(
-                    color = Color(0xFF080B16).copy(alpha = 0.88f),
-                    radius = posterWidth * 0.085f,
-                    center = Offset(posterLeft + posterWidth * 0.48f, posterTop + posterHeight * 0.57f)
-                )
-                drawRoundRect(
-                    color = Color(0xFF080B16).copy(alpha = 0.88f),
-                    topLeft = Offset(posterLeft + posterWidth * 0.39f, posterTop + posterHeight * 0.65f),
-                    size = Size(posterWidth * 0.18f, posterHeight * 0.24f),
-                    cornerRadius = CornerRadius(posterWidth * 0.06f)
-                )
-                drawRoundRect(
-                    color = Color.White.copy(alpha = 0.88f),
-                    topLeft = Offset(posterLeft + posterWidth * 0.16f, posterTop + posterHeight * 0.88f),
-                    size = Size(posterWidth * 0.68f, 2.5f),
-                    cornerRadius = CornerRadius(1f)
-                )
-                drawRoundRect(
-                    color = Color.White.copy(alpha = 0.48f),
-                    topLeft = Offset(posterLeft + posterWidth * 0.28f, posterTop + posterHeight * 0.93f),
-                    size = Size(posterWidth * 0.44f, 1.8f),
-                    cornerRadius = CornerRadius(1f)
-                )
-                drawRoundRect(
-                    color = Color(0xFF20C8F5).copy(alpha = 0.35f),
-                    topLeft = Offset(x + 4f, top),
-                    size = Size(frameWidth - 8f, frameHeight),
-                    cornerRadius = CornerRadius(9f),
-                    style = Stroke(width = 2f)
-                )
-                // Lubang perforasi khas pita film.
-                for (hole in 0..3) {
-                    val holeX = x + frameWidth * (0.18f + hole * 0.21f)
-                    drawRoundRect(
-                        color = Color(0xFF9CA9C8).copy(alpha = 0.5f),
-                        topLeft = Offset(holeX, top + 5f),
-                        size = Size(frameWidth * 0.11f, 5f),
-                        cornerRadius = CornerRadius(2f)
-                    )
-                    drawRoundRect(
-                        color = Color(0xFF9CA9C8).copy(alpha = 0.5f),
-                        topLeft = Offset(holeX, top + frameHeight - 10f),
-                        size = Size(frameWidth * 0.11f, 5f),
-                        cornerRadius = CornerRadius(2f)
-                    )
+            Row(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer { translationX = -filmProgress * 112.dp.toPx() },
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                repeat(3) {
+                    moviePosters.forEachIndexed { index, posterUrl ->
+                        Box(
+                            modifier = Modifier
+                                .width(96.dp)
+                                .fillMaxHeight()
+                                .padding(vertical = 13.dp)
+                                .clip(RoundedCornerShape(7.dp))
+                                .background(Color(0xFF18233A))
+                                .border(
+                                    BorderStroke(1.dp, Color(0xFF20C8F5).copy(alpha = 0.55f)),
+                                    RoundedCornerShape(7.dp)
+                                )
+                        ) {
+                            AsyncImage(
+                                model = ImageRequest.Builder(LocalContext.current)
+                                    .data(posterUrl)
+                                    .crossfade(true)
+                                    .build(),
+                                contentDescription = "Poster film superhero nomor ${index + 1}",
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        }
+                    }
                 }
             }
-            drawRect(
-                brush = Brush.horizontalGradient(
-                    listOf(Color.Transparent, Color(0xFF8B5CF6).copy(alpha = 0.16f), Color.Transparent)
-                ),
-                topLeft = Offset(0f, 0f),
-                size = Size(size.width, size.height)
+            // Lubang perforasi di sisi atas dan bawah pita film.
+            Column(
+                modifier = Modifier.fillMaxSize(),
+                verticalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().height(9.dp).background(Color(0xFF050811)),
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    repeat(12) {
+                        Box(Modifier.size(13.dp, 5.dp).clip(RoundedCornerShape(2.dp)).background(Color(0xFF9CA9C8).copy(alpha = 0.55f)))
+                    }
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth().height(9.dp).background(Color(0xFF050811)),
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    repeat(12) {
+                        Box(Modifier.size(13.dp, 5.dp).clip(RoundedCornerShape(2.dp)).background(Color(0xFF9CA9C8).copy(alpha = 0.55f)))
+                    }
+                }
+            }
+            Box(
+                Modifier.fillMaxSize().background(
+                    Brush.horizontalGradient(
+                        listOf(Color(0xFF03040A).copy(alpha = 0.12f), Color.Transparent, Color(0xFF03040A).copy(alpha = 0.12f))
+                    )
+                )
             )
         }
         Column(
