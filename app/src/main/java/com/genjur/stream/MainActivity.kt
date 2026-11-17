@@ -1865,7 +1865,8 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
             onPlay = { selectedVersion ->
                 if (selectedVersion.videoUrl.isNotBlank()) {
                     recordWatch(selectedVersion)
-                    selectedMovie = null
+                    // Pertahankan halaman detail di belakang player.
+                    // Saat player ditutup, pengguna kembali ke detail film, bukan katalog.
                     playingMovie = selectedVersion
                 }
             }
