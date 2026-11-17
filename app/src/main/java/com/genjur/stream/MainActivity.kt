@@ -132,8 +132,15 @@ private val VIDEO_FILTER_CATEGORIES = listOf("Animasi", "Drama", "Action", "Adve
 private val DEFAULT_VIDEO_FILTERS = VIDEO_FILTER_CATEGORIES.filterNot { it == "Adult 18+" }.toSet()
 
 private fun matchesVideoFilters(movie: FeedMovie, enabled: Set<String>): Boolean {
-    val text = (movie.title + " " + movie.category + " " + movie.genres.joinToString(" ") + " " + movie.description).lowercase()
-    val adult = Regex("""(?i)(\badult\b|18\s*\+|xxx|hentai|pornographic|porn\b)""").containsMatchIn(text)
+    val text = (movie.title + " " + movie.category + " " + movie.genres.joinToString(" ") + " " + movie.description)
+        .lowercase()
+        .replace(Regex("""<[^>]*>"""), " ")
+        .replace("&nbsp;", " ")
+    // Deteksi istilah dewasa Indonesia/Inggris dari judul, kategori, genre, maupun detail film.
+    // Frasa "film romance" ikut ditandai, tetapi genre "Romance" biasa tidak otomatis dianggap dewasa.
+    val adult = Regex(
+        """(?i)(\b18\s*\+\b|\b21\s*\+\b|\badult\b|\bdewasa\b|\bbokep\b|\bblue\s*film\b|\bfilm\s+semi\b|\bsemi\s+dewasa\b|\bsemi\b|\berotis\b|\berotic\b|\berotica\b|\bporn(?:o|ographic)?\b|\bxxx\b|\bhentai\b|\bjav\b|\buncensored\b|\bsex(?:ual)?\b|\bnudity\b|\bfilm\s+romance\b)"""
+    ).containsMatchIn(text)
     if (adult) return "Adult 18+" in enabled
     val tags = (movie.genres + movie.category.split(",", "/", "|", "•")).map { raw ->
         when (raw.trim().lowercase()) {
