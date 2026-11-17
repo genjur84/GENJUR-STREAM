@@ -13,7 +13,7 @@
         android:label="GENJUR STREAM"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher"
-        android:theme="@android:style/Theme.Material.NoActionBar"
+        android:theme="@style/Theme.GenjurStream.Starting"
         android:usesCleartextTraffic="false">
 
         <provider
