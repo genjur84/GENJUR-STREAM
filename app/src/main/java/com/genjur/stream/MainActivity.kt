@@ -63,6 +63,7 @@ import androidx.compose.ui.platform.LocalContext
 import coil.request.ImageRequest
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.window.DialogWindowProvider
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
 import androidx.media3.exoplayer.ExoPlayer
@@ -3758,10 +3759,25 @@ private fun InAppVideoPlayer(
         onDismissRequest = onClose,
         properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
+        // Ambil window dialog yang benar: pada Android, menyembunyikan system bar
+        // hanya pada activity window tidak selalu membuat dialog ikut edge-to-edge.
+        val playerDialogWindow = (LocalView.current.parent as? DialogWindowProvider)?.window
+        SideEffect {
+            playerDialogWindow?.let { window ->
+                WindowCompat.setDecorFitsSystemWindows(window, !isFullscreen)
+                val bars = WindowInsetsControllerCompat(window, window.decorView)
+                if (isFullscreen) {
+                    bars.hide(WindowInsetsCompat.Type.systemBars())
+                    bars.systemBarsBehavior =
+                        WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                } else {
+                    bars.show(WindowInsetsCompat.Type.systemBars())
+                }
+            }
+        }
         Surface(
-            modifier = if (isFullscreen) Modifier.fillMaxSize() else
-                Modifier.fillMaxWidth().fillMaxHeight(0.88f).padding(12.dp),
-            shape = if (isFullscreen) RoundedCornerShape(0.dp) else RoundedCornerShape(20.dp),
+            modifier = Modifier.fillMaxSize(),
+            shape = RoundedCornerShape(0.dp),
             color = Color.Black
         ) {
             if (isFullscreen) {
