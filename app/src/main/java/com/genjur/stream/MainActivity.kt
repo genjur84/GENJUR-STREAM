@@ -170,7 +170,8 @@ internal data class FeedMovie(
     val downloadAllowed: Boolean = false,
     val subtitleUrl: String = "",
     val subtitleLanguage: String = "",
-    val streamOptions: List<StreamOption> = emptyList()
+    val streamOptions: List<StreamOption> = emptyList(),
+    val trailerUrl: String = ""
 )
 private fun movieKey(movie: FeedMovie): String =
     "${movie.title.trim().lowercase()}|${movie.videoUrl.trim()}|${movie.licenseId}"
@@ -182,6 +183,7 @@ private fun encodeMovie(movie: FeedMovie): JSONObject = JSONObject().apply {
     put("releaseYear", movie.releaseYear); put("genres", JSONArray(movie.genres)); put("duration", movie.duration)
     put("downloadUrl", movie.downloadUrl); put("downloadAllowed", movie.downloadAllowed)
     put("subtitleUrl", movie.subtitleUrl); put("subtitleLanguage", movie.subtitleLanguage)
+    put("trailerUrl", movie.trailerUrl)
     put("streams", JSONArray().apply { movie.streamOptions.forEach { put(JSONObject().put("quality", it.quality).put("videoUrl", it.videoUrl)) } })
 }
 
@@ -200,6 +202,7 @@ private fun decodeMovie(json: JSONObject): FeedMovie {
         downloadAllowed = json.optBoolean("downloadAllowed", false),
         subtitleUrl = json.optString("subtitleUrl"),
         subtitleLanguage = json.optString("subtitleLanguage", "id"),
+        trailerUrl = json.optString("trailerUrl"),
         streamOptions = json.optJSONArray("streams")?.let { arr ->
             (0 until arr.length()).mapNotNull { index -> arr.optJSONObject(index)?.let { item ->
                 StreamOption(item.optString("quality", "Otomatis"), item.optString("videoUrl"))
@@ -512,10 +515,39 @@ private suspend fun loadSourceMovieDetails(movie: FeedMovie): FeedMovie = withCo
         .distinct().take(8).ifEmpty { movie.genres }
     val duration = document.selectFirst("[itemprop=duration], .runtime, .duration, .movie-runtime")
         ?.text()?.trim()?.takeIf { it.isNotBlank() } ?: movie.duration
+    // Ambil trailer yang memang ditautkan oleh halaman sumber.
+    val trailerRaw = document.select("iframe[src], a[href], video[src], video source[src]")
+        .mapNotNull { element ->
+            val raw = if (element.hasAttr("src")) element.attr("src") else element.attr("href")
+            val label = (element.text() + " " + element.attr("title") + " " +
+                element.attr("aria-label") + " " + element.attr("class")).lowercase()
+            val host = runCatching { Uri.parse(raw).host.orEmpty().lowercase() }.getOrDefault("")
+            val isVideoHost = host.contains("youtube.com") || host == "youtu.be" ||
+                host.contains("youtube-nocookie.com") || host.contains("vimeo.com")
+            if (raw.isNotBlank() && (isVideoHost || label.contains("trailer") || label.contains("teaser"))) raw else null
+        }.firstOrNull().orEmpty()
+    val trailerUrl = runCatching {
+        val absolute = when {
+            trailerRaw.startsWith("//") -> "https:$trailerRaw"
+            trailerRaw.startsWith("https://") -> trailerRaw
+            trailerRaw.startsWith("http://") -> trailerRaw.replaceFirst("http://", "https://")
+            trailerRaw.isNotBlank() -> URL(URL(pageUrl), trailerRaw).toString()
+            else -> ""
+        }
+        val uri = Uri.parse(absolute)
+        when {
+            uri.host.orEmpty().contains("youtube.com") && uri.path.orEmpty().startsWith("/embed/") -> absolute
+            uri.host.orEmpty().contains("youtube.com") -> uri.getQueryParameter("v")?.let { "https://www.youtube-nocookie.com/embed/$it" } ?: absolute
+            uri.host.orEmpty() == "youtu.be" -> uri.lastPathSegment?.let { "https://www.youtube-nocookie.com/embed/$it" } ?: absolute
+            uri.host.orEmpty().contains("youtube-nocookie.com") || uri.host.orEmpty().contains("vimeo.com") -> absolute
+            uri.scheme == "https" -> absolute
+            else -> ""
+        }
+    }.getOrDefault("")
     val options = streams.map { url -> StreamOption(detectedQualityLabel("", url), url) }
     movie.copy(title = title.take(140), description = description.take(1200), posterUrl = poster,
         releaseYear = year, genres = genres, duration = duration, termsUrl = pageUrl,
-        streamOptions = options)
+        streamOptions = options, trailerUrl = trailerUrl.ifBlank { movie.trailerUrl })
 }
 
 class MainActivity : ComponentActivity() {
@@ -1967,6 +1999,7 @@ private fun MovieDetailDialog(
         mutableStateOf(if (isSourceMetadataOnly) movie.streamOptions.firstOrNull()?.videoUrl ?: movie.termsUrl
             else movie.streamOptions.firstOrNull()?.videoUrl ?: movie.videoUrl)
     }
+    var showTrailer by remember(movie) { mutableStateOf(false) }
     Dialog(onDismissRequest = onClose, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         // Halaman detail menutup katalog sepenuhnya, bukan dialog mengambang.
         Surface(Modifier.fillMaxSize(),
@@ -2000,6 +2033,18 @@ private fun MovieDetailDialog(
                     if (movie.genres.isNotEmpty()) {
                         Spacer(Modifier.height(10.dp))
                         Text(movie.genres.joinToString("  •  "), color = Color(0xFFD5C9E8), fontSize = 12.sp)
+                    }
+                    if (movie.trailerUrl.isNotBlank()) {
+                        Spacer(Modifier.height(14.dp))
+                        OutlinedButton(
+                            onClick = { showTrailer = true },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = Green)
+                        ) {
+                            Icon(Icons.Filled.PlayArrow, contentDescription = null)
+                            Spacer(Modifier.width(8.dp))
+                            Text("Tonton Trailer")
+                        }
                     }
                     Spacer(Modifier.height(22.dp))
                     Divider(color = Color(0xFF393344))
@@ -2069,6 +2114,38 @@ private fun MovieDetailDialog(
                         Text(if (selectedStreamUrl.isBlank()) "▶  PLAY — Stream belum tersedia" else "▶  PLAY sekarang")
                     }
                     TextButton(onClick = onClose, modifier = Modifier.fillMaxWidth()) { Text("Kembali ke katalog", color = Green) }
+                }
+            }
+        }
+    }
+    if (showTrailer) {
+        Dialog(
+            onDismissRequest = { showTrailer = false },
+            properties = DialogProperties(usePlatformDefaultWidth = false)
+        ) {
+            Surface(Modifier.fillMaxSize(), color = Color.Black, shape = RoundedCornerShape(0.dp)) {
+                Column(Modifier.fillMaxSize()) {
+                    Row(
+                        Modifier.fillMaxWidth().background(Panel).padding(horizontal = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("Trailer • " + movie.title, color = Color.White,
+                            modifier = Modifier.weight(1f), maxLines = 1, fontWeight = FontWeight.Bold)
+                        TextButton(onClick = { showTrailer = false }) { Text("Tutup", color = Green) }
+                    }
+                    AndroidView(
+                        factory = { ctx ->
+                            WebView(ctx).apply {
+                                settings.javaScriptEnabled = true
+                                settings.domStorageEnabled = true
+                                settings.mediaPlaybackRequiresUserGesture = true
+                                webViewClient = WebViewClient()
+                                webChromeClient = WebChromeClient()
+                                loadUrl(movie.trailerUrl)
+                            }
+                        },
+                        modifier = Modifier.fillMaxSize()
+                    )
                 }
             }
         }
