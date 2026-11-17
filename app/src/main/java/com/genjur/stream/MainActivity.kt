@@ -1596,6 +1596,7 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                                                     sourceName = catalogSourceName,
                                                     sourceUrl = catalogSourceUrl,
                                                     movies = sourceCatalogMovies,
+                                                    enabledVideoFilters = enabledVideoFilters,
                                                     loading = sourceCatalogLoading,
                                                     message = sourceCatalogMessage,
                                                     onMoviesLoaded = { sourceCatalogMovies = it },
