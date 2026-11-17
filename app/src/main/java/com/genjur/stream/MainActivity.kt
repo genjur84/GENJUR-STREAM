@@ -3606,6 +3606,7 @@ private fun SourceFallbackPlayer(
         }
         }
     }
+    }
 }
 
 @Composable
