@@ -2230,6 +2230,7 @@ private fun SourceCatalogScreen(
     var reloadToken by remember(sourceUrl) { mutableIntStateOf(0) }
     var gridColumns by remember(sourceUrl) { mutableIntStateOf(3) }
     var selectedGenre by remember(sourceUrl) { mutableStateOf("Semua") }
+    var categoryMenuExpanded by remember(sourceUrl) { mutableStateOf(false) }
     val plugin = remember(sourceUrl) { SourcePluginRegistry.resolve(sourceUrl) }
 
     LaunchedEffect(sourceUrl, reloadToken) {
@@ -2306,14 +2307,36 @@ private fun SourceCatalogScreen(
             color = Muted, fontSize = 11.sp
         )
         if (movies.isNotEmpty()) {
-            if (genreOptions.isNotEmpty()) {
-                Row(
-                    Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    FilterChip(selected = selectedGenre == "Semua", onClick = { selectedGenre = "Semua" }, label = { Text("Semua") })
-                    genreOptions.forEach { genre ->
-                        FilterChip(selected = selectedGenre == genre, onClick = { selectedGenre = genre }, label = { Text(genre) })
+            Row(
+                Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text("Kategori film", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                Box {
+                    OutlinedButton(onClick = { categoryMenuExpanded = true }) {
+                        Text(selectedGenre, color = Color.White, maxLines = 1)
+                        Spacer(Modifier.width(6.dp))
+                        Text("⌄", color = Green)
+                    }
+                    DropdownMenu(
+                        expanded = categoryMenuExpanded,
+                        onDismissRequest = { categoryMenuExpanded = false }
+                    ) {
+                        (listOf("Semua") + genreOptions).forEach { genre ->
+                            DropdownMenuItem(
+                                text = {
+                                    Text(
+                                        if (selectedGenre == genre) "✓  $genre" else genre,
+                                        color = if (selectedGenre == genre) Green else Color.White
+                                    )
+                                },
+                                onClick = {
+                                    selectedGenre = genre
+                                    categoryMenuExpanded = false
+                                }
+                            )
+                        }
                     }
                 }
             }
