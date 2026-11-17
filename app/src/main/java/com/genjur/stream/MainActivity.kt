@@ -1530,7 +1530,7 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                                 // Katalog tampil sebagai lapisan penuh di atas halaman utama,
                                 // termasuk menutupi header dan navigasi bawah.
                                 Dialog(
-                                    onDismissRequest = { selectedTab = "Sumber Link" },
+                                    onDismissRequest = { selectedTab = "Beranda" },
                                     properties = DialogProperties(usePlatformDefaultWidth = false)
                                 ) {
                                     Surface(
