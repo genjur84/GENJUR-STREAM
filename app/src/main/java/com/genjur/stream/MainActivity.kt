@@ -3624,8 +3624,15 @@ private fun InAppVideoPlayer(
     fallbackVideoUrls: List<String> = emptyList()
 ) {
     var isFullscreen by remember { mutableStateOf(false) }
-    var videoResizeMode by remember { mutableStateOf(AspectRatioFrameLayout.RESIZE_MODE_ZOOM) }
+    // -1 = Otomatis: pas di portrait, memenuhi layar di landscape.
+    var videoResizeMode by remember { mutableIntStateOf(-1) }
+    val effectiveResizeMode = when (videoResizeMode) {
+        -1 -> if (isFullscreen) AspectRatioFrameLayout.RESIZE_MODE_ZOOM
+              else AspectRatioFrameLayout.RESIZE_MODE_FIT
+        else -> videoResizeMode
+    }
     val videoResizeLabel = when (videoResizeMode) {
+        -1 -> "Auto"
         AspectRatioFrameLayout.RESIZE_MODE_FIT -> "Pas"
         AspectRatioFrameLayout.RESIZE_MODE_FILL -> "Regang"
         else -> "Penuh"
@@ -3797,13 +3804,13 @@ private fun InAppVideoPlayer(
                                 useController = true
                                 // Perbesar video agar memenuhi layar landscape; sisi video
                                 // yang terpotong mengikuti rasio layar, tanpa meregangkan gambar.
-                                resizeMode = videoResizeMode
+                                resizeMode = effectiveResizeMode
                                 setShowBuffering(PlayerView.SHOW_BUFFERING_WHEN_PLAYING)
                             }
                         },
                         update = {
                             it.player = player
-                            it.resizeMode = videoResizeMode
+                            it.resizeMode = effectiveResizeMode
                         },
                         modifier = Modifier.fillMaxSize()
                     )
@@ -3814,9 +3821,10 @@ private fun InAppVideoPlayer(
                     ) {
                         TextButton(onClick = {
                             videoResizeMode = when (videoResizeMode) {
-                                AspectRatioFrameLayout.RESIZE_MODE_ZOOM -> AspectRatioFrameLayout.RESIZE_MODE_FIT
+                                -1 -> AspectRatioFrameLayout.RESIZE_MODE_FIT
                                 AspectRatioFrameLayout.RESIZE_MODE_FIT -> AspectRatioFrameLayout.RESIZE_MODE_FILL
-                                else -> AspectRatioFrameLayout.RESIZE_MODE_ZOOM
+                                AspectRatioFrameLayout.RESIZE_MODE_FILL -> AspectRatioFrameLayout.RESIZE_MODE_ZOOM
+                                else -> -1
                             }
                         }) {
                             Text(videoResizeLabel, color = Color.White)
@@ -3851,6 +3859,7 @@ private fun InAppVideoPlayer(
                             PlayerView(context).apply {
                                 this.player = player
                                 useController = true
+                                resizeMode = effectiveResizeMode
                                 setShowBuffering(PlayerView.SHOW_BUFFERING_WHEN_PLAYING)
                             }
                         },
