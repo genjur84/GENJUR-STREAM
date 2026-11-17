@@ -505,6 +505,19 @@ internal fun loadGenericHtmlCatalog(sourceUrl: String, html: String, sourceName:
         if (title.length !in 2..120) return@forEach
         if (title.lowercase() in setOf("watch now", "watch movie", "tonton film", "play", "read more", "lihat semua", "more", "hd", "trailer")) return@forEach
         val cardText = card.text().replace(Regex("\\s+"), " ").trim().take(900)
+        // Banyak tema LK21 menaruh label kualitas pada elemen terpisah, bukan teks judul kartu.
+        val qualityText = buildString {
+            append(title).append(' ').append(cardText)
+            card.select("[class*=quality], [class*=resolution], [class*=ribbon], [class*=badge], [class*=label], [data-quality], [data-resolution], .mli-quality, .quality")
+                .forEach { element ->
+                    append(' ').append(element.text()).append(' ')
+                    append(element.attr("class")).append(' ')
+                    append(element.attr("data-quality")).append(' ')
+                    append(element.attr("data-resolution")).append(' ')
+                }
+            append(' ').append(link.attr("class")).append(' ')
+            append(link.attr("data-quality"))
+        }
         val year = Regex("\\b(?:19|20)\\d{2}\\b").find("$title $cardText")?.value.orEmpty()
         val category = categoryWords.firstOrNull { cardText.contains(it, true) } ?: "Film"
         val poster = image?.let { img ->
@@ -527,7 +540,7 @@ internal fun loadGenericHtmlCatalog(sourceUrl: String, html: String, sourceName:
             title = title, description = description, category = category, videoUrl = href,
             licenseId = "Metadata halaman sumber", termsUrl = sourceUrl,
             attribution = "Metadata katalog $sourceLabel", posterUrl = poster,
-            qualityLabel = catalogQualityFromText("$title $cardText"),
+            qualityLabel = catalogQualityFromText(qualityText),
             releaseYear = year, genres = categoryWords.filter { cardText.contains(it, true) }.distinct().take(5)
         ))
     }
