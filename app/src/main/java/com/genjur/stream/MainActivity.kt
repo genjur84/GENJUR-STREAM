@@ -53,6 +53,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
 import coil.compose.AsyncImage
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -3626,9 +3627,16 @@ private fun InAppVideoPlayer(
     var isFullscreen by remember { mutableStateOf(false) }
     // -1 = Otomatis: pas di portrait, memenuhi layar di landscape.
     var videoResizeMode by remember { mutableIntStateOf(-1) }
+    var videoAspectRatio by remember { mutableFloatStateOf(0f) }
+    var playerAreaAspectRatio by remember { mutableFloatStateOf(0f) }
+    // Auto compares the actual video ratio with the available player area.
+    // If they are close, fill the screen; if they differ significantly,
+    // show the complete frame rather than cropping too much.
     val effectiveResizeMode = when (videoResizeMode) {
-        -1 -> if (isFullscreen) AspectRatioFrameLayout.RESIZE_MODE_ZOOM
-              else AspectRatioFrameLayout.RESIZE_MODE_FIT
+        -1 -> if (videoAspectRatio > 0f && playerAreaAspectRatio > 0f &&
+            kotlin.math.abs(videoAspectRatio / playerAreaAspectRatio - 1f) > 0.12f
+        ) AspectRatioFrameLayout.RESIZE_MODE_FIT
+          else AspectRatioFrameLayout.RESIZE_MODE_ZOOM
         else -> videoResizeMode
     }
     val videoResizeLabel = when (videoResizeMode) {
@@ -3682,6 +3690,11 @@ private fun InAppVideoPlayer(
         // langsung dari player situs. Setiap kandidat hanya dicoba satu kali.
         val attemptedServerUrls = mutableSetOf(movie.videoUrl)
         val fallbackListener = object : Player.Listener {
+            override fun onVideoSizeChanged(videoSize: androidx.media3.common.VideoSize) {
+                if (videoSize.height > 0) {
+                    videoAspectRatio = videoSize.width * videoSize.pixelWidthHeightRatio / videoSize.height
+                }
+            }
             override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
                 val nextServer = fallbackVideoUrls.firstOrNull {
                     it.isNotBlank() && it !in attemptedServerUrls
@@ -3812,7 +3825,9 @@ private fun InAppVideoPlayer(
                             it.player = player
                             it.resizeMode = effectiveResizeMode
                         },
-                        modifier = Modifier.fillMaxSize()
+                        modifier = Modifier.fillMaxSize().onSizeChanged { size ->
+                            if (size.height > 0) playerAreaAspectRatio = size.width.toFloat() / size.height
+                        }
                     )
                     Row(
                         modifier = Modifier.align(Alignment.TopEnd).padding(8.dp),
