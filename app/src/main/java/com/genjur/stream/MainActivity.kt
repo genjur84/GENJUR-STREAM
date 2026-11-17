@@ -1501,25 +1501,35 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                                         color = Bg,
                                         shape = RoundedCornerShape(0.dp)
                                     ) {
-                                        Column(
-                                            Modifier.fillMaxSize()
-                                                .verticalScroll(rememberScrollState())
-                                                .padding(horizontal = horizontal, vertical = 10.dp)
-                                        ) {
-                                            SourceCatalogScreen(
-                                                sourceName = catalogSourceName,
-                                                sourceUrl = catalogSourceUrl,
-                                                movies = sourceCatalogMovies,
-                                                loading = sourceCatalogLoading,
-                                                message = sourceCatalogMessage,
-                                                onMoviesLoaded = { sourceCatalogMovies = it },
-                                                onLoadingChanged = { sourceCatalogLoading = it },
-                                                onMessageChanged = { sourceCatalogMessage = it },
-                                                onOpenMovie = { movie -> selectedMovie = movie },
-                                                onOpenSource = {
-                                                    browserInitialUrl = catalogSourceUrl
-                                                    selectedTab = "Browser Sumber"
-                                                }
+                                        Box(Modifier.fillMaxSize()) {
+                                            Column(
+                                                Modifier.fillMaxSize()
+                                                    .verticalScroll(rememberScrollState())
+                                                    .padding(start = horizontal, end = horizontal, top = 10.dp, bottom = 88.dp)
+                                            ) {
+                                                SourceCatalogScreen(
+                                                    sourceName = catalogSourceName,
+                                                    sourceUrl = catalogSourceUrl,
+                                                    movies = sourceCatalogMovies,
+                                                    loading = sourceCatalogLoading,
+                                                    message = sourceCatalogMessage,
+                                                    onMoviesLoaded = { sourceCatalogMovies = it },
+                                                    onLoadingChanged = { sourceCatalogLoading = it },
+                                                    onMessageChanged = { sourceCatalogMessage = it },
+                                                    onOpenMovie = { movie -> selectedMovie = movie },
+                                                    onOpenSource = {
+                                                        browserInitialUrl = catalogSourceUrl
+                                                        selectedTab = "Browser Sumber"
+                                                    }
+                                                )
+                                            }
+                                            ExtendedFloatingActionButton(
+                                                onClick = { selectedTab = "Sumber Link" },
+                                                modifier = Modifier.align(Alignment.BottomEnd).padding(18.dp),
+                                                containerColor = Green,
+                                                contentColor = Color.White,
+                                                icon = { Icon(Icons.Filled.Link, contentDescription = "Sumber Link") },
+                                                text = { Text("Sumber Link", fontWeight = FontWeight.Bold) }
                                             )
                                         }
                                     }
