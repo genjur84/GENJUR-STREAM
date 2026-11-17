@@ -2604,36 +2604,28 @@ private fun SourceCatalogScreen(
             }
         }
         if (movies.isNotEmpty()) {
+            Text("Kategori film", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
             Row(
-                Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
+                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("Kategori film", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-                Box {
-                    OutlinedButton(onClick = { categoryMenuExpanded = true }) {
-                        Text(selectedGenre, color = Color.White, maxLines = 1)
-                        Spacer(Modifier.width(6.dp))
-                        Text("⌄", color = Green)
-                    }
-                    DropdownMenu(
-                        expanded = categoryMenuExpanded,
-                        onDismissRequest = { categoryMenuExpanded = false }
+                (listOf("Semua") + genreOptions).forEach { genre ->
+                    val isSelected = selectedGenre == genre
+                    Surface(
+                        modifier = Modifier.clickable { selectedGenre = genre },
+                        shape = RoundedCornerShape(20.dp),
+                        color = if (isSelected) Green else Panel,
+                        border = if (isSelected) null else BorderStroke(1.dp, Color.White.copy(alpha = 0.12f))
                     ) {
-                        (listOf("Semua") + genreOptions).forEach { genre ->
-                            DropdownMenuItem(
-                                text = {
-                                    Text(
-                                        if (selectedGenre == genre) "✓  $genre" else genre,
-                                        color = if (selectedGenre == genre) Green else Color.White
-                                    )
-                                },
-                                onClick = {
-                                    selectedGenre = genre
-                                    categoryMenuExpanded = false
-                                }
-                            )
-                        }
+                        Text(
+                            genre,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 9.dp),
+                            color = if (isSelected) Color.White else Muted,
+                            fontSize = 12.sp,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                            maxLines = 1
+                        )
                     }
                 }
             }
