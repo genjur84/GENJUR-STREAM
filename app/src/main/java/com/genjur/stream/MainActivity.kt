@@ -3665,13 +3665,16 @@ private fun SourceFallbackPlayer(
     fun addServerCandidate(candidate: String) {
         val uri = Uri.parse(candidate)
         val path = uri.path.orEmpty().lowercase()
+        val mediaUrlText = (path + "?" + uri.encodedQuery.orEmpty()).lowercase()
         val isPlayableMedia = path.endsWith(".m3u8") || path.endsWith(".mpd") ||
             path.endsWith(".mp4") || path.endsWith(".m4v") || path.endsWith(".webm")
+        // Tolak URL media yang jelas berasal dari jaringan iklan atau endpoint
+        // pre-roll/VAST. Beberapa situs memakai host CDN berbeda untuk iklannya.
+        val adPath = Regex("""(^|[/_.?&=-])(ads?|advert|advertisement|preroll|pre-roll|vast|vpaid|popunder|banner|sponsor|tracking)([/_.?&=-]|$)""")
+            .containsMatchIn(mediaUrlText)
         if (uri.scheme !in listOf("https", "http") || uri.host.isNullOrBlank() ||
-            !isPlayableMedia || isGenjurAdHost(uri.host)) return
+            !isPlayableMedia || isGenjurAdHost(uri.host) || adPath) return
         if (detectedServerUrls.none { it == candidate }) detectedServerUrls.add(candidate)
-        // Sembunyikan halaman situs seketika saat media ditemukan agar iklan situs
-        // tidak sempat terlihat selama pengumpulan kandidat dan perpindahan player.
         showSourcePlayer = false
     }
 
@@ -3696,12 +3699,13 @@ private fun SourceFallbackPlayer(
         }
     }
 
-    // Kumpulkan beberapa URL server yang diekspos player situs sebelum mencoba
-    // server pertama. Player internal akan mencoba kandidat berikutnya jika gagal.
-    LaunchedEffect(detectedServerUrls.firstOrNull()) {
+    // Beri waktu bagi pre-roll singkat untuk selesai dan stream film utama
+    // untuk terdeteksi. Kandidat terbaru lebih mungkin merupakan stream film,
+    // sedangkan URL media pertama sering kali hanya video iklan pembuka.
+    LaunchedEffect(detectedServerUrls.size) {
         if (detectedServerUrls.isNotEmpty() && detectedDirectUrl.isBlank()) {
-            delay(2200)
-            val selected = detectedServerUrls.firstOrNull()
+            delay(6500)
+            val selected = detectedServerUrls.lastOrNull()
             val sourceView = webViewRef.value
             if (!selected.isNullOrBlank() && sourceView != null && detectedDirectUrl.isBlank()) {
                 stopSourceAndUseInternalPlayer(sourceView, selected)
