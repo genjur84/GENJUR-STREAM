@@ -1756,7 +1756,7 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                         }
                         if (selectedTab == "Cari" || selectedTab == "Kategori") {
                             Spacer(Modifier.height(14.dp))
-                            feedMovies.filter { movie ->
+                            val matchingMovies = feedMovies.filter { movie ->
                                 val selectedHost = selectedSearchSourceUrl?.let { Uri.parse(it).host?.lowercase()?.removePrefix("www.") }
                                 val movieHost = listOf(movie.videoUrl, movie.termsUrl).mapNotNull { candidate ->
                                     runCatching { Uri.parse(candidate).host?.lowercase()?.removePrefix("www.") }.getOrNull()
@@ -1765,16 +1765,42 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                                     (selectedTab != "Cari" || selectedHost == null || movieHost == selectedHost || movieHost?.endsWith(".$selectedHost") == true) &&
                                     (category == "Semua" || selectedTab != "Kategori" || movie.category.equals(category, true)) &&
                                     (search.isBlank() || movie.title.contains(search, true) || movie.description.contains(search, true) || movie.genres.any { it.contains(search, true) })
-                            }.forEach { movie ->
-                                Card(Modifier.fillMaxWidth().padding(bottom = 9.dp), colors = CardDefaults.cardColors(containerColor = Panel)) {
-                                    Row(Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
-                                        Column(Modifier.weight(1f)) {
-                                            Text(movie.title, color = Color.White, fontWeight = FontWeight.Bold)
-                                            if (selectedTab != "Cari") {
-                                                Text(movie.category, color = Green, fontSize = 11.sp)
+                            }
+                            if (selectedTab == "Cari") {
+                                if (matchingMovies.isEmpty()) {
+                                    Text("Film tidak ditemukan.", color = Muted, fontSize = 13.sp)
+                                } else {
+                                    matchingMovies.chunked(3).forEach { posterRow ->
+                                        Row(
+                                            Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.spacedBy(9.dp)
+                                        ) {
+                                            posterRow.forEach { movie ->
+                                                Box(
+                                                    Modifier.weight(1f).clickable { selectedMovie = movie }
+                                                ) {
+                                                    MoviePoster(
+                                                        url = movie.posterUrl,
+                                                        title = movie.title,
+                                                        height = 190.dp
+                                                    )
+                                                }
+                                            }
+                                            repeat(3 - posterRow.size) {
+                                                Spacer(Modifier.weight(1f))
                                             }
                                         }
-                                        if (selectedTab != "Cari") {
+                                        Spacer(Modifier.height(12.dp))
+                                    }
+                                }
+                            } else {
+                                matchingMovies.forEach { movie ->
+                                    Card(Modifier.fillMaxWidth().padding(bottom = 9.dp), colors = CardDefaults.cardColors(containerColor = Panel)) {
+                                        Row(Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                                            Column(Modifier.weight(1f)) {
+                                                Text(movie.title, color = Color.White, fontWeight = FontWeight.Bold)
+                                                Text(movie.category, color = Green, fontSize = 11.sp)
+                                            }
                                             TextButton(onClick = {
                                                 if (movie.licenseId == "Metadata halaman sumber") {
                                                     browserInitialUrl = movie.videoUrl
