@@ -3399,13 +3399,6 @@ private fun SourceFallbackPlayer(
         }
     }
 
-    // Pertahankan satu dialog induk selama transisi player situs ke player internal.
-    // Dengan begitu, saat salah satu dialog player berganti, katalog tidak sempat terlihat.
-    Dialog(
-        onDismissRequest = onClose,
-        properties = DialogProperties(usePlatformDefaultWidth = false)
-    ) {
-        Surface(Modifier.fillMaxSize(), color = Color.Black) {
     // Jika halaman sumber menyediakan URL media HTML5 biasa yang dapat diakses,
     // pindahkan pemutaran ke ExoPlayer GENJUR. Jika tidak, tetap gunakan player situs.
     if (detectedDirectUrl.isNotBlank()) {
@@ -3603,7 +3596,6 @@ private fun SourceFallbackPlayer(
                     }
                 }
             }
-        }
         }
     }
 }
