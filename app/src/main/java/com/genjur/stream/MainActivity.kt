@@ -2456,16 +2456,7 @@ private fun SourceCatalogScreen(
     var reloadToken by remember(sourceUrl) { mutableIntStateOf(0) }
     var gridColumns by remember(sourceUrl) { mutableIntStateOf(3) }
     var selectedGenre by remember(sourceUrl) { mutableStateOf("Semua") }
-    var catalogSearch by remember(sourceUrl) { mutableStateOf("") }
     var categoryMenuExpanded by remember(sourceUrl) { mutableStateOf(false) }
-    val keyboardController = LocalSoftwareKeyboardController.current
-    val focusManager = LocalFocusManager.current
-    var catalogSearchFocused by remember(sourceUrl) { mutableStateOf(false) }
-    BackHandler(enabled = catalogSearchFocused) {
-        keyboardController?.hide()
-        focusManager.clearFocus(force = true)
-        catalogSearchFocused = false
-    }
     val plugin = remember(sourceUrl) { SourcePluginRegistry.resolve(sourceUrl) }
 
     LaunchedEffect(sourceUrl, reloadToken) {
@@ -2517,19 +2508,11 @@ private fun SourceCatalogScreen(
             .filter { it.isNotBlank() && it != "Film" && it != "Serial" && it != "Series" }
             .distinct().sorted()
     }
-    val visibleMovies = remember(movies, selectedGenre, catalogSearch) {
+    val visibleMovies = remember(movies, selectedGenre) {
         movies.filter { movie ->
-            val matchesGenre = selectedGenre == "Semua" ||
+            selectedGenre == "Semua" ||
                 (movie.genres + movie.category.split(",", "/", "|", "•")).map(::normalizeGenre)
                     .any { it.equals(selectedGenre, ignoreCase = true) }
-            val query = catalogSearch.trim()
-            val matchesSearch = query.isBlank() ||
-                movie.title.contains(query, ignoreCase = true) ||
-                movie.description.contains(query, ignoreCase = true) ||
-                movie.releaseYear.contains(query, ignoreCase = true) ||
-                movie.category.contains(query, ignoreCase = true) ||
-                movie.genres.any { it.contains(query, ignoreCase = true) }
-            matchesGenre && matchesSearch
         }
     }
     val featuredMovies = remember(visibleMovies) {
@@ -2564,24 +2547,7 @@ private fun SourceCatalogScreen(
             else "Katalog native • Plugin ${plugin.displayName}",
             color = Muted, fontSize = 11.sp
         )
-        OutlinedTextField(
-            value = catalogSearch,
-            onValueChange = { catalogSearch = it },
-            modifier = Modifier.fillMaxWidth().onFocusChanged { catalogSearchFocused = it.isFocused },
-            singleLine = true,
-            placeholder = { Text("Cari judul film...", color = Muted) },
-            label = { Text("Pencarian katalog") },
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedTextColor = Color.White,
-                unfocusedTextColor = Color.White,
-                focusedBorderColor = Green,
-                unfocusedBorderColor = Muted.copy(alpha = 0.5f),
-                focusedLabelColor = Green,
-                unfocusedLabelColor = Muted,
-                cursorColor = Green
-            )
-        )
-        if (featuredMovie != null && catalogSearch.isBlank()) {
+        if (featuredMovie != null) {
             androidx.compose.animation.Crossfade(targetState = featuredMovie) { movie ->
                 Card(
                     Modifier.fillMaxWidth().height(205.dp).clickable { onOpenMovie(movie) },
@@ -2669,8 +2635,7 @@ private fun SourceCatalogScreen(
         } else {
             if (visibleMovies.isEmpty()) {
                 Text(
-                    if (catalogSearch.isNotBlank()) "Film dengan kata kunci \"$catalogSearch\" tidak ditemukan."
-                    else "Belum ada film dalam kategori $selectedGenre.",
+                    "Belum ada film dalam kategori $selectedGenre.",
                     color = Muted, fontSize = 12.sp
                 )
             }
