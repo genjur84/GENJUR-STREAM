@@ -602,6 +602,9 @@ private suspend fun loadSourceMovieDetails(movie: FeedMovie): FeedMovie = withCo
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Tampilkan UI dan animasi pembuka terlebih dahulu; pekerjaan pendukung dilakukan sesudahnya.
+        setContent { MaterialTheme { GenjurStreamApp(this) } }
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 PLAYBACK_NOTIFICATION_CHANNEL,
@@ -619,7 +622,6 @@ class MainActivity : ComponentActivity() {
             .remove("installed_extensions")
             .apply()
         scheduleBackgroundCatalogChecks()
-        setContent { MaterialTheme { GenjurStreamApp(this) } }
     }
 
     fun showWebPlaybackNotification(title: String, pageUrl: String) {
