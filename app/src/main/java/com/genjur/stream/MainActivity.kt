@@ -3323,7 +3323,15 @@ private fun SourceFallbackPlayer(
     var fullscreenView by remember { mutableStateOf<android.view.View?>(null) }
     var fullscreenCallback by remember { mutableStateOf<android.webkit.WebChromeClient.CustomViewCallback?>(null) }
     var detectedDirectUrl by remember(movie) { mutableStateOf("") }
+    var showSourcePlayer by remember(movie) { mutableStateOf(false) }
     val webViewRef = remember { mutableStateOf<android.webkit.WebView?>(null) }
+
+    // Beri waktu player situs memuat sumber media di belakang layar.
+    // Jika sumber langsung belum ditemukan, tampilkan situs sebagai cadangan.
+    LaunchedEffect(movie) {
+        delay(18_000)
+        if (detectedDirectUrl.isBlank()) showSourcePlayer = true
+    }
 
     BackHandler(enabled = fullscreenView != null) {
         fullscreenCallback?.onCustomViewHidden()
@@ -3377,6 +3385,7 @@ private fun SourceFallbackPlayer(
                         }
                         TextButton(onClick = onClose) { Text("Tutup", color = Green) }
                     }
+                    Box(Modifier.fillMaxWidth().weight(1f)) {
                     AndroidView(
                         factory = { context ->
                             android.webkit.WebView(context).apply {
@@ -3511,9 +3520,40 @@ private fun SourceFallbackPlayer(
                                 loadUrl(movie.termsUrl.ifBlank { movie.videoUrl })
                             }
                         },
-                        modifier = Modifier.fillMaxWidth().weight(1f),
+                        modifier = Modifier.fillMaxSize(),
                         update = { webViewRef.value = it }
                     )
+                    if (!showSourcePlayer) {
+                        Box(
+                            Modifier.fillMaxSize().background(Color.Black),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.Center
+                            ) {
+                                CircularProgressIndicator(color = Green, strokeWidth = 3.dp)
+                                Spacer(Modifier.height(18.dp))
+                                Text(
+                                    "Mencari sumber video…",
+                                    color = Color.White,
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                Spacer(Modifier.height(7.dp))
+                                Text(
+                                    "Player situs disiapkan di belakang layar.",
+                                    color = Muted,
+                                    fontSize = 11.sp
+                                )
+                                Spacer(Modifier.height(18.dp))
+                                TextButton(onClick = { showSourcePlayer = true }) {
+                                    Text("Tampilkan player situs", color = Green)
+                                }
+                            }
+                        }
+                    }
+                    }
                 }
             }
         }
