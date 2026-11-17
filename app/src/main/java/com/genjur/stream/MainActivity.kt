@@ -3631,8 +3631,26 @@ private fun InAppVideoPlayer(
     onClose: () -> Unit,
     fallbackVideoUrls: List<String> = emptyList()
 ) {
-    var isFullscreen by remember { mutableStateOf(false) }
-    // -1 = Otomatis: pas di portrait, memenuhi layar di landscape.
+    // Saat tombol Play ditekan, player langsung dibuka dalam landscape penuh.
+    var isFullscreen by remember { mutableStateOf(true) }
+    SideEffect {
+        activity.requestedOrientation = if (isFullscreen) {
+            ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+        } else {
+            ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+        }
+        val activityBars = WindowInsetsControllerCompat(activity.window, activity.window.decorView)
+        if (isFullscreen) {
+            WindowCompat.setDecorFitsSystemWindows(activity.window, false)
+            activityBars.hide(WindowInsetsCompat.Type.systemBars())
+            activityBars.systemBarsBehavior =
+                WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        } else {
+            activityBars.show(WindowInsetsCompat.Type.systemBars())
+            WindowCompat.setDecorFitsSystemWindows(activity.window, true)
+        }
+    }
+    // -1 = Otomatis: menyesuaikan rasio video dengan layar landscape.
     var videoResizeMode by remember { mutableIntStateOf(-1) }
     var videoAspectRatio by remember { mutableFloatStateOf(0f) }
     var playerAreaAspectRatio by remember { mutableFloatStateOf(0f) }
