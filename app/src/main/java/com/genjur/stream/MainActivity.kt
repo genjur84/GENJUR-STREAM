@@ -3399,6 +3399,13 @@ private fun SourceFallbackPlayer(
         }
     }
 
+    // Satu jendela induk dipertahankan sepanjang perpindahan dari pencarian sumber
+    // ke ExoPlayer. Dialog anak boleh berganti tanpa membuka katalog di belakangnya.
+    Dialog(
+        onDismissRequest = onClose,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Surface(Modifier.fillMaxSize(), color = Color.Black) {
     // Jika halaman sumber menyediakan URL media HTML5 biasa yang dapat diakses,
     // pindahkan pemutaran ke ExoPlayer GENJUR. Jika tidak, tetap gunakan player situs.
     if (detectedDirectUrl.isNotBlank()) {
@@ -3596,6 +3603,7 @@ private fun SourceFallbackPlayer(
                     }
                 }
             }
+        }
         }
     }
 }
