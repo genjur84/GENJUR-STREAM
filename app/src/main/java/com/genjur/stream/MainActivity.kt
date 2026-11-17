@@ -3975,6 +3975,32 @@ private fun SourceFallbackPlayer(
                                         super.onPageFinished(view, url)
                                         val script = """
                                             (function() {
+                                              // Klik otomatis Skip Ads LK21 segera setelah tombol aktif (termasuk label hitung mundur).
+                                              function genjurTrySkipAds(doc) {
+                                                try {
+                                                  var nodes = doc.querySelectorAll('button, a, [role="button"], input[type="button"], input[type="submit"], [class*="skip"], [id*="skip"]');
+                                                  nodes.forEach(function(el) {
+                                                    if (!el || el.disabled || el.getAttribute('aria-disabled') === 'true' ||
+                                                        el.getAttribute('aria-hidden') === 'true') return;
+                                                    var label = [el.innerText, el.textContent, el.getAttribute('aria-label'),
+                                                      el.getAttribute('title'), el.value, el.id, el.className]
+                                                      .filter(Boolean).join(' ').replace(/\\s+/g, ' ').trim().toLowerCase();
+                                                    if (!label || label.length > 100) return;
+                                                    if (/\\bskip\\s*ads?\\b|\\bskip\\s+advertisement\\b|lewati\\s+iklan/.test(label)) {
+                                                      try { el.click(); } catch(e) {}
+                                                    }
+                                                  });
+                                                  Array.prototype.forEach.call(doc.querySelectorAll('iframe'), function(frame) {
+                                                    try { if (frame.contentDocument) genjurTrySkipAds(frame.contentDocument); } catch(e) {}
+                                                  });
+                                                } catch(e) {}
+                                              }
+                                              if (!window.__genjurSkipAdsTimer) {
+                                                genjurTrySkipAds(document);
+                                                window.__genjurSkipAdsTimer = window.setInterval(function() {
+                                                  genjurTrySkipAds(document);
+                                                }, 350);
+                                              }
                                               function attach(media) {
                                                 if (!media || media.dataset.genjurBridge === '1') return;
                                                 media.dataset.genjurBridge = '1';
