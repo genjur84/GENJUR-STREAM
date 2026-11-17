@@ -21,6 +21,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -4318,7 +4319,7 @@ private data class RepositoryExtension(
 private fun GenjurStreamApp(activity: MainActivity) {
     var showSplash by remember { mutableStateOf(true) }
     LaunchedEffect(Unit) {
-        delay(2200)
+        delay(3500)
         showSplash = false
     }
     Box(modifier = Modifier.fillMaxSize()) {
@@ -4336,46 +4337,94 @@ private fun GenjurStreamApp(activity: MainActivity) {
 
 @Composable
 private fun GenjurSplashScreen() {
-    val transition = rememberInfiniteTransition(label = "genjur_splash")
-    val logoScale by transition.animateFloat(
-        initialValue = 0.92f,
-        targetValue = 1.06f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 850),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "logo_pulse"
-    )
-    val glowAlpha by transition.animateFloat(
-        initialValue = 0.45f,
+    val transition = rememberInfiniteTransition(label = "cinematic_intro")
+    val filmProgress by transition.animateFloat(
+        initialValue = 0f,
         targetValue = 1f,
         animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 850),
+            animation = tween(durationMillis = 4200, easing = androidx.compose.animation.core.LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "film_strip_motion"
+    )
+    val glowAlpha by transition.animateFloat(
+        initialValue = 0.55f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1100),
             repeatMode = RepeatMode.Reverse
         ),
-        label = "logo_glow"
+        label = "cinematic_glow"
     )
     Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(
-                Brush.verticalGradient(
-                    colors = listOf(Color(0xFF050711), Color(0xFF10102A), Color(0xFF050711))
-                )
-            ),
+        modifier = Modifier.fillMaxSize().background(
+            Brush.verticalGradient(
+                colors = listOf(Color(0xFF03040A), Color(0xFF0B1022), Color(0xFF03040A))
+            )
+        ),
         contentAlignment = Alignment.Center
     ) {
+        // Klise film bergerak berulang di belakang logo.
+        Canvas(
+            modifier = Modifier.fillMaxWidth().height(164.dp)
+        ) {
+            val frameWidth = size.width / 5.2f
+            val frameHeight = size.height * 0.66f
+            val top = (size.height - frameHeight) / 2f
+            val travel = filmProgress * frameWidth
+            for (i in -1..7) {
+                val x = i * frameWidth - travel
+                drawRoundRect(
+                    color = Color(0xFF11182B),
+                    topLeft = Offset(x + 4f, top),
+                    size = Size(frameWidth - 8f, frameHeight),
+                    cornerRadius = CornerRadius(9f)
+                )
+                drawRoundRect(
+                    color = Color(0xFF20C8F5).copy(alpha = 0.35f),
+                    topLeft = Offset(x + 4f, top),
+                    size = Size(frameWidth - 8f, frameHeight),
+                    cornerRadius = CornerRadius(9f),
+                    style = Stroke(width = 2f)
+                )
+                // Lubang perforasi khas pita film.
+                for (hole in 0..3) {
+                    val holeX = x + frameWidth * (0.18f + hole * 0.21f)
+                    drawRoundRect(
+                        color = Color(0xFF9CA9C8).copy(alpha = 0.5f),
+                        topLeft = Offset(holeX, top + 5f),
+                        size = Size(frameWidth * 0.11f, 5f),
+                        cornerRadius = CornerRadius(2f)
+                    )
+                    drawRoundRect(
+                        color = Color(0xFF9CA9C8).copy(alpha = 0.5f),
+                        topLeft = Offset(holeX, top + frameHeight - 10f),
+                        size = Size(frameWidth * 0.11f, 5f),
+                        cornerRadius = CornerRadius(2f)
+                    )
+                }
+            }
+            drawRect(
+                brush = Brush.horizontalGradient(
+                    listOf(Color.Transparent, Color(0xFF8B5CF6).copy(alpha = 0.16f), Color.Transparent)
+                ),
+                topLeft = Offset(0f, 0f),
+                size = Size(size.width, size.height)
+            )
+        }
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
             Box(
                 modifier = Modifier
-                    .size(112.dp)
-                    .graphicsLayer(scaleX = logoScale, scaleY = logoScale, alpha = glowAlpha)
+                    .size(108.dp)
+                    .graphicsLayer(alpha = glowAlpha)
                     .background(
-                        Brush.linearGradient(listOf(Color(0xFFB026FF), Color(0xFF087DFF), Color(0xFF00D5F2))),
-                        RoundedCornerShape(32.dp)
+                        Brush.linearGradient(
+                            listOf(Color(0xFF9B35FF), Color(0xFF176BFF), Color(0xFF00D5F2))
+                        ),
+                        RoundedCornerShape(30.dp)
                     ),
                 contentAlignment = Alignment.Center
             ) {
@@ -4386,26 +4435,27 @@ private fun GenjurSplashScreen() {
                     modifier = Modifier.size(76.dp)
                 )
             }
-            Spacer(modifier = Modifier.height(26.dp))
+            Spacer(modifier = Modifier.height(22.dp))
             Text(
                 text = "GENJUR",
                 color = Color.White,
                 fontSize = 34.sp,
                 fontWeight = FontWeight.ExtraBold,
-                letterSpacing = 3.sp
+                letterSpacing = 4.sp
             )
             Text(
                 text = "STREAM",
-                color = Color(0xFF18BFFF),
-                fontSize = 29.sp,
+                color = Color(0xFF19C8F5),
+                fontSize = 27.sp,
                 fontWeight = FontWeight.ExtraBold,
-                letterSpacing = 5.sp
+                letterSpacing = 7.sp
             )
-            Spacer(modifier = Modifier.height(14.dp))
+            Spacer(modifier = Modifier.height(13.dp))
             Text(
-                text = "Temukan tontonan favoritmu",
+                text = "YOUR CINEMATIC WORLD",
                 color = Color(0xFFB9C4D8),
-                fontSize = 13.sp
+                fontSize = 10.sp,
+                letterSpacing = 3.sp
             )
         }
     }
