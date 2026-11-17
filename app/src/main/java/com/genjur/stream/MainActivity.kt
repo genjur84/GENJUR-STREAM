@@ -26,6 +26,13 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.RepeatMode
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -4313,7 +4320,99 @@ private data class RepositoryExtension(
 
 @Composable
 private fun GenjurStreamApp(activity: MainActivity) {
-    GenjurStreamHome(activity)
+    var showSplash by remember { mutableStateOf(true) }
+    LaunchedEffect(Unit) {
+        delay(2200)
+        showSplash = false
+    }
+    Box(modifier = Modifier.fillMaxSize()) {
+        GenjurStreamHome(activity)
+        AnimatedVisibility(
+            visible = showSplash,
+            modifier = Modifier.fillMaxSize(),
+            enter = fadeIn(animationSpec = tween(180)),
+            exit = fadeOut(animationSpec = tween(550))
+        ) {
+            GenjurSplashScreen()
+        }
+    }
+}
+
+@Composable
+private fun GenjurSplashScreen() {
+    val transition = rememberInfiniteTransition(label = "genjur_splash")
+    val logoScale by transition.animateFloat(
+        initialValue = 0.92f,
+        targetValue = 1.06f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 850),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "logo_pulse"
+    )
+    val glowAlpha by transition.animateFloat(
+        initialValue = 0.45f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 850),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "logo_glow"
+    )
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(Color(0xFF050711), Color(0xFF10102A), Color(0xFF050711))
+                )
+            ),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(112.dp)
+                    .graphicsLayer(scaleX = logoScale, scaleY = logoScale, alpha = glowAlpha)
+                    .background(
+                        Brush.linearGradient(listOf(Color(0xFFB026FF), Color(0xFF087DFF), Color(0xFF00D5F2))),
+                        RoundedCornerShape(32.dp)
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.PlayArrow,
+                    contentDescription = "GENJUR STREAM",
+                    tint = Color.White,
+                    modifier = Modifier.size(76.dp)
+                )
+            }
+            Spacer(modifier = Modifier.height(26.dp))
+            Text(
+                text = "GENJUR",
+                color = Color.White,
+                fontSize = 34.sp,
+                fontWeight = FontWeight.ExtraBold,
+                letterSpacing = 3.sp
+            )
+            Text(
+                text = "STREAM",
+                color = Color(0xFF18BFFF),
+                fontSize = 29.sp,
+                fontWeight = FontWeight.ExtraBold,
+                letterSpacing = 5.sp
+            )
+            Spacer(modifier = Modifier.height(14.dp))
+            Text(
+                text = "Temukan tontonan favoritmu",
+                color = Color(0xFFB9C4D8),
+                fontSize = 13.sp
+            )
+        }
+    }
 }
 
 @Composable
