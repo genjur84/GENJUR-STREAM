@@ -1950,8 +1950,9 @@ private fun MovieDetailDialog(
             else movie.streamOptions.firstOrNull()?.videoUrl ?: movie.videoUrl)
     }
     Dialog(onDismissRequest = onClose, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-        Surface(Modifier.fillMaxWidth().fillMaxHeight(0.9f).padding(12.dp),
-            shape = RoundedCornerShape(22.dp), color = Panel) {
+        // Halaman detail menutup katalog sepenuhnya, bukan dialog mengambang.
+        Surface(Modifier.fillMaxSize(),
+            shape = RoundedCornerShape(0.dp), color = Panel) {
             Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
                 Box {
                     MoviePoster(url = movie.posterUrl, title = movie.title, height = 300.dp)
