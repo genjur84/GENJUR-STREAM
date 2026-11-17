@@ -4007,9 +4007,11 @@ private fun InAppVideoPlayer(
                                 this.player = player
                                 useController = true
                                 controllerShowTimeoutMs = 4500
-                                setControllerVisibilityListener { visibility ->
-                                    landscapeControlsVisible = visibility == android.view.View.VISIBLE
-                                }
+                                setControllerVisibilityListener(
+                                    PlayerView.ControllerVisibilityListener { visibility: Int ->
+                                        landscapeControlsVisible = visibility == android.view.View.VISIBLE
+                                    }
+                                )
                                 landscapePlayerView = this
                                 // Perbesar video agar memenuhi layar landscape; sisi video
                                 // yang terpotong mengikuti rasio layar, tanpa meregangkan gambar.
@@ -4020,9 +4022,11 @@ private fun InAppVideoPlayer(
                         update = {
                             it.player = player
                             it.resizeMode = effectiveResizeMode
-                            it.setControllerVisibilityListener { visibility ->
-                                landscapeControlsVisible = visibility == android.view.View.VISIBLE
-                            }
+                            it.setControllerVisibilityListener(
+                                PlayerView.ControllerVisibilityListener { visibility: Int ->
+                                    landscapeControlsVisible = visibility == android.view.View.VISIBLE
+                                }
+                            )
                             landscapePlayerView = it
                         },
                         modifier = Modifier.fillMaxSize().onSizeChanged { size ->
