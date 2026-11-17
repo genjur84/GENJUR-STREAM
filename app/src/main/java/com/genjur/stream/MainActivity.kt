@@ -3934,6 +3934,30 @@ private fun SourceFallbackPlayer(
                                         // Bridge dipanggil dari thread JavaScript WebView.
                                         this@apply.post { addServerCandidate(url) }
                                     }
+                                    @JavascriptInterface
+                                    fun onStartFilmPrompt() {
+                                        // Prompt LK21 memerlukan sentuhan native, bukan click() JavaScript.
+                                        this@apply.post {
+                                            val target = this@apply
+                                            if (target.width > 0 && target.height > 0) {
+                                                val x = target.width / 2f
+                                                val y = target.height / 2f
+                                                val downTime = android.os.SystemClock.uptimeMillis()
+                                                val down = android.view.MotionEvent.obtain(
+                                                    downTime, downTime,
+                                                    android.view.MotionEvent.ACTION_DOWN, x, y, 0
+                                                )
+                                                val up = android.view.MotionEvent.obtain(
+                                                    downTime, android.os.SystemClock.uptimeMillis() + 70,
+                                                    android.view.MotionEvent.ACTION_UP, x, y, 0
+                                                )
+                                                target.dispatchTouchEvent(down)
+                                                target.dispatchTouchEvent(up)
+                                                down.recycle()
+                                                up.recycle()
+                                            }
+                                        }
+                                    }
                                 }, "GenjurMediaBridge")
                                 webViewClient = object : android.webkit.WebViewClient() {
                                     override fun shouldInterceptRequest(
@@ -4005,30 +4029,15 @@ private fun SourceFallbackPlayer(
                                               // Kirim satu klik di tengah player hanya setelah pesan mulai film terlihat.
                                               function genjurTryStartFilm(doc) {
                                                 try {
-                                                  if (doc.__genjurFilmStartClicked) return;
+                                                  if (doc.__genjurFilmStartRequested) return;
                                                   var bodyText = (doc.body && (doc.body.innerText || doc.body.textContent) || '').toLowerCase();
                                                   var asksToStart = /klik\\s+di\\s+mana\\s+saja\\s+untuk\\s+memulai\\s+film|klik\\s+dimana\\s+saja\\s+untuk\\s+memulai\\s+film|click\\s+anywhere\\s+to\\s+start\\s+(the\\s+)?(movie|film|video)/i.test(bodyText);
                                                   if (!asksToStart) return;
-                                                  var selectors = 'video, .jwplayer, .plyr, .video-js, [class*="player"], [id*="player"], iframe';
-                                                  var players = Array.prototype.slice.call(doc.querySelectorAll(selectors));
-                                                  var target = players.find(function(el) {
-                                                    var r = el.getBoundingClientRect();
-                                                    var st = doc.defaultView.getComputedStyle(el);
-                                                    return r.width > 80 && r.height > 60 && st.display !== 'none' &&
-                                                      st.visibility !== 'hidden' && Number(st.opacity || 1) > 0;
-                                                  });
-                                                  if (!target) return;
-                                                  var rect = target.getBoundingClientRect();
-                                                  var x = Math.max(1, Math.min(doc.documentElement.clientWidth - 2, rect.left + rect.width / 2));
-                                                  var y = Math.max(1, Math.min(doc.documentElement.clientHeight - 2, rect.top + rect.height / 2));
-                                                  var hit = doc.elementFromPoint(x, y) || target;
-                                                  var options = { bubbles: true, cancelable: true, view: doc.defaultView,
-                                                    clientX: x, clientY: y, button: 0 };
-                                                  try { hit.dispatchEvent(new MouseEvent('mousedown', options)); } catch(e) {}
-                                                  try { hit.dispatchEvent(new MouseEvent('mouseup', options)); } catch(e) {}
-                                                  try { hit.dispatchEvent(new MouseEvent('click', options)); } catch(e) {}
-                                                  try { target.click(); } catch(e) {}
-                                                  doc.__genjurFilmStartClicked = true;
+                                                  // Minta Android mengirim satu sentuhan native ke tengah WebView.
+                                                  if (window.GenjurMediaBridge && GenjurMediaBridge.onStartFilmPrompt) {
+                                                    GenjurMediaBridge.onStartFilmPrompt();
+                                                    doc.__genjurFilmStartRequested = true;
+                                                  }
                                                 } catch(e) {}
                                               }
                                               function genjurScanFrames(doc) {
