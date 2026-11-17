@@ -156,6 +156,25 @@ private fun detectedQualityLabel(label: String, videoUrl: String): String {
     return "Kualitas sumber (otomatis)"
 }
 
+private fun catalogQualityFromText(text: String): String {
+    val value = text.uppercase().replace(Regex("\\s+"), " ")
+    val labels = listOf(
+        "2160P" to Regex("\\b2160\\s*P?\\b"), "4K" to Regex("\\b4K\\b"),
+        "1080P" to Regex("\\b1080\\s*P?\\b"), "FHD" to Regex("\\bFHD\\b"),
+        "720P" to Regex("\\b720\\s*P?\\b"), "HD" to Regex("\\bHD\\b"),
+        "480P" to Regex("\\b480\\s*P?\\b"), "SD" to Regex("\\bSD\\b"),
+        "360P" to Regex("\\b360\\s*P?\\b"),
+        "CAM" to Regex("\\b(?:CAM|HDCAM|HDTS|TS|TELESYNC)\\b")
+    )
+    return labels.firstOrNull { it.second.containsMatchIn(value) }?.first.orEmpty()
+}
+
+private fun movieCatalogQuality(movie: FeedMovie): String {
+    val streamQuality = movie.streamOptions.map { catalogQualityFromText(it.quality) }
+        .firstOrNull { it.isNotBlank() }.orEmpty()
+    return streamQuality.ifBlank { movie.qualityLabel }
+}
+
 internal data class FeedMovie(
     val title: String,
     val description: String,
@@ -165,6 +184,7 @@ internal data class FeedMovie(
     val termsUrl: String,
     val attribution: String,
     val posterUrl: String = "",
+    val qualityLabel: String = "",
     val releaseYear: String = "",
     val genres: List<String> = emptyList(),
     val duration: String = "",
@@ -182,7 +202,7 @@ private fun encodeMovie(movie: FeedMovie): JSONObject = JSONObject().apply {
     put("title", movie.title); put("description", movie.description); put("category", movie.category)
     put("videoUrl", movie.videoUrl); put("licenseId", movie.licenseId); put("termsUrl", movie.termsUrl)
     put("attribution", movie.attribution); put("posterUrl", movie.posterUrl)
-    put("releaseYear", movie.releaseYear); put("genres", JSONArray(movie.genres)); put("duration", movie.duration)
+    put("qualityLabel", movie.qualityLabel); put("releaseYear", movie.releaseYear); put("genres", JSONArray(movie.genres)); put("duration", movie.duration)
     put("downloadUrl", movie.downloadUrl); put("downloadAllowed", movie.downloadAllowed)
     put("subtitleUrl", movie.subtitleUrl); put("subtitleLanguage", movie.subtitleLanguage)
     put("trailerUrl", movie.trailerUrl)
@@ -196,7 +216,7 @@ private fun decodeMovie(json: JSONObject): FeedMovie {
         category = json.optString("category"), videoUrl = json.optString("videoUrl"),
         licenseId = json.optString("licenseId"), termsUrl = json.optString("termsUrl"),
         attribution = json.optString("attribution"), posterUrl = json.optString("posterUrl"),
-        releaseYear = json.optString("releaseYear"),
+        qualityLabel = json.optString("qualityLabel"), releaseYear = json.optString("releaseYear"),
         genres = if (genres == null) emptyList() else
             (0 until genres.length()).map { genres.optString(it) }.filter { it.isNotBlank() },
         duration = json.optString("duration"),
@@ -438,6 +458,7 @@ internal fun loadGenericHtmlCatalog(sourceUrl: String, html: String, sourceName:
             title = title, description = description, category = category, videoUrl = href,
             licenseId = "Metadata halaman sumber", termsUrl = sourceUrl,
             attribution = "Metadata katalog $sourceLabel", posterUrl = poster,
+            qualityLabel = catalogQualityFromText("$title $cardText"),
             releaseYear = year, genres = categoryWords.filter { cardText.contains(it, true) }.distinct().take(5)
         ))
     }
@@ -549,6 +570,7 @@ private suspend fun loadSourceMovieDetails(movie: FeedMovie): FeedMovie = withCo
     val options = streams.map { url -> StreamOption(detectedQualityLabel("", url), url) }
     movie.copy(title = title.take(140), description = description.take(1200), posterUrl = poster,
         releaseYear = year, genres = genres, duration = duration, termsUrl = pageUrl,
+        qualityLabel = catalogQualityFromText(pageText).ifBlank { movie.qualityLabel },
         streamOptions = options, trailerUrl = trailerUrl.ifBlank { movie.trailerUrl })
 }
 
@@ -2540,7 +2562,25 @@ private fun SourceCatalogScreen(
                             shape = RoundedCornerShape(10.dp)
                         ) {
                             Column(Modifier.fillMaxWidth().padding(6.dp)) {
-                                MoviePoster(movie.posterUrl, movie.title, 164.dp)
+                                Box(Modifier.fillMaxWidth()) {
+                                    MoviePoster(movie.posterUrl, movie.title, 164.dp)
+                                    movieCatalogQuality(movie).takeIf { it.isNotBlank() }?.let { quality ->
+                                        Surface(
+                                            modifier = Modifier.align(Alignment.TopEnd).padding(5.dp),
+                                            color = when (quality) {
+                                                "CAM", "TS" -> Color(0xFFB3261E)
+                                                "SD", "360P", "480P" -> Color(0xFF616161)
+                                                "4K", "2160P" -> Color(0xFF6A1B9A)
+                                                else -> Color(0xFF167C50)
+                                            },
+                                            shape = RoundedCornerShape(5.dp)
+                                        ) {
+                                            Text(quality, color = Color.White, fontSize = 10.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp))
+                                        }
+                                    }
+                                }
                                 Spacer(Modifier.height(6.dp))
                                 Text(
                                     movie.title,
