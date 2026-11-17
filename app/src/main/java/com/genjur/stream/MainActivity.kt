@@ -3893,7 +3893,7 @@ private fun SourceFallbackPlayer(
                     ) {
                         Column(Modifier.weight(1f)) {
                             Text(movie.title, color = Color.White, fontWeight = FontWeight.Bold, maxLines = 1)
-                            Text("Player GENJUR • player situs sebagai cadangan", color = Green, fontSize = 10.sp)
+                            Text("Player GENJUR STREAM", color = Green, fontSize = 10.sp)
                         }
                         IconButton(onClick = onDownload) {
                             Icon(Icons.Filled.Download, contentDescription = "Unduh", tint = Green)
