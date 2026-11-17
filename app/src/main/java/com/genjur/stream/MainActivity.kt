@@ -3996,10 +3996,49 @@ private fun SourceFallbackPlayer(
                                                 } catch(e) {}
                                               }
                                               if (!window.__genjurSkipAdsTimer) {
-                                                genjurTrySkipAds(document);
+                                                genjurScanFrames(document);
                                                 window.__genjurSkipAdsTimer = window.setInterval(function() {
-                                                  genjurTrySkipAds(document);
+                                                  genjurScanFrames(document);
                                                 }, 350);
+                                              }
+                                              // Setelah Skip Ads, LK21 meminta satu ketukan pada area player.
+                                              // Kirim satu klik di tengah player hanya setelah pesan mulai film terlihat.
+                                              function genjurTryStartFilm(doc) {
+                                                try {
+                                                  if (doc.__genjurFilmStartClicked) return;
+                                                  var bodyText = (doc.body && (doc.body.innerText || doc.body.textContent) || '').toLowerCase();
+                                                  var asksToStart = /klik\\s+di\\s+mana\\s+saja\\s+untuk\\s+memulai\\s+film|klik\\s+dimana\\s+saja\\s+untuk\\s+memulai\\s+film|click\\s+anywhere\\s+to\\s+start\\s+(the\\s+)?(movie|film|video)/i.test(bodyText);
+                                                  if (!asksToStart) return;
+                                                  var selectors = 'video, .jwplayer, .plyr, .video-js, [class*="player"], [id*="player"], iframe';
+                                                  var players = Array.prototype.slice.call(doc.querySelectorAll(selectors));
+                                                  var target = players.find(function(el) {
+                                                    var r = el.getBoundingClientRect();
+                                                    var st = doc.defaultView.getComputedStyle(el);
+                                                    return r.width > 80 && r.height > 60 && st.display !== 'none' &&
+                                                      st.visibility !== 'hidden' && Number(st.opacity || 1) > 0;
+                                                  });
+                                                  if (!target) return;
+                                                  var rect = target.getBoundingClientRect();
+                                                  var x = Math.max(1, Math.min(doc.documentElement.clientWidth - 2, rect.left + rect.width / 2));
+                                                  var y = Math.max(1, Math.min(doc.documentElement.clientHeight - 2, rect.top + rect.height / 2));
+                                                  var hit = doc.elementFromPoint(x, y) || target;
+                                                  var options = { bubbles: true, cancelable: true, view: doc.defaultView,
+                                                    clientX: x, clientY: y, button: 0 };
+                                                  try { hit.dispatchEvent(new MouseEvent('mousedown', options)); } catch(e) {}
+                                                  try { hit.dispatchEvent(new MouseEvent('mouseup', options)); } catch(e) {}
+                                                  try { hit.dispatchEvent(new MouseEvent('click', options)); } catch(e) {}
+                                                  try { target.click(); } catch(e) {}
+                                                  doc.__genjurFilmStartClicked = true;
+                                                } catch(e) {}
+                                              }
+                                              function genjurScanFrames(doc) {
+                                                try {
+                                                  genjurTrySkipAds(doc);
+                                                  genjurTryStartFilm(doc);
+                                                  Array.prototype.forEach.call(doc.querySelectorAll('iframe'), function(frame) {
+                                                    try { if (frame.contentDocument) genjurScanFrames(frame.contentDocument); } catch(e) {}
+                                                  });
+                                                } catch(e) {}
                                               }
                                               function attach(media) {
                                                 if (!media || media.dataset.genjurBridge === '1') return;
