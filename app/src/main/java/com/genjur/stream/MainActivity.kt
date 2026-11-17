@@ -3631,8 +3631,9 @@ private fun InAppVideoPlayer(
     onClose: () -> Unit,
     fallbackVideoUrls: List<String> = emptyList()
 ) {
-    // Saat tombol Play ditekan, player langsung dibuka dalam landscape penuh.
-    var isFullscreen by remember { mutableStateOf(true) }
+    // Saat tombol Play ditekan, player dibuka dalam mode portrait terlebih dahulu.
+    // Pengguna dapat beralih ke landscape penuh melalui tombol fullscreen.
+    var isFullscreen by remember { mutableStateOf(false) }
     SideEffect {
         activity.requestedOrientation = if (isFullscreen) {
             ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
