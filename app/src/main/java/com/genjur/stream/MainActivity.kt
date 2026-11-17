@@ -2368,14 +2368,16 @@ private fun SourceCatalogScreen(
 
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            TextButton(onClick = { onMessageChanged(null); onMoviesLoaded(emptyList()) }) {
-                Text("‹ Daftar Sumber", color = Green)
-            }
             Spacer(Modifier.weight(1f))
-            TextButton(onClick = { onMoviesLoaded(emptyList()); reloadToken++ }) {
-                Text("Muat Ulang", color = Green)
+            IconButton(
+                onClick = { onMoviesLoaded(emptyList()); reloadToken++ },
+                enabled = !loading
+            ) {
+                Icon(Icons.Filled.Refresh, contentDescription = "Refresh katalog", tint = Green)
             }
-            TextButton(onClick = onOpenSource) { Text("Buka situs", color = Green) }
+            IconButton(onClick = onOpenSource) {
+                Icon(Icons.Filled.Language, contentDescription = "Buka situs sumber", tint = Green)
+            }
         }
         Text(sourceName, color = Color.White, fontSize = 23.sp, fontWeight = FontWeight.ExtraBold)
         Text(
