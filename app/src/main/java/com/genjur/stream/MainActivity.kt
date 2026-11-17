@@ -71,6 +71,7 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.ui.PlayerView
+import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerNotificationManager
 import com.arthenica.ffmpegkit.FFmpegKit
 import com.arthenica.ffmpegkit.FFprobeKit
@@ -3788,6 +3789,9 @@ private fun InAppVideoPlayer(
                             PlayerView(context).apply {
                                 this.player = player
                                 useController = true
+                                // Perbesar video agar memenuhi layar landscape; sisi video
+                                // yang terpotong mengikuti rasio layar, tanpa meregangkan gambar.
+                                resizeMode = AspectRatioFrameLayout.RESIZE_MODE_ZOOM
                                 setShowBuffering(PlayerView.SHOW_BUFFERING_WHEN_PLAYING)
                             }
                         },
