@@ -190,10 +190,9 @@ private class PlaybackStartedBridge(
 ) {
     @JavascriptInterface
     fun onVideoPlay(title: String, pageUrl: String, videoUrl: String) {
+        // Jangan langsung membuka URL pertama saat tombol Play ditekan:
+        // pada beberapa sumber, video pertama adalah iklan pre-roll.
         onPlayback(title, pageUrl)
-        if (videoUrl.startsWith("https://") || videoUrl.startsWith("http://")) {
-            onAutoPlay(title, pageUrl, videoUrl)
-        }
     }
     @JavascriptInterface
     fun onVideoAvailable(title: String, pageUrl: String, videoUrl: String, quality: String, sizeBytes: Long) {
@@ -3484,16 +3483,9 @@ private fun SourceBrowser(
                                         playbackNotificationSent = true
                                         onPlaybackStarted(view.title?.takeIf { it.isNotBlank() } ?: "Video dari situs", view.url ?: currentUrl)
                                     }
-                                    val recentUserPlay = playbackGestureAt.get().let { it > 0L && android.os.SystemClock.elapsedRealtime() - it < 10000L }
-                                    if ((sitePlaybackStarted || recentUserPlay) && !autoPlayerOpened) {
-                                        sitePlaybackStarted = true
-                                        autoPlayerOpened = true
-                                        onPlayCandidate(
-                                            view.title?.takeIf { it.isNotBlank() } ?: "Video dari situs",
-                                            view.url ?: currentUrl,
-                                            mediaUrl
-                                        )
-                                    }
+                                    // Request media jaringan dapat berupa iklan pre-roll.
+                                    // Jangan auto-play dari request pertama; tunggu metadata video HTML5
+                                    // yang sudah lolos pemeriksaan durasi di GenjurPlayback.
                                     if (sitePlaybackStarted && detectedVideoOptions.none { it.videoUrl == mediaUrl }) {
                                         detectedVideoTitle = view.title?.takeIf { it.isNotBlank() } ?: "Video dari situs"
                                         detectedVideoPage = view.url ?: currentUrl
@@ -3557,9 +3549,11 @@ private fun SourceBrowser(
                                     }
                                     if (window.__genjurPlaybackHooked) return;
                                     window.__genjurPlaybackHooked = true;
-                                    function reportMedia(title, url, quality) {
+                                    function reportMedia(title, url, quality, duration) {
                                         try {
                                             if (!url || !/^https?:\/\//i.test(url)) return;
+                                            // Abaikan video pendek (umumnya iklan pre-roll 5–20 detik).
+                                            if (typeof duration === 'number' && isFinite(duration) && duration > 0 && duration <= 25) return;
                                             var entry = performance.getEntriesByName(url).slice(-1)[0];
                                             var size = entry ? (entry.encodedBodySize || entry.transferSize || 0) : 0;
                                             GenjurPlayback.onVideoAvailable(title || document.title || 'Video dari situs', location.href, url, quality || 'Kualitas tersedia', size);
@@ -3580,12 +3574,12 @@ private fun SourceBrowser(
                                             sources.forEach(function(source) {
                                                 var label = source.getAttribute('label') || source.getAttribute('data-quality') ||
                                                     source.getAttribute('size') || (v.videoHeight ? (v.videoHeight + 'p') : 'Kualitas tersedia');
-                                                reportMedia(title, source.src, label);
+                                                reportMedia(title, source.src, label, v.duration);
                                             });
                                             var media = v.currentSrc || v.src || '';
                                             if (media) {
                                                 var quality = v.videoHeight ? (v.videoHeight + 'p') : 'Kualitas otomatis';
-                                                reportMedia(title, media, quality);
+                                                reportMedia(title, media, quality, v.duration);
                                             }
                                         }
                                         v.addEventListener('loadedmetadata', scanSources);
