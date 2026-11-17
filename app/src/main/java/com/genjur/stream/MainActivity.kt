@@ -56,6 +56,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.focus.onFocusChanged
 import coil.compose.AsyncImage
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -2338,11 +2339,11 @@ private fun SourceCatalogScreen(
     var categoryMenuExpanded by remember(sourceUrl) { mutableStateOf(false) }
     val keyboardController = LocalSoftwareKeyboardController.current
     val focusManager = LocalFocusManager.current
-    val density = LocalDensity.current
-    val keyboardVisible = WindowInsets.ime.getBottom(density) > 0
-    BackHandler(enabled = keyboardVisible) {
+    var catalogSearchFocused by remember(sourceUrl) { mutableStateOf(false) }
+    BackHandler(enabled = catalogSearchFocused) {
         keyboardController?.hide()
-        focusManager.clearFocus()
+        focusManager.clearFocus(force = true)
+        catalogSearchFocused = false
     }
     val plugin = remember(sourceUrl) { SourcePluginRegistry.resolve(sourceUrl) }
 
@@ -2445,7 +2446,7 @@ private fun SourceCatalogScreen(
         OutlinedTextField(
             value = catalogSearch,
             onValueChange = { catalogSearch = it },
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().onFocusChanged { catalogSearchFocused = it.isFocused },
             singleLine = true,
             placeholder = { Text("Cari judul film...", color = Muted) },
             label = { Text("Pencarian katalog") },
