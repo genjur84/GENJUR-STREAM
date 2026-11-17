@@ -3626,6 +3626,9 @@ private fun SourceBrowser(
                                                     .replace(/\\s+/g, ' ').trim();
                                                 if (!label || !/(player\\s*[1-9]|p2p|cast|hydrax|server\\s*[1-9])/i.test(label)) return;
                                                 if (el.disabled || el.getAttribute('aria-hidden') === 'true') return;
+                                                var state = ((el.className || '') + ' ' + (el.getAttribute('aria-pressed') || '') +
+                                                    ' ' + (el.getAttribute('aria-selected') || '')).toLowerCase();
+                                                if (/active|selected|current|true/.test(state)) return;
                                                 if (result.every(function(x) { return x.el !== el; })) result.push({el:el,label:label});
                                             });
                                             return result;
@@ -3633,16 +3636,16 @@ private fun SourceBrowser(
                                         var options = collect();
                                         var index = 0;
                                         function tryNext() {
-                                            if (window.__genjurMediaFound || index >= options.length) return;
+                                            if (index >= options.length) return;
                                             var option = options[index++];
                                             try { option.el.click(); } catch(e) {}
                                             setTimeout(function() {
-                                                if (!window.__genjurMediaFound) tryNext();
+                                                tryNext();
                                             }, 6500);
                                         }
                                         if (options.length > 1) setTimeout(tryNext, 6500);
                                         new MutationObserver(function() {
-                                            if (!window.__genjurMediaFound) options = collect();
+                                            options = collect();
                                         }).observe(document.documentElement, {childList:true,subtree:true});
                                     })();
                                     var scanTimer = null;
