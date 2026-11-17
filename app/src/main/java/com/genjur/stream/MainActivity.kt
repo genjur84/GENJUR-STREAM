@@ -3403,7 +3403,7 @@ private fun SourceFallbackPlayer(
                 removeAllViews()
                 destroy()
             }
-            activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+            activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
             WindowInsetsControllerCompat(activity.window, activity.window.decorView)
                 .show(WindowInsetsCompat.Type.systemBars())
         }
@@ -3572,7 +3572,7 @@ private fun SourceFallbackPlayer(
                                         fullscreenView?.let { view -> decor?.removeView(view) }
                                         fullscreenView = null
                                         fullscreenCallback = null
-                                        activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+                                        activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
                                         WindowCompat.setDecorFitsSystemWindows(activity.window, true)
                                         WindowInsetsControllerCompat(activity.window, activity.window.decorView)
                                             .show(WindowInsetsCompat.Type.systemBars())
@@ -3752,7 +3752,7 @@ private fun InAppVideoPlayer(
             player.removeListener(fallbackListener)
             playbackNotification.setPlayer(null)
             player.release()
-            activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+            activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
             WindowInsetsControllerCompat(activity.window, activity.window.decorView)
                 .show(WindowInsetsCompat.Type.systemBars())
         }
@@ -3771,7 +3771,7 @@ private fun InAppVideoPlayer(
         activity.requestedOrientation = if (enabled) {
             ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
         } else {
-            ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+            ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
         }
         val controller = WindowInsetsControllerCompat(activity.window, activity.window.decorView)
         if (enabled) {
