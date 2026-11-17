@@ -3675,6 +3675,8 @@ private fun InAppVideoPlayer(
     // Saat tombol Play ditekan, player dibuka dalam mode portrait terlebih dahulu.
     // Pengguna dapat beralih ke landscape penuh melalui tombol fullscreen.
     var isFullscreen by remember { mutableStateOf(false) }
+    var landscapeControlsVisible by remember { mutableStateOf(true) }
+    var landscapePlayerView by remember { mutableStateOf<PlayerView?>(null) }
     SideEffect {
         activity.requestedOrientation = if (isFullscreen) {
             ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
@@ -3882,6 +3884,11 @@ private fun InAppVideoPlayer(
                             PlayerView(context).apply {
                                 this.player = player
                                 useController = true
+                                controllerShowTimeoutMs = 4500
+                                setControllerVisibilityListener { visibility ->
+                                    landscapeControlsVisible = visibility == android.view.View.VISIBLE
+                                }
+                                landscapePlayerView = this
                                 // Perbesar video agar memenuhi layar landscape; sisi video
                                 // yang terpotong mengikuti rasio layar, tanpa meregangkan gambar.
                                 resizeMode = effectiveResizeMode
@@ -3891,11 +3898,16 @@ private fun InAppVideoPlayer(
                         update = {
                             it.player = player
                             it.resizeMode = effectiveResizeMode
+                            it.setControllerVisibilityListener { visibility ->
+                                landscapeControlsVisible = visibility == android.view.View.VISIBLE
+                            }
+                            landscapePlayerView = it
                         },
                         modifier = Modifier.fillMaxSize().onSizeChanged { size ->
                             if (size.height > 0) playerAreaAspectRatio = size.width.toFloat() / size.height
                         }
                     )
+                    if (landscapeControlsVisible) {
                     Row(
                         modifier = Modifier.align(Alignment.TopEnd).padding(8.dp),
                         horizontalArrangement = Arrangement.spacedBy(4.dp),
@@ -3914,9 +3926,18 @@ private fun InAppVideoPlayer(
                         IconButton(onClick = { requestPlayerDownload() }) {
                             Icon(Icons.Filled.Download, contentDescription = "Unduh video", tint = Color.White)
                         }
-                        IconButton(onClick = { setFullscreen(false) }) {
+                        IconButton(onClick = {
+                            requestPlayerDownload()
+                            landscapePlayerView?.showController()
+                        }) {
+                            Icon(Icons.Filled.Download, contentDescription = "Unduh video", tint = Color.White)
+                        }
+                        IconButton(onClick = {
+                            setFullscreen(false)
+                        }) {
                             Icon(Icons.Filled.FullscreenExit, contentDescription = "Keluar full screen", tint = Color.White)
                         }
+                    }
                     }
                 }
             } else {
