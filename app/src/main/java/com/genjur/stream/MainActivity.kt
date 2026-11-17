@@ -1523,14 +1523,49 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                                                     }
                                                 )
                                             }
-                                            ExtendedFloatingActionButton(
-                                                onClick = { selectedTab = "Sumber Link" },
-                                                modifier = Modifier.align(Alignment.BottomEnd).padding(18.dp),
-                                                containerColor = Green,
-                                                contentColor = Color.White,
-                                                icon = { Icon(Icons.Filled.Link, contentDescription = "Sumber Link") },
-                                                text = { Text("Sumber Link", fontWeight = FontWeight.Bold) }
-                                            )
+                                            if (savedSourceMenu.isNotEmpty()) {
+                                                Column(
+                                                    modifier = Modifier.align(Alignment.BottomEnd).padding(end = 16.dp, bottom = 18.dp),
+                                                    horizontalAlignment = Alignment.End
+                                                ) {
+                                                    DropdownMenu(
+                                                        expanded = sourceMenuExpanded,
+                                                        onDismissRequest = { sourceMenuExpanded = false },
+                                                        modifier = Modifier.heightIn(max = 320.dp).background(Panel)
+                                                    ) {
+                                                        DropdownMenuItem(
+                                                            text = { Text("None", color = Color.White, maxLines = 1) },
+                                                            onClick = {
+                                                                selectedTab = "Beranda"
+                                                                selectedSourceName = "Sumber Link"
+                                                                browserInitialUrl = ""
+                                                                sourceMenuExpanded = false
+                                                            }
+                                                        )
+                                                        savedSourceMenu.forEach { source ->
+                                                            DropdownMenuItem(
+                                                                text = { Text(source.name, color = Color.White, maxLines = 1) },
+                                                                onClick = {
+                                                                    catalogSourceUrl = source.url
+                                                                    catalogSourceName = source.name
+                                                                    sourceCatalogMovies = emptyList()
+                                                                    sourceCatalogMessage = null
+                                                                    selectedSourceName = source.name
+                                                                    sourceMenuExpanded = false
+                                                                }
+                                                            )
+                                                        }
+                                                    }
+                                                    Button(
+                                                        onClick = { sourceMenuExpanded = !sourceMenuExpanded },
+                                                        colors = ButtonDefaults.buttonColors(containerColor = Green, contentColor = Color.White),
+                                                        shape = RoundedCornerShape(24.dp),
+                                                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp)
+                                                    ) {
+                                                        Text("$selectedSourceName  ▾", fontWeight = FontWeight.Bold)
+                                                    }
+                                                }
+                                            }
                                         }
                                     }
                                 }
