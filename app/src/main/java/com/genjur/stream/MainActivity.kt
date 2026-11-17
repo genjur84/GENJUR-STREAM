@@ -197,8 +197,20 @@ internal data class FeedMovie(
     val subtitleUrl: String = "",
     val subtitleLanguage: String = "",
     val streamOptions: List<StreamOption> = emptyList(),
-    val trailerUrl: String = ""
+    val trailerUrl: String = "",
+    val sourceName: String = ""
 )
+private fun catalogSourceDisplayName(sourceUrl: String): String {
+    val host = runCatching { Uri.parse(sourceUrl).host.orEmpty().lowercase().removePrefix("www.") }.getOrDefault("")
+    return when {
+        host.contains("lk21") -> "LK21"
+        host.contains("geeknotdead") || host.contains("dutamovie") -> "Duta Movie"
+        host.contains("cimax") || host.contains("cmax") -> "Cmax"
+        host.contains("klikxxi") -> "Klikxxi"
+        else -> host.ifBlank { "Sumber tidak dikenal" }
+    }
+}
+
 private fun movieKey(movie: FeedMovie): String =
     "${movie.title.trim().lowercase()}|${movie.videoUrl.trim()}|${movie.licenseId}"
 
@@ -209,7 +221,7 @@ private fun encodeMovie(movie: FeedMovie): JSONObject = JSONObject().apply {
     put("qualityLabel", movie.qualityLabel); put("releaseYear", movie.releaseYear); put("genres", JSONArray(movie.genres)); put("duration", movie.duration)
     put("downloadUrl", movie.downloadUrl); put("downloadAllowed", movie.downloadAllowed)
     put("subtitleUrl", movie.subtitleUrl); put("subtitleLanguage", movie.subtitleLanguage)
-    put("trailerUrl", movie.trailerUrl)
+    put("trailerUrl", movie.trailerUrl); put("sourceName", movie.sourceName)
     put("streams", JSONArray().apply { movie.streamOptions.forEach { put(JSONObject().put("quality", it.quality).put("videoUrl", it.videoUrl)) } })
 }
 
@@ -229,6 +241,7 @@ private fun decodeMovie(json: JSONObject): FeedMovie {
         subtitleUrl = json.optString("subtitleUrl"),
         subtitleLanguage = json.optString("subtitleLanguage", "id"),
         trailerUrl = json.optString("trailerUrl"),
+        sourceName = json.optString("sourceName"),
         streamOptions = json.optJSONArray("streams")?.let { arr ->
             (0 until arr.length()).mapNotNull { index -> arr.optJSONObject(index)?.let { item ->
                 StreamOption(item.optString("quality", "Otomatis"), item.optString("videoUrl"))
@@ -1096,7 +1109,7 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                                 require(htmlItems.isNotEmpty()) {
                                     "Halaman terbaca, tetapi pola daftar film tidak dikenali otomatis."
                                 }
-                                movies.addAll(htmlItems)
+                                movies.addAll(htmlItems.map { it.copy(sourceName = catalogSourceDisplayName(sourceUrl)) })
                                 return@runCatching
                             }
                             if (root.optString("catalogType") == "wikimedia_public_domain_videos") {
@@ -1195,7 +1208,8 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                                         downloadAllowed = downloadAllowed,
                                         subtitleUrl = subtitleLink,
                                         subtitleLanguage = item.optString("subtitleLanguage", "id").trim(),
-                                        streamOptions = streamOptions
+                                        streamOptions = streamOptions,
+                                        sourceName = catalogSourceDisplayName(sourceUrl)
                                     ))
                                 }
                             }
@@ -1212,7 +1226,11 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
             }
             feedLoading = false
             result.onSuccess { (movies, loadedSources, sourceErrors) ->
-                feedMovies = movies.distinctBy { "${it.title.trim().lowercase()}|${it.releaseYear.trim()}" }
+                feedMovies = movies.groupBy { "${it.title.trim().lowercase()}|${it.releaseYear.trim()}" }
+                    .values.map { sameMovie ->
+                        val first = sameMovie.first()
+                        first.copy(sourceName = sameMovie.map { it.sourceName }.filter { it.isNotBlank() }.distinct().joinToString(" • "))
+                    }
                 feedMessage = when {
                     loadedSources == 0 -> "Tidak ada sumber yang berhasil dibaca. " +
                         sourceErrors.take(2).joinToString(" • ")
@@ -1779,11 +1797,24 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                                                 Box(
                                                     Modifier.weight(1f).clickable { selectedMovie = movie }
                                                 ) {
-                                                    MoviePoster(
-                                                        url = movie.posterUrl,
-                                                        title = movie.title,
-                                                        height = 190.dp
-                                                    )
+                                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                                        MoviePoster(
+                                                            url = movie.posterUrl,
+                                                            title = movie.title,
+                                                            height = 190.dp
+                                                        )
+                                                        if (movie.sourceName.isNotBlank()) {
+                                                            Text(
+                                                                text = movie.sourceName,
+                                                                color = Green,
+                                                                fontSize = 10.sp,
+                                                                maxLines = 1,
+                                                                overflow = TextOverflow.Ellipsis,
+                                                                modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                                                                textAlign = TextAlign.Center
+                                                            )
+                                                        }
+                                                    }
                                                 }
                                             }
                                             repeat(3 - posterRow.size) {
