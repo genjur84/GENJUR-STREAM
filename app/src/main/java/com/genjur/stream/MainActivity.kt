@@ -4384,6 +4384,66 @@ private fun GenjurSplashScreen() {
                     size = Size(frameWidth - 8f, frameHeight),
                     cornerRadius = CornerRadius(9f)
                 )
+                // Setiap bingkai berisi ilustrasi poster film mini yang berbeda.
+                val posterTop = top + 14f
+                val posterHeight = frameHeight - 28f
+                val posterLeft = x + 9f
+                val posterWidth = frameWidth - 18f
+                val posterPalettes = listOf(
+                    listOf(Color(0xFF071B3A), Color(0xFF168AAD), Color(0xFFF4A261)),
+                    listOf(Color(0xFF280B36), Color(0xFF9D174D), Color(0xFFF9C74F)),
+                    listOf(Color(0xFF101820), Color(0xFF386641), Color(0xFFA7C957)),
+                    listOf(Color(0xFF160F29), Color(0xFF4A4E9B), Color(0xFFB8C0FF)),
+                    listOf(Color(0xFF351C12), Color(0xFFBB4D00), Color(0xFFFFD166))
+                )
+                val palette = posterPalettes[Math.floorMod(i, posterPalettes.size)]
+                drawRoundRect(
+                    brush = Brush.verticalGradient(palette),
+                    topLeft = Offset(posterLeft, posterTop),
+                    size = Size(posterWidth, posterHeight),
+                    cornerRadius = CornerRadius(4f)
+                )
+                // Matahari/bulan dan siluet pegunungan atau gedung memberi kesan artwork poster.
+                drawCircle(
+                    color = palette[2].copy(alpha = 0.9f),
+                    radius = posterWidth * 0.17f,
+                    center = Offset(posterLeft + posterWidth * 0.68f, posterTop + posterHeight * 0.30f)
+                )
+                val posterScene = androidx.compose.ui.graphics.Path().apply {
+                    moveTo(posterLeft, posterTop + posterHeight * 0.72f)
+                    lineTo(posterLeft + posterWidth * 0.28f, posterTop + posterHeight * 0.43f)
+                    lineTo(posterLeft + posterWidth * 0.48f, posterTop + posterHeight * 0.68f)
+                    lineTo(posterLeft + posterWidth * 0.72f, posterTop + posterHeight * 0.40f)
+                    lineTo(posterLeft + posterWidth, posterTop + posterHeight * 0.70f)
+                    lineTo(posterLeft + posterWidth, posterTop + posterHeight)
+                    lineTo(posterLeft, posterTop + posterHeight)
+                    close()
+                }
+                drawPath(posterScene, color = palette[0].copy(alpha = 0.88f))
+                // Siluet karakter di tengah poster.
+                drawCircle(
+                    color = Color(0xFF080B16).copy(alpha = 0.88f),
+                    radius = posterWidth * 0.085f,
+                    center = Offset(posterLeft + posterWidth * 0.48f, posterTop + posterHeight * 0.57f)
+                )
+                drawRoundRect(
+                    color = Color(0xFF080B16).copy(alpha = 0.88f),
+                    topLeft = Offset(posterLeft + posterWidth * 0.39f, posterTop + posterHeight * 0.65f),
+                    size = Size(posterWidth * 0.18f, posterHeight * 0.24f),
+                    cornerRadius = CornerRadius(posterWidth * 0.06f)
+                )
+                drawRoundRect(
+                    color = Color.White.copy(alpha = 0.88f),
+                    topLeft = Offset(posterLeft + posterWidth * 0.16f, posterTop + posterHeight * 0.88f),
+                    size = Size(posterWidth * 0.68f, 2.5f),
+                    cornerRadius = CornerRadius(1f)
+                )
+                drawRoundRect(
+                    color = Color.White.copy(alpha = 0.48f),
+                    topLeft = Offset(posterLeft + posterWidth * 0.28f, posterTop + posterHeight * 0.93f),
+                    size = Size(posterWidth * 0.44f, 1.8f),
+                    cornerRadius = CornerRadius(1f)
+                )
                 drawRoundRect(
                     color = Color(0xFF20C8F5).copy(alpha = 0.35f),
                     topLeft = Offset(x + 4f, top),
