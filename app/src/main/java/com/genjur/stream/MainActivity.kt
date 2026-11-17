@@ -93,6 +93,7 @@ import com.arthenica.ffmpegkit.FFprobeKit
 import com.arthenica.ffmpegkit.ReturnCode
 import androidx.media3.common.Player
 import androidx.core.content.FileProvider
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.core.content.ContextCompat
 import androidx.core.app.NotificationCompat
 import androidx.core.view.WindowCompat
@@ -601,6 +602,7 @@ private suspend fun loadSourceMovieDetails(movie: FeedMovie): FeedMovie = withCo
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
+        installSplashScreen()
         super.onCreate(savedInstanceState)
         // Tampilkan UI dan animasi pembuka terlebih dahulu; pekerjaan pendukung dilakukan sesudahnya.
         setContent { MaterialTheme { GenjurStreamApp(this) } }
