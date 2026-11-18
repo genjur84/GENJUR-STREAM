@@ -724,6 +724,7 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
     var search by remember { mutableStateOf("") }
+    var searchSubmitted by remember { mutableStateOf(false) }
     var category by remember { mutableStateOf("Semua") }
     var enabledVideoFilters by remember { mutableStateOf(DEFAULT_VIDEO_FILTERS) }
     var videoFiltersLoaded by remember { mutableStateOf(false) }
@@ -1617,7 +1618,7 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                         }
                         when (selectedTab) {
                             "Cari" -> {
-                                OutlinedTextField(value = search, onValueChange = { search = it },
+                                OutlinedTextField(value = search, onValueChange = { search = it; searchSubmitted = false },
                                     modifier = Modifier.fillMaxWidth(), singleLine = true,
                                     placeholder = { Text("Cari judul tontonan...", color = Muted) },
                                     colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White,
@@ -1650,49 +1651,35 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                                             ) {
                                                 DropdownMenuItem(
                                                     text = { Text("Semua sumber", color = Color.White) },
-                                                    onClick = { selectedSearchSourceUrl = null; searchSourceDropdownExpanded = false }
+                                                    onClick = { selectedSearchSourceUrl = null; searchSourceDropdownExpanded = false; searchSubmitted = false }
                                                 )
                                                 savedSourceMenu.forEach { source ->
                                                     DropdownMenuItem(
                                                         text = { Text(source.name, color = Color.White, maxLines = 1) },
-                                                        onClick = { selectedSearchSourceUrl = source.url; searchSourceDropdownExpanded = false }
+                                                        onClick = { selectedSearchSourceUrl = source.url; searchSourceDropdownExpanded = false; searchSubmitted = false }
                                                     )
                                                 }
                                             }
                                         }
                                     }
                                 }
-                                val selectedSource = savedSourceMenu.firstOrNull { it.url == selectedSearchSourceUrl }
                                 Spacer(Modifier.height(10.dp))
-                                OutlinedButton(
-                                    onClick = {
-                                        val sourceUrl = selectedSource?.url
-                                        val host = sourceUrl?.let { Uri.parse(it).host?.lowercase()?.removePrefix("www.") }
-                                        if (host != null && search.isNotBlank()) {
-                                            val query = Uri.encode(search.trim())
-                                            browserInitialUrl = if (host == "youtube.com" || host.endsWith(".youtube.com") || host == "youtu.be") {
-                                                "https://www.youtube.com/results?search_query=$query"
-                                            } else {
-                                                // Sertakan domain sumber sebagai kata kunci biasa, bukan operator site:
-                                                "https://www.google.com/search?q=" + Uri.encode("${search.trim()} $host")
-                                            }
-                                            selectedTab = "Beranda"
-                                        }
-                                    },
+                                Button(
+                                    onClick = { searchSubmitted = true },
                                     modifier = Modifier.fillMaxWidth(),
-                                    enabled = selectedSource != null && search.isNotBlank(),
-                                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Green)
+                                    enabled = search.isNotBlank(),
+                                    colors = ButtonDefaults.buttonColors(containerColor = Green, contentColor = Color.Black)
                                 ) {
-                                    Text(if (selectedSource != null) "Cari di sumber ${selectedSource.name}" else "Pilih sumber untuk mencari")
+                                    Icon(Icons.Filled.Search, contentDescription = null)
+                                    Spacer(Modifier.width(8.dp))
+                                    Text("Cari", fontWeight = FontWeight.Bold)
                                 }
-                                selectedSource?.let { source ->
-                                    val sourceHost = Uri.parse(source.url).host?.removePrefix("www.") ?: source.url
-                                    Text(
-                                        "Hasil pencarian dibatasi ke alamat $sourceHost. Periksa alamat situs pada setiap hasil sebelum dibuka.",
-                                        color = Muted,
-                                        fontSize = 11.sp
-                                    )
-                                }
+                                Text(
+                                    if (selectedSearchSourceUrl == null) "Pencarian akan dilakukan pada semua sumber."
+                                    else "Pencarian dibatasi pada sumber terpilih.",
+                                    color = Muted,
+                                    fontSize = 11.sp
+                                )
                             }
                             "Sumber Link" -> {
                                 SourceLinksScreen(activity = activity, onOpenLink = { link ->
@@ -2007,8 +1994,10 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                                     (search.isBlank() || movie.title.contains(search, true) || movie.description.contains(search, true) || movie.genres.any { it.contains(search, true) })
                             }
                             if (selectedTab == "Cari") {
-                                if (matchingMovies.isEmpty()) {
-                                    Text("Film tidak ditemukan.", color = Muted, fontSize = 13.sp)
+                                if (!searchSubmitted) {
+                                    Text("Ketik judul film, pilih sumber atau Semua sumber, lalu tekan Cari.", color = Muted, fontSize = 13.sp)
+                                } else if (matchingMovies.isEmpty()) {
+                                    Text("Film tidak ditemukan pada sumber yang dipilih.", color = Muted, fontSize = 13.sp)
                                 } else {
                                     matchingMovies.chunked(3).forEach { posterRow ->
                                         Row(
