@@ -1498,6 +1498,90 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                     else Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = horizontal)
                 ) {
                     if (selectedTab == "Beranda" || selectedTab == "Browser Sumber") {
+                        if (selectedTab == "Beranda") {
+                            val todayMovie = feedMovies.firstOrNull { it.posterUrl.isNotBlank() }
+                            Card(
+                                modifier = Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 24.dp),
+                                shape = RoundedCornerShape(28.dp),
+                                colors = CardDefaults.cardColors(containerColor = Color(0xFF24172F))
+                            ) {
+                                Box(Modifier.fillMaxWidth().height(300.dp).padding(22.dp)) {
+                                    Column(
+                                        modifier = Modifier.align(Alignment.CenterStart).fillMaxWidth(0.76f),
+                                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                                    ) {
+                                        Text("PILIHAN HARI INI", color = Color(0xFFC6A1FF),
+                                            fontSize = 12.sp, fontWeight = FontWeight.ExtraBold)
+                                        Text(
+                                            todayMovie?.title ?: "Cerita hebat. Pengalaman seru.",
+                                            color = Color.White, fontSize = 29.sp,
+                                            lineHeight = 34.sp, fontWeight = FontWeight.ExtraBold,
+                                            maxLines = 3, overflow = TextOverflow.Ellipsis
+                                        )
+                                        Text(
+                                            if (todayMovie != null) todayMovie.description.ifBlank { "Temukan tontonan pilihan hari ini." }
+                                            else "Temukan tontonan dari katalog sumber yang sudah kamu tambahkan.",
+                                            color = Color(0xFFD5C9DC), fontSize = 14.sp,
+                                            lineHeight = 21.sp, maxLines = 3, overflow = TextOverflow.Ellipsis
+                                        )
+                                        Button(
+                                            onClick = {
+                                                if (todayMovie != null) selectedMovie = todayMovie
+                                                else selectedTab = "Sumber Link"
+                                            },
+                                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF8B55F6)),
+                                            shape = RoundedCornerShape(16.dp),
+                                            contentPadding = PaddingValues(horizontal = 24.dp, vertical = 12.dp)
+                                        ) { Text(if (todayMovie != null) "Lihat film" else "Jelajahi", color = Color.White, fontWeight = FontWeight.Bold) }
+                                    }
+                                    Text("✦", modifier = Modifier.align(Alignment.CenterEnd),
+                                        color = Color(0xFFB58BFF), fontSize = 92.sp, fontWeight = FontWeight.Light)
+                                    Text("GENJUR", modifier = Modifier.align(Alignment.BottomEnd),
+                                        color = Color(0xFF8B55F6).copy(alpha = 0.38f),
+                                        fontSize = 27.sp, fontWeight = FontWeight.Black)
+                                }
+                            }
+                            Row(
+                                Modifier.fillMaxWidth().padding(bottom = 12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text("Lanjutkan Menonton", color = Color.White, fontSize = 21.sp,
+                                    fontWeight = FontWeight.ExtraBold, modifier = Modifier.weight(1f))
+                                TextButton(onClick = { selectedTab = "Riwayat" }) {
+                                    Text("Lihat semua  →", color = Color(0xFFAA79FF), fontWeight = FontWeight.Bold)
+                                }
+                            }
+                            if (watchHistory.isEmpty()) {
+                                Text("Film yang sudah kamu putar akan muncul di sini.",
+                                    color = Muted, fontSize = 12.sp,
+                                    modifier = Modifier.padding(bottom = 18.dp))
+                            } else {
+                                Row(
+                                    Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())
+                                        .padding(bottom = 20.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    watchHistory.take(12).forEach { movie ->
+                                        Column(
+                                            Modifier.width(150.dp).clickable {
+                                                if (movie.category == "Sumber Web") {
+                                                    browserInitialUrl = movie.videoUrl
+                                                    selectedTab = "Browser Sumber"
+                                                } else selectedMovie = movie
+                                            }
+                                        ) {
+                                            MoviePoster(movie.posterUrl, movie.title, 190.dp, 140.dp)
+                                            Spacer(Modifier.height(7.dp))
+                                            Text(movie.title, color = Color.White, fontSize = 12.sp,
+                                                fontWeight = FontWeight.SemiBold, maxLines = 2,
+                                                overflow = TextOverflow.Ellipsis)
+                                            Text(movie.category, color = Muted, fontSize = 10.sp,
+                                                maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                        }
+                                    }
+                                }
+                            }
+                        }
                         // Halaman sumber ditampilkan pada lapisan WebView persisten di area Beranda.
                     } else {
                         if (selectedTab != "Browser Sumber") {
