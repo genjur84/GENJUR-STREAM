@@ -1506,8 +1506,35 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                                 colors = CardDefaults.cardColors(containerColor = Color(0xFF24172F))
                             ) {
                                 Box(Modifier.fillMaxWidth().height(300.dp).padding(22.dp)) {
+                                    if (!todayMovie?.posterUrl.isNullOrBlank()) {
+                                        AsyncImage(
+                                            model = ImageRequest.Builder(LocalContext.current)
+                                                .data(todayMovie?.posterUrl)
+                                                .crossfade(true)
+                                                .build(),
+                                            contentDescription = "Poster pilihan hari ini",
+                                            contentScale = ContentScale.Crop,
+                                            modifier = Modifier
+                                                .align(Alignment.CenterEnd)
+                                                .width(174.dp)
+                                                .fillMaxHeight()
+                                                .clip(RoundedCornerShape(20.dp))
+                                        )
+                                        Box(
+                                            Modifier.fillMaxSize().background(
+                                                Brush.horizontalGradient(
+                                                    colors = listOf(
+                                                        Color(0xFF24172F),
+                                                        Color(0xFF24172F).copy(alpha = 0.94f),
+                                                        Color(0xFF24172F).copy(alpha = 0.55f),
+                                                        Color.Transparent
+                                                    )
+                                                )
+                                            )
+                                        )
+                                    }
                                     Column(
-                                        modifier = Modifier.align(Alignment.CenterStart).fillMaxWidth(0.76f),
+                                        modifier = Modifier.align(Alignment.CenterStart).fillMaxWidth(0.70f),
                                         verticalArrangement = Arrangement.spacedBy(12.dp)
                                     ) {
                                         Text("PILIHAN HARI INI", color = Color(0xFFC6A1FF),
