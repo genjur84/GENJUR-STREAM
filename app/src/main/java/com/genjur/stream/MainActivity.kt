@@ -4654,7 +4654,7 @@ private fun GenjurSplashScreen() {
                     moviePosters.forEachIndexed { index, posterUrl ->
                         Box(
                             modifier = Modifier
-                                .width(96.dp)
+                                .width(112.dp)
                                 .fillMaxHeight()
                                 .padding(vertical = 13.dp)
                                 .clip(RoundedCornerShape(7.dp))
