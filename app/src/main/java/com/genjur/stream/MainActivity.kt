@@ -4705,6 +4705,7 @@ private fun GenjurSplashScreen() {
             "https://image.tmdb.org/t/p/w342/or06FN3Dka5tukK1e9sl16pB3iy.jpg", // Avengers: Endgame
             "https://image.tmdb.org/t/p/w342/1g0dhYtq4irTY1GPXvft6k4YLjm.jpg", // Spider-Man: No Way Home
             "https://image.tmdb.org/t/p/w342/ombsmhYUqR4qqOLOxAyr5V8hbyv.jpg", // Superman
+            "https://image.tmdb.org/t/p/w342/qJ2tW6WMUDux911r6m7haRef0WH.jpg", // Batman: The Dark Knight
             "https://image.tmdb.org/t/p/w342/74xTEgt7R36Fpooo50r9T25onhq.jpg", // The Batman
             "https://image.tmdb.org/t/p/w342/7WsyChQLEftFiDOVTGkum3p6vs.jpg" // Avengers: Infinity War
         )
