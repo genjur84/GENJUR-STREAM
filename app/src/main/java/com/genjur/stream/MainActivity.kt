@@ -3975,6 +3975,21 @@ private fun SourceFallbackPlayer(
         onDismissRequest = onClose,
         properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
+        val sourceDialogWindow = (LocalView.current.parent as? DialogWindowProvider)?.window
+        SideEffect {
+            sourceDialogWindow?.let { window ->
+                window.setLayout(
+                    android.view.WindowManager.LayoutParams.MATCH_PARENT,
+                    android.view.WindowManager.LayoutParams.MATCH_PARENT
+                )
+                window.setBackgroundDrawableResource(android.R.color.black)
+                WindowCompat.setDecorFitsSystemWindows(window, false)
+                WindowInsetsControllerCompat(window, window.decorView).apply {
+                    hide(WindowInsetsCompat.Type.systemBars())
+                    systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                }
+            }
+        }
         Surface(Modifier.fillMaxSize(), color = Color.Black) {
     // Jika halaman sumber menyediakan URL media HTML5 biasa yang dapat diakses,
     // pindahkan pemutaran ke ExoPlayer GENJUR. Jika tidak, tetap gunakan player situs.
@@ -3991,27 +4006,27 @@ private fun SourceFallbackPlayer(
             onDismissRequest = onClose,
             properties = DialogProperties(usePlatformDefaultWidth = false)
         ) {
+            val searchingDialogWindow = (LocalView.current.parent as? DialogWindowProvider)?.window
+            SideEffect {
+                searchingDialogWindow?.let { window ->
+                    window.setLayout(
+                        android.view.WindowManager.LayoutParams.MATCH_PARENT,
+                        android.view.WindowManager.LayoutParams.MATCH_PARENT
+                    )
+                    window.setBackgroundDrawableResource(android.R.color.black)
+                    WindowCompat.setDecorFitsSystemWindows(window, false)
+                    WindowInsetsControllerCompat(window, window.decorView).apply {
+                        hide(WindowInsetsCompat.Type.systemBars())
+                        systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                    }
+                }
+            }
             Surface(
-                // Layar pencarian sumber juga selalu memenuhi layar landscape.
                 modifier = Modifier.fillMaxSize(),
                 shape = RoundedCornerShape(0.dp),
                 color = Color.Black
             ) {
-                Column(Modifier.fillMaxSize().background(Color.Black)) {
-                    Row(
-                        Modifier.fillMaxWidth().background(Panel).padding(horizontal = 8.dp, vertical = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(Modifier.weight(1f)) {
-                            Text(movie.title, color = Color.White, fontWeight = FontWeight.Bold, maxLines = 1)
-                            Text("Player GENJUR STREAM", color = Green, fontSize = 10.sp)
-                        }
-                        IconButton(onClick = onDownload) {
-                            Icon(Icons.Filled.Download, contentDescription = "Unduh", tint = Green)
-                        }
-                        TextButton(onClick = onClose) { Text("Tutup", color = Green) }
-                    }
-                    Box(Modifier.fillMaxWidth().weight(1f)) {
+                Box(Modifier.fillMaxSize().background(Color.Black)) {
                     AndroidView(
                         factory = { context ->
                             android.webkit.WebView(context).apply {
