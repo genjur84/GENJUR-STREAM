@@ -3003,7 +3003,12 @@ private fun SourceLinksScreen(activity: MainActivity, onOpenLink: (String) -> Un
                     }
                     val jsonText = connection.getInputStream().bufferedReader().use { it.readText() }.removePrefix("\uFEFF").trim()
                     val root = JSONObject(jsonText)
-                    require(root.optInt("schemaVersion", 0) == 1) { "Versi format repositori tidak didukung." }
+                    if (root.optInt("manifestVersion", 0) == 1 && root.has("pluginLists")) {
+                        error("Link ini adalah repositori ekstensi CloudStream (Mega Repo), bukan katalog domain GENJUR. Muat melalui menu Repositori Penyedia Film agar daftar plugin CloudStream terbaca. File .cs3 masih memerlukan dukungan runtime sebelum bisa dipakai memutar film.")
+                    }
+                    require(root.optInt("schemaVersion", 0) == 1) {
+                        "Format katalog tidak didukung. Repositori Sumber GENJUR memakai schemaVersion 1; repositori CloudStream memakai manifestVersion 1."
+                    }
                     val entries = root.optJSONArray("sources") ?: error("Repositori tidak memiliki daftar sources.")
                     val parsed = mutableListOf<SourceRepositoryEntry>()
                     for (index in 0 until entries.length()) {
