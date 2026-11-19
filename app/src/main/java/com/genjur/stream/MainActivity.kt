@@ -4145,26 +4145,9 @@ private fun SourceFallbackPlayer(
                                         view: android.webkit.WebView,
                                         request: android.webkit.WebResourceRequest
                                     ): android.webkit.WebResourceResponse? {
-                                        // Pantau permintaan media yang benar-benar diminta player,
-                                        // termasuk yang berasal dari iframe lintas domain.
-                                        val uri = request.url
-                                        val path = uri.path.orEmpty().lowercase()
-                                        val fullUrl = uri.toString()
-                                        val accept = request.requestHeaders.entries
-                                            .firstOrNull { it.key.equals("Accept", ignoreCase = true) }
-                                            ?.value.orEmpty().lowercase()
-                                        val directMedia = path.endsWith(".mp4") || path.endsWith(".m4v") ||
-                                            path.endsWith(".webm") || path.endsWith(".m3u8") ||
-                                            path.endsWith(".mpd") ||
-                                            accept.contains("video/") || accept.contains("application/vnd.apple.mpegurl")
-                                        val looksLikeAd = isGenjurAdHost(uri.host) ||
-                                            Regex("""(?i)(/ads?/|advert|doubleclick|popunder|banner|tracking|analytics)""")
-                                                .containsMatchIn(fullUrl)
-                                        if (directMedia && !looksLikeAd &&
-                                            uri.scheme in listOf("https", "http") && !uri.host.isNullOrBlank()) {
-                                            // Tetap biarkan WebView mengumpulkan kandidat server lain.
-                                            view.post { addServerCandidate(fullUrl) }
-                                        }
+                                        // Jangan pilih request MP4/HLS mentah sebagai film.
+                                        // Iklan pre-roll dapat memakai format yang sama; kandidat film
+                                        // hanya berasal dari GenjurMediaBridge setelah durasi >= 45 detik.
                                         return super.shouldInterceptRequest(view, request)
                                     }
 
