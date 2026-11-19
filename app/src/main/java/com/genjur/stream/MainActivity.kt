@@ -4465,6 +4465,16 @@ private fun InAppVideoPlayer(
         val playerDialogWindow = (LocalView.current.parent as? DialogWindowProvider)?.window
         SideEffect {
             playerDialogWindow?.let { window ->
+                if (isFullscreen) {
+                    // Paksa window dialog menutup seluruh area layar landscape.
+                    // Tanpa ini, beberapa perangkat masih menyisakan sisi layar
+                    // yang memperlihatkan halaman detail di belakang player.
+                    window.setLayout(
+                        android.view.WindowManager.LayoutParams.MATCH_PARENT,
+                        android.view.WindowManager.LayoutParams.MATCH_PARENT
+                    )
+                    window.setBackgroundDrawableResource(android.R.color.black)
+                }
                 WindowCompat.setDecorFitsSystemWindows(window, !isFullscreen)
                 val bars = WindowInsetsControllerCompat(window, window.decorView)
                 if (isFullscreen) {
