@@ -76,6 +76,8 @@ dependencies {
     implementation("androidx.core:core-splashscreen:1.0.1")
     implementation("io.coil-kt:coil-compose:2.7.0")
     implementation("org.jsoup:jsoup:1.18.3")
+    // Jsoup exposes JSpecify nullability annotations in its public API; keep them on the Kotlin compiler classpath.
+    implementation("org.jspecify:jspecify:1.0.0")
 
     // CloudStream 4.9.1 extension API used by .cs3 providers.
     implementation("com.github.recloudstream.cloudstream:library:v4.9.1")
