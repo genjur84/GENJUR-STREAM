@@ -1500,7 +1500,12 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                 ) {
                     if (selectedTab == "Beranda" || selectedTab == "Browser Sumber") {
                         if (selectedTab == "Beranda") {
-                            val todayMovie = feedMovies.firstOrNull { it.posterUrl.isNotBlank() }
+                            // Pilihan Hari Ini berganti otomatis setiap hari dari poster katalog
+                            // yang berhasil dimuat. Refresh katalog berkala juga memperbarui daftar kandidat.
+                            val todayCandidates = feedMovies.filter { it.posterUrl.isNotBlank() }
+                            val todayIndex = if (todayCandidates.isEmpty()) 0
+                                else ((System.currentTimeMillis() / 86_400_000L) % todayCandidates.size).toInt()
+                            val todayMovie = todayCandidates.getOrNull(todayIndex)
                             Card(
                                 modifier = Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 24.dp),
                                 shape = RoundedCornerShape(28.dp),
