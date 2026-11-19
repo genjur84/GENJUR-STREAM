@@ -565,7 +565,7 @@ private suspend fun loadSourceMovieDetails(movie: FeedMovie): FeedMovie = withCo
 
     fun resolveUrl(rawValue: String, baseUrl: String): String {
         val raw = rawValue.trim().trim('"', '\'')
-            .replace("\\\\/", "/").replace("\\/", "/")
+            .replace("\\/", "/")
             .replace("&amp;", "&").replace("\\u0026", "&")
         if (raw.isBlank() || raw.startsWith("blob:", true) || raw.startsWith("data:", true) ||
             raw.startsWith("javascript:", true)) return ""
@@ -595,10 +595,10 @@ private suspend fun loadSourceMovieDetails(movie: FeedMovie): FeedMovie = withCo
             addMedia(element.attr("src"), baseUrl)
         }
         val mediaPattern = Regex(
-            """(?i)(?:https?:)?//[^"'\\s<>]+?\\.(?:m3u8|mpd|mp4|m4v|webm)(?:\\?[^"'\\s<>]*)?|(?:/|\\./|\\.\\./)[^"'\\s<>]+?\\.(?:m3u8|mpd|mp4|m4v|webm)(?:\\?[^"'\\s<>]*)?"""
+            """(?i)(?:https?:)?//[^"'\s<>]+?\.(?:m3u8|mpd|mp4|m4v|webm)(?:\?[^"'\s<>]*)?|(?:/|\./|\.\./)[^"'\s<>]+?\.(?:m3u8|mpd|mp4|m4v|webm)(?:\?[^"'\s<>]*)?"""
         )
         val configPattern = Regex(
-            """(?i)(?:file|src|source|hls|dash|url|videoUrl|hlsUrl|mpdUrl)\\s*[:=]\\s*["']([^"']+)["']"""
+            """(?i)(?:file|src|source|hls|dash|url|videoUrl|hlsUrl|mpdUrl)\s*[:=]\s*["']([^"']+)["']"""
         )
         doc.select("script").forEach { script ->
             val scriptText = (script.data() + " " + script.html())
@@ -645,7 +645,7 @@ private suspend fun loadSourceMovieDetails(movie: FeedMovie): FeedMovie = withCo
         .ifBlank { document.selectFirst(".synopsis, .description, .desc, .movie-description, .entry-content, [itemprop=description]")?.text()?.trim()?.take(1200).orEmpty() }
         .ifBlank { movie.description }
     val rawPoster = meta("meta[property=og:image]", "meta[name=twitter:image]")
-    val poster = resolveUrl(rawPoster, pageUrl).takeIf { it.startsWith("https://") } ?: movie.posterUrl
+    val poster = if (rawPoster.isBlank()) movie.posterUrl else resolveUrl(rawPoster, pageUrl).takeIf { it.startsWith("https://") } ?: movie.posterUrl
     val pageText = document.text().take(12000)
     val year = Regex("\\b(?:19|20)\\d{2}\\b").find(pageText)?.value ?: movie.releaseYear
     val genreWords = listOf("Action", "Adventure", "Animation", "Anime", "Comedy", "Crime", "Documentary", "Drama", "Family", "Fantasy", "Horror", "Mystery", "Romance", "Sci-Fi", "Thriller", "Aksi", "Petualangan", "Animasi", "Komedi", "Kriminal", "Dokumenter", "Horor")
@@ -665,7 +665,7 @@ private suspend fun loadSourceMovieDetails(movie: FeedMovie): FeedMovie = withCo
             if (raw.isNotBlank() && (isVideoHost || label.contains("trailer") || label.contains("teaser"))) raw else null
         }.firstOrNull().orEmpty()
     val trailerUrl = runCatching {
-        val absolute = resolveUrl(trailerRaw, pageUrl)
+        val absolute = if (trailerRaw.isBlank()) "" else resolveUrl(trailerRaw, pageUrl)
         val uri = Uri.parse(absolute)
         when {
             uri.host.orEmpty().contains("youtube.com") && uri.path.orEmpty().startsWith("/embed/") -> absolute
