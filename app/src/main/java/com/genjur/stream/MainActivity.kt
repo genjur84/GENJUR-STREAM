@@ -4903,7 +4903,17 @@ private fun RepositoryDialog(activity: MainActivity, onOpenWebsite: (String) -> 
     var url by remember { mutableStateOf("") }
     var loading by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
+    var pluginLoadingId by remember { mutableStateOf<String?>(null) }
+    var pluginMessage by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
+
+    LaunchedEffect(Unit) {
+        installed.filter { it.isCloudStream && it.pluginUrl.isNotBlank() }.forEach { extension ->
+            runCatching {
+                CloudStreamPluginRuntime.installAndLoad(activity, extension.pluginUrl, extension.id)
+            }
+        }
+    }
 
     fun saveRepositories() {
         val a = JSONArray()
@@ -5074,6 +5084,9 @@ private fun RepositoryDialog(activity: MainActivity, onOpenWebsite: (String) -> 
                     }
                 }
                 if (loading) LinearProgressIndicator(Modifier.fillMaxWidth(), color = Green)
+                pluginMessage?.let {
+                    Text(it, color = if (it.startsWith("Plugin gagal")) MaterialTheme.colorScheme.error else Green, fontSize = 11.sp)
+                }
                 if (discovered.isNotEmpty()) {
                     Text("Daftar penyedia (${discovered.size})", color = Color.White, fontWeight = FontWeight.Bold)
                     discovered.forEach { extension ->
@@ -5094,8 +5107,38 @@ private fun RepositoryDialog(activity: MainActivity, onOpenWebsite: (String) -> 
                                     if (extension.language.isNotBlank()) Text("Bahasa: ${extension.language}", color = Muted, fontSize = 10.sp)
                                     if (extension.tvTypes.isNotBlank()) Text("Kategori: ${extension.tvTypes}", color = Muted, fontSize = 10.sp)
                                     Text("File: ${extension.pluginUrl.substringAfterLast('/')}", color = Muted, fontSize = 10.sp)
-                                    Text("Daftar berhasil dibaca. Plugin .cs3 belum dapat dijalankan di GENJUR STREAM.",
-                                        color = Color(0xFFFFC857), fontSize = 11.sp)
+                                    Text("Plugin CloudStream dijalankan melalui runtime kompatibilitas GENJUR.",
+                                        color = Muted, fontSize = 11.sp)
+                                    TextButton(
+                                        enabled = pluginLoadingId != extension.id,
+                                        onClick = {
+                                            scope.launch {
+                                                pluginLoadingId = extension.id
+                                                pluginMessage = null
+                                                val result = runCatching {
+                                                    CloudStreamPluginRuntime.installAndLoad(
+                                                        activity, extension.pluginUrl, extension.id
+                                                    )
+                                                }
+                                                pluginLoadingId = null
+                                                result.onSuccess { status ->
+                                                    if (installed.none { it.id == extension.id && it.repositoryUrl == extension.repositoryUrl }) {
+                                                        installed = installed + extension
+                                                        saveInstalled()
+                                                    }
+                                                    pluginMessage = "Plugin " + status.name + " aktif. Provider terdaftar: " + status.registeredProviders.size + "."
+                                                }.onFailure { failure ->
+                                                    pluginMessage = "Plugin gagal dimuat: " + (failure.message ?: failure.javaClass.simpleName)
+                                                }
+                                            }
+                                        }
+                                    ) {
+                                        Text(
+                                            if (pluginLoadingId == extension.id) "Memasang & memuat…"
+                                            else if (isInstalled) "Aktifkan plugin" else "Pasang & aktifkan plugin",
+                                            color = Green
+                                        )
+                                    }
                                 } else {
                                     TextButton(onClick = {
                                         installed = if (isInstalled) installed.filterNot {
