@@ -3971,7 +3971,7 @@ private fun SourceFallbackPlayer(
         val adPath = Regex("""(^|[/_.?&=-])(ads?|advert|advertisement|preroll|pre-roll|vast|vpaid|popunder|banner|sponsor|tracking)([/_.?&=-]|$)""")
             .containsMatchIn(mediaUrlText)
         if (uri.scheme !in listOf("https", "http") || uri.host.isNullOrBlank() ||
-            !isPlayableMedia || durationSeconds < 45.0 || isGenjurAdHost(uri.host) || adPath) return
+            !isPlayableMedia || (durationSeconds > 0.0 && durationSeconds < 45.0) || isGenjurAdHost(uri.host) || adPath) return
         if (detectedServerUrls.none { it == candidate }) detectedServerUrls.add(candidate)
     }
 
