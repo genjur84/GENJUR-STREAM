@@ -42,13 +42,8 @@ jobs:
       - name: Accept licenses and install Android SDK 37
         run: |
           yes | sdkmanager --licenses
-          sdkmanager --channel=3 "platforms;android-37.0" "build-tools;37.0.0" "platform-tools"
-          # AGP resolves compileSdk 37 as platforms/android-37.
-          # sdkmanager currently installs the preview platform under android-37.0.
-          if [ -d "$ANDROID_HOME/platforms/android-37.0" ] && [ ! -e "$ANDROID_HOME/platforms/android-37" ]; then
-            ln -s android-37.0 "$ANDROID_HOME/platforms/android-37"
-          fi
-          ls -ld "$ANDROID_HOME/platforms/android-37" "$ANDROID_HOME/platforms/android-37.0"
+          sdkmanager "platforms;android-36" "build-tools;36.0.0" "platform-tools"
+          ls -ld "$ANDROID_HOME/platforms/android-36"
 
       - name: Generate increasing app version
         run: |
