@@ -201,7 +201,7 @@ private class PlaybackStartedBridge(
     }
 }
 
-internal data class StreamOption(val quality: String, val videoUrl: String, val sizeBytes: Long = 0L)
+internal data class StreamOption(val quality: String, val videoUrl: String, val sizeBytes: Long = 0L, val referer: String = "")
 
 private fun detectedQualityLabel(label: String, videoUrl: String): String {
     val source = "$label $videoUrl"
@@ -274,7 +274,7 @@ private fun encodeMovie(movie: FeedMovie): JSONObject = JSONObject().apply {
     put("downloadUrl", movie.downloadUrl); put("downloadAllowed", movie.downloadAllowed)
     put("subtitleUrl", movie.subtitleUrl); put("subtitleLanguage", movie.subtitleLanguage)
     put("trailerUrl", movie.trailerUrl); put("sourceName", movie.sourceName)
-    put("streams", JSONArray().apply { movie.streamOptions.forEach { put(JSONObject().put("quality", it.quality).put("videoUrl", it.videoUrl)) } })
+    put("streams", JSONArray().apply { movie.streamOptions.forEach { put(JSONObject().put("quality", it.quality).put("videoUrl", it.videoUrl).put("referer", it.referer)) } })
 }
 
 private fun decodeMovie(json: JSONObject): FeedMovie {
@@ -296,7 +296,7 @@ private fun decodeMovie(json: JSONObject): FeedMovie {
         sourceName = json.optString("sourceName"),
         streamOptions = json.optJSONArray("streams")?.let { arr ->
             (0 until arr.length()).mapNotNull { index -> arr.optJSONObject(index)?.let { item ->
-                StreamOption(item.optString("quality", "Otomatis"), item.optString("videoUrl"))
+                StreamOption(item.optString("quality", "Otomatis"), item.optString("videoUrl"), referer = item.optString("referer"))
             } }.filter { it.videoUrl.isNotBlank() }
         } ?: emptyList()
     )
@@ -552,6 +552,7 @@ private suspend fun loadSourceMovieDetails(movie: FeedMovie): FeedMovie = withCo
     val pageUrl = movie.videoUrl
     val userAgent = "Mozilla/5.0 (Linux; Android 11) AppleWebKit/537.36 Chrome/131.0.0.0 Mobile Safari/537.36"
     val streams = LinkedHashSet<String>()
+    val streamReferers = LinkedHashMap<String, String>()
     val visitedPages = LinkedHashSet<String>()
     val mediaExtensions = listOf(".m3u8", ".mpd", ".mp4", ".m4v", ".webm")
 
@@ -587,7 +588,10 @@ private suspend fun loadSourceMovieDetails(movie: FeedMovie): FeedMovie = withCo
         val looksLikeMedia = mediaExtensions.any { path.endsWith(it) } ||
             mediaExtensions.any { uri.encodedQuery.orEmpty().lowercase().contains(it) }
         if (uri.scheme == "https" && !uri.host.isNullOrBlank() && looksLikeMedia &&
-            !isAdMedia(absolute)) streams.add(absolute)
+            !isAdMedia(absolute)) {
+            streams.add(absolute)
+            streamReferers.putIfAbsent(absolute, baseUrl)
+        }
     }
 
     fun scanDocument(doc: org.jsoup.nodes.Document, baseUrl: String): List<String> {
@@ -676,7 +680,7 @@ private suspend fun loadSourceMovieDetails(movie: FeedMovie): FeedMovie = withCo
             else -> ""
         }
     }.getOrDefault("")
-    val options = streams.map { url -> StreamOption(detectedQualityLabel("", url), url) }
+    val options = streams.map { url -> StreamOption(detectedQualityLabel("", url), url, referer = streamReferers[url] ?: pageUrl) }
     movie.copy(
         title = title.take(140), description = description.take(1200), posterUrl = poster,
         releaseYear = year, genres = genres, duration = duration, termsUrl = pageUrl,
@@ -2291,15 +2295,19 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                     // Utamakan URL stream langsung yang sudah berhasil diekstrak
                     // dari metadata halaman/iframe publik, seperti alur provider CloudStream.
                     // Halaman sumber hanya dibuka sebagai fallback bila belum ada stream.
+                    val firstDirectOption = selectedVersion.streamOptions.firstOrNull {
+                        it.videoUrl.startsWith("https://") || it.videoUrl.startsWith("http://")
+                    }
+                    val firstDirectStream = firstDirectOption?.videoUrl
                     val directStreams = selectedVersion.streamOptions
                         .map { it.videoUrl }
                         .filter { it.startsWith("https://") || it.startsWith("http://") }
                         .distinct()
-                    val firstDirectStream = directStreams.firstOrNull()
                     val playbackMovie = if (firstDirectStream != null) {
                         selectedVersion.copy(
                             videoUrl = firstDirectStream,
                             downloadUrl = firstDirectStream,
+                            termsUrl = firstDirectOption.referer.ifBlank { selectedVersion.termsUrl },
                             licenseId = "Direct source media"
                         )
                     } else {
