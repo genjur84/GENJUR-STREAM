@@ -29,6 +29,7 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.rememberInfiniteTransition
@@ -4713,11 +4714,13 @@ private fun GenjurSplashScreen() {
             modifier = Modifier
                 .fillMaxWidth()
                 .height(164.dp)
+                .clipToBounds()
                 .background(Color(0xFF080D1B))
         ) {
             Row(
                 modifier = Modifier
-                    .fillMaxSize()
+                    .width((moviePosters.size * 120 * 3).dp)
+                    .fillMaxHeight()
                     .graphicsLayer { translationX = -filmProgress * 112.dp.toPx() },
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
