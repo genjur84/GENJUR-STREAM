@@ -551,6 +551,87 @@ internal fun loadGenericHtmlCatalog(sourceUrl: String, html: String, sourceName:
 private suspend fun loadSourceMovieDetails(movie: FeedMovie): FeedMovie = withContext(Dispatchers.IO) {
     val pageUrl = movie.videoUrl
     val userAgent = "Mozilla/5.0 (Linux; Android 11) AppleWebKit/537.36 Chrome/131.0.0.0 Mobile Safari/537.36"
+    val streams = LinkedHashSet<String>()
+    val visitedPages = LinkedHashSet<String>()
+    val mediaExtensions = listOf(".m3u8", ".mpd", ".mp4", ".m4v", ".webm")
+
+    fun isAdMedia(url: String): Boolean {
+        val uri = Uri.parse(url)
+        val pathAndQuery = (uri.path.orEmpty() + "?" + uri.encodedQuery.orEmpty()).lowercase()
+        return isGenjurAdHost(uri.host) ||
+            Regex("""(^|[/_.?&=-])(ads?|advert|advertisement|preroll|pre-roll|vast|vpaid|popunder|banner|sponsor|tracking)([/_.?&=-]|$)""")
+                .containsMatchIn(pathAndQuery)
+    }
+
+    fun resolveUrl(rawValue: String, baseUrl: String): String {
+        val raw = rawValue.trim().trim('"', '\'')
+            .replace("\\\\/", "/").replace("\\/", "/")
+            .replace("&amp;", "&").replace("\\u0026", "&")
+        if (raw.isBlank() || raw.startsWith("blob:", true) || raw.startsWith("data:", true) ||
+            raw.startsWith("javascript:", true)) return ""
+        return runCatching {
+            when {
+                raw.startsWith("//") -> "https:$raw"
+                raw.startsWith("https://", true) -> raw
+                raw.startsWith("http://", true) -> raw.replaceFirst("http://", "https://")
+                else -> URL(URL(baseUrl), raw).toString()
+            }
+        }.getOrDefault("")
+    }
+
+    fun addMedia(raw: String, baseUrl: String) {
+        val absolute = resolveUrl(raw, baseUrl)
+        if (absolute.isBlank()) return
+        val uri = Uri.parse(absolute)
+        val path = uri.path.orEmpty().lowercase()
+        val looksLikeMedia = mediaExtensions.any { path.endsWith(it) } ||
+            mediaExtensions.any { uri.encodedQuery.orEmpty().lowercase().contains(it) }
+        if (uri.scheme == "https" && !uri.host.isNullOrBlank() && looksLikeMedia &&
+            !isAdMedia(absolute)) streams.add(absolute)
+    }
+
+    fun scanDocument(doc: org.jsoup.nodes.Document, baseUrl: String): List<String> {
+        doc.select("video[src], video source[src], source[src], audio[src]").forEach { element ->
+            addMedia(element.attr("src"), baseUrl)
+        }
+        val mediaPattern = Regex(
+            """(?i)(?:https?:)?//[^"'\\s<>]+?\\.(?:m3u8|mpd|mp4|m4v|webm)(?:\\?[^"'\\s<>]*)?|(?:/|\\./|\\.\\./)[^"'\\s<>]+?\\.(?:m3u8|mpd|mp4|m4v|webm)(?:\\?[^"'\\s<>]*)?"""
+        )
+        val configPattern = Regex(
+            """(?i)(?:file|src|source|hls|dash|url|videoUrl|hlsUrl|mpdUrl)\\s*[:=]\\s*["']([^"']+)["']"""
+        )
+        doc.select("script").forEach { script ->
+            val scriptText = (script.data() + " " + script.html())
+                .replace("\\/", "/").replace("\\u0026", "&")
+            mediaPattern.findAll(scriptText).forEach { addMedia(it.value, baseUrl) }
+            configPattern.findAll(scriptText).forEach { addMedia(it.groupValues[1], baseUrl) }
+        }
+        return doc.select("iframe[src]").mapNotNull { frame ->
+            val url = resolveUrl(frame.attr("src"), baseUrl)
+            url.takeIf { it.startsWith("https://") && !isAdMedia(it) }
+        }.distinct()
+    }
+
+    val queue = ArrayDeque<Pair<String, Int>>()
+    queue.add(pageUrl to 0)
+    while (queue.isNotEmpty() && visitedPages.size < 13) {
+        val (currentUrl, depth) = queue.removeFirst()
+        if (!visitedPages.add(currentUrl)) continue
+        runCatching {
+            val connection = Jsoup.connect(currentUrl)
+                .userAgent(userAgent)
+                .header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
+                .timeout(if (depth == 0) 18000 else 12000)
+                .followRedirects(true)
+            if (currentUrl != pageUrl) connection.referrer(pageUrl)
+            val doc = connection.get()
+            val embeds = scanDocument(doc, currentUrl)
+            if (depth < 2) embeds.take(8).forEach { embed ->
+                if (embed !in visitedPages && queue.none { it.first == embed }) queue.add(embed to depth + 1)
+            }
+        }
+    }
+
     val document = Jsoup.connect(pageUrl).userAgent(userAgent).timeout(18000)
         .followRedirects(true).get()
     fun meta(vararg selectors: String): String =
@@ -558,60 +639,13 @@ private suspend fun loadSourceMovieDetails(movie: FeedMovie): FeedMovie = withCo
             document.selectFirst(selector)?.attr("content")?.trim()?.takeIf { it.isNotBlank() }
         }.firstOrNull().orEmpty()
 
-    fun mediaUrls(doc: org.jsoup.nodes.Document, baseUrl: String): List<String> {
-        val found = LinkedHashSet<String>()
-        fun add(rawValue: String) {
-            val raw = rawValue.trim().trim('"', '\'').replace("\\\\/", "/")
-                .replace("\\/", "/").replace("&amp;", "&")
-            if (raw.isBlank() || raw.startsWith("blob:", true) || raw.startsWith("data:", true)) return
-            val absolute = runCatching {
-                when {
-                    raw.startsWith("//") -> "https:$raw"
-                    raw.startsWith("https://", true) -> raw
-                    raw.startsWith("http://", true) -> raw.replaceFirst("http://", "https://")
-                    else -> URL(URL(baseUrl), raw).toString()
-                }
-            }.getOrNull() ?: return
-            val uri = Uri.parse(absolute)
-            val path = uri.path.orEmpty().lowercase()
-            if (uri.scheme == "https" && (path.endsWith(".m3u8") || path.endsWith(".mp4"))) {
-                found.add(absolute)
-            }
-        }
-        doc.select("video[src], video source[src], source[src], a[href]").forEach { element ->
-            val value = if (element.hasAttr("src")) element.attr("src") else element.attr("href")
-            add(value)
-        }
-        val mediaPattern = Regex("""(?i)(?:https?://[^"'\s<>]+?\.(?:m3u8|mp4)(?:\?[^"'\s<>]*)?|(?:/|\./)[^"'\s<>]+?\.(?:m3u8|mp4)(?:\?[^"'\s<>]*)?)""")
-        doc.select("script").forEach { script ->
-            val scriptText = (script.data() + " " + script.html()).replace("\\/", "/").replace("\u0026", "&")
-            mediaPattern.findAll(scriptText).forEach { add(it.value) }
-        }
-        return found.toList()
-    }
-
-    val streams = LinkedHashSet<String>()
-    streams.addAll(mediaUrls(document, pageUrl))
-    // Banyak halaman menyematkan player pihak ketiga melalui iframe. Periksa hanya
-    // URL iframe HTTPS yang terlihat di halaman; tidak melewati login atau DRM.
-    val embeds = document.select("iframe[src]").map { it.absUrl("src") }
-        .filter { it.startsWith("https://") }.distinct().take(5)
-    for (embedUrl in embeds) {
-        runCatching {
-            val embed = Jsoup.connect(embedUrl).userAgent(userAgent).referrer(pageUrl)
-                .header("Accept", "*/*").timeout(12000).followRedirects(true).get()
-            streams.addAll(mediaUrls(embed, embedUrl))
-        }
-    }
-
     val title = meta("meta[property=og:title]", "meta[name=twitter:title]")
         .ifBlank { document.selectFirst("h1")?.text()?.trim().orEmpty() }.ifBlank { movie.title }
     val description = meta("meta[property=og:description]", "meta[name=description]", "meta[name=twitter:description]")
         .ifBlank { document.selectFirst(".synopsis, .description, .desc, .movie-description, .entry-content, [itemprop=description]")?.text()?.trim()?.take(1200).orEmpty() }
         .ifBlank { movie.description }
     val rawPoster = meta("meta[property=og:image]", "meta[name=twitter:image]")
-    val poster = (if (rawPoster.startsWith("//")) "https:$rawPoster" else rawPoster)
-        .takeIf { it.startsWith("https://") } ?: movie.posterUrl
+    val poster = resolveUrl(rawPoster, pageUrl).takeIf { it.startsWith("https://") } ?: movie.posterUrl
     val pageText = document.text().take(12000)
     val year = Regex("\\b(?:19|20)\\d{2}\\b").find(pageText)?.value ?: movie.releaseYear
     val genreWords = listOf("Action", "Adventure", "Animation", "Anime", "Comedy", "Crime", "Documentary", "Drama", "Family", "Fantasy", "Horror", "Mystery", "Romance", "Sci-Fi", "Thriller", "Aksi", "Petualangan", "Animasi", "Komedi", "Kriminal", "Dokumenter", "Horor")
@@ -620,7 +654,6 @@ private suspend fun loadSourceMovieDetails(movie: FeedMovie): FeedMovie = withCo
         .distinct().take(8).ifEmpty { movie.genres }
     val duration = document.selectFirst("[itemprop=duration], .runtime, .duration, .movie-runtime")
         ?.text()?.trim()?.takeIf { it.isNotBlank() } ?: movie.duration
-    // Ambil trailer yang memang ditautkan oleh halaman sumber.
     val trailerRaw = document.select("iframe[src], a[href], video[src], video source[src]")
         .mapNotNull { element ->
             val raw = if (element.hasAttr("src")) element.attr("src") else element.attr("href")
@@ -632,13 +665,7 @@ private suspend fun loadSourceMovieDetails(movie: FeedMovie): FeedMovie = withCo
             if (raw.isNotBlank() && (isVideoHost || label.contains("trailer") || label.contains("teaser"))) raw else null
         }.firstOrNull().orEmpty()
     val trailerUrl = runCatching {
-        val absolute = when {
-            trailerRaw.startsWith("//") -> "https:$trailerRaw"
-            trailerRaw.startsWith("https://") -> trailerRaw
-            trailerRaw.startsWith("http://") -> trailerRaw.replaceFirst("http://", "https://")
-            trailerRaw.isNotBlank() -> URL(URL(pageUrl), trailerRaw).toString()
-            else -> ""
-        }
+        val absolute = resolveUrl(trailerRaw, pageUrl)
         val uri = Uri.parse(absolute)
         when {
             uri.host.orEmpty().contains("youtube.com") && uri.path.orEmpty().startsWith("/embed/") -> absolute
@@ -650,12 +677,14 @@ private suspend fun loadSourceMovieDetails(movie: FeedMovie): FeedMovie = withCo
         }
     }.getOrDefault("")
     val options = streams.map { url -> StreamOption(detectedQualityLabel("", url), url) }
-    movie.copy(title = title.take(140), description = description.take(1200), posterUrl = poster,
+    movie.copy(
+        title = title.take(140), description = description.take(1200), posterUrl = poster,
         releaseYear = year, genres = genres, duration = duration, termsUrl = pageUrl,
+        licenseId = if (options.isEmpty()) "Source page fallback" else "Direct source media",
         qualityLabel = catalogQualityFromText(pageText).ifBlank { movie.qualityLabel },
-        streamOptions = options, trailerUrl = trailerUrl.ifBlank { movie.trailerUrl })
+        streamOptions = options, trailerUrl = trailerUrl.ifBlank { movie.trailerUrl }
+    )
 }
-
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
@@ -2273,7 +2302,11 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                             downloadUrl = firstDirectStream,
                             licenseId = "Direct source media"
                         )
-                    } else selectedVersion
+                    } else {
+                        // Jika ekstraksi awal belum menemukan media, jalankan provider fallback
+                        // di WebView untuk mengamati stream yang diminta player halaman sumber.
+                        selectedVersion.copy(licenseId = "Source page fallback")
+                    }
                     // Pertahankan halaman detail di belakang player.
                     // Saat player ditutup, pengguna kembali ke detail film, bukan katalog.
                     playingMovie = playbackMovie
