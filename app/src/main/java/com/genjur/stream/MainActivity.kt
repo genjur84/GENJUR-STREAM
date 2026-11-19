@@ -707,11 +707,7 @@ class MainActivity : ComponentActivity() {
             }
             getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
         }
-        // Bersihkan data repositori/ekstensi lama agar katalog repositori tidak muncul lagi.
-        getSharedPreferences("genjur_stream_sources", 0).edit()
-            .remove("repositories")
-            .remove("installed_extensions")
-            .apply()
+        // Repositori dan pilihan pengguna dipertahankan antar pembukaan aplikasi.
         scheduleBackgroundCatalogChecks()
     }
 
@@ -5028,8 +5024,25 @@ private fun RepositoryDialog(activity: MainActivity, onOpenWebsite: (String) -> 
         text = {
             Column(Modifier.heightIn(max = 520.dp).verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(9.dp)) {
-                Text("Tambahkan repositori untuk menemukan penyedia film. Daftar dapat berisi katalog feed GENJUR atau tautan ke layanan streaming resmi. GENJUR STREAM tidak menjalankan kode/plugin pihak ketiga.",
+                Text("Tambahkan repositori untuk menemukan penyedia film. GENJUR dapat membaca katalog GENJUR dan metadata repositori CloudStream. File plugin .cs3 belum dapat dijalankan langsung oleh player GENJUR.",
                     color = Muted, fontSize = 12.sp)
+                OutlinedButton(
+                    onClick = {
+                        val megaUrl = "https://raw.githubusercontent.com/self-similarity/MegaRepo/builds/repo.json"
+                        val existing = repositories.firstOrNull { it.url.equals(megaUrl, true) }
+                        val repo = existing ?: SavedRepository("Mega Repo CloudStream", megaUrl).also {
+                            repositories = repositories + it
+                            saveRepositories()
+                        }
+                        name = repo.name
+                        url = repo.url
+                        loadRepository(repo)
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !loading
+                ) {
+                    Text("Tambah / Muat Mega Repo CloudStream")
+                }
                 OutlinedTextField(value = name, onValueChange = { name = it },
                     label = { Text("Nama repositori") }, singleLine = true)
                 OutlinedTextField(value = url, onValueChange = { url = it },
