@@ -3942,6 +3942,7 @@ private fun SourceFallbackPlayer(
     var fullscreenView by remember { mutableStateOf<android.view.View?>(null) }
     var fullscreenCallback by remember { mutableStateOf<android.webkit.WebChromeClient.CustomViewCallback?>(null) }
     var detectedDirectUrl by remember(movie) { mutableStateOf("") }
+    var sourcePageLoaded by remember(movie) { mutableStateOf(false) }
     val detectedServerUrls = remember(movie) { mutableStateListOf<String>() }
     val webViewRef = remember { mutableStateOf<android.webkit.WebView?>(null) }
     val isLandscape = LocalContext.current.resources.configuration.orientation ==
@@ -4169,6 +4170,9 @@ private fun SourceFallbackPlayer(
 
                                     override fun onPageFinished(view: android.webkit.WebView, url: String) {
                                         super.onPageFinished(view, url)
+                                        // Halaman player sudah siap; jangan biarkan overlay pencarian
+                                        // menutupi player situs ketika stream tidak bisa diekstrak.
+                                        sourcePageLoaded = true
                                         val script = """
                                             (function() {
                                               // Klik otomatis Skip Ads LK21 segera setelah tombol aktif (termasuk label hitung mundur).
@@ -4290,7 +4294,8 @@ private fun SourceFallbackPlayer(
                         modifier = Modifier.fillMaxSize(),
                         update = { webViewRef.value = it }
                     )
-                    Box(
+                    if (!sourcePageLoaded) {
+                        Box(
                             Modifier.fillMaxSize().background(Color.Black),
                             contentAlignment = Alignment.Center
                         ) {
@@ -4308,12 +4313,13 @@ private fun SourceFallbackPlayer(
                                 )
                                 Spacer(Modifier.height(7.dp))
                                 Text(
-                                    "Mengambil stream film untuk diputar di GENJUR STREAM.",
+                                    "Menyiapkan halaman pemutar film.",
                                     color = Muted,
                                     fontSize = 11.sp
                                 )
                             }
                         }
+                    }
                     }
                 }
             }
