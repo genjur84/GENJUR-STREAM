@@ -3996,13 +3996,16 @@ private fun SourceFallbackPlayer(
         }
     }
 
-    // Beri waktu bagi pre-roll singkat untuk selesai dan stream film utama
-    // untuk terdeteksi. Kandidat terbaru lebih mungkin merupakan stream film,
-    // sedangkan URL media pertama sering kali hanya video iklan pembuka.
+    // Jangan pindah ke ExoPlayer tepat setelah URL media pertama tertangkap:
+    // LK21 sering meminta stream iklan lebih dahulu. Beri waktu lebih panjang
+    // agar iklan selesai dan permintaan stream film utama ikut terdeteksi.
     LaunchedEffect(detectedServerUrls.size) {
         if (detectedServerUrls.isNotEmpty() && detectedDirectUrl.isBlank()) {
-            delay(6500)
-            val selected = detectedServerUrls.lastOrNull()
+            delay(18000)
+            val candidates = detectedServerUrls.toList()
+            // Utamakan kandidat terakhir karena player situs biasanya mengganti
+            // sumber dari pre-roll ke film setelah tombol Skip Ads / start film.
+            val selected = candidates.lastOrNull()
             val sourceView = webViewRef.value
             if (!selected.isNullOrBlank() && sourceView != null && detectedDirectUrl.isBlank()) {
                 stopSourceAndUseInternalPlayer(sourceView, selected)
@@ -4433,10 +4436,10 @@ private fun InAppVideoPlayer(
         fun skipShortPreRollIfNeeded() {
             val durationMs = player.duration
             val currentUrl = player.currentMediaItem?.localConfiguration?.uri?.toString().orEmpty()
-            // Iklan pembuka LK21 umumnya berdurasi sekitar 5–25 detik.
+            // Iklan pembuka LK21 dapat berdurasi hingga sekitar 45 detik.
             // Periksa lagi di ExoPlayer karena metadata HTML kadang belum tersedia
             // saat URL pertama kali terdeteksi dari permintaan jaringan.
-            if (durationMs in 1L..25_000L && currentUrl.isNotBlank() &&
+            if (durationMs in 1L..45_000L && currentUrl.isNotBlank() &&
                 currentUrl !in shortAdSkippedUrls) {
                 shortAdSkippedUrls.add(currentUrl)
                 if (!tryNextServer("Terdeteksi klip pendek ${durationMs / 1000} detik (kemungkinan iklan)")) {
