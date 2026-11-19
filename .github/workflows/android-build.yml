@@ -42,6 +42,11 @@ jobs:
             echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/genjur-stream.jks"
           fi
 
+      - name: Install Android SDK 37
+        run: |
+          yes | sdkmanager --licenses >/dev/null
+          sdkmanager "platforms;android-37" "build-tools;35.0.0" "platform-tools"
+
       - name: Build APK
         env:
           ANDROID_KEYSTORE_PATH: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' && format('{0}/genjur-stream.jks', runner.temp) || '' }}
