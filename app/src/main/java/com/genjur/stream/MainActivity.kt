@@ -2258,9 +2258,24 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
             onPlay = { selectedVersion ->
                 if (selectedVersion.videoUrl.isNotBlank()) {
                     recordWatch(selectedVersion)
+                    // Utamakan URL stream langsung yang sudah berhasil diekstrak
+                    // dari metadata halaman/iframe publik, seperti alur provider CloudStream.
+                    // Halaman sumber hanya dibuka sebagai fallback bila belum ada stream.
+                    val directStreams = selectedVersion.streamOptions
+                        .map { it.videoUrl }
+                        .filter { it.startsWith("https://") || it.startsWith("http://") }
+                        .distinct()
+                    val firstDirectStream = directStreams.firstOrNull()
+                    val playbackMovie = if (firstDirectStream != null) {
+                        selectedVersion.copy(
+                            videoUrl = firstDirectStream,
+                            downloadUrl = firstDirectStream,
+                            licenseId = "Direct source media"
+                        )
+                    } else selectedVersion
                     // Pertahankan halaman detail di belakang player.
                     // Saat player ditutup, pengguna kembali ke detail film, bukan katalog.
-                    playingMovie = selectedVersion
+                    playingMovie = playbackMovie
                 }
             }
         )
@@ -2277,7 +2292,14 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
         if (movie.licenseId == "Source page fallback") {
             SourceFallbackPlayer(activity, movie, onDownload = downloadPlayback, onClose = closePlayback)
         } else {
-            InAppVideoPlayer(activity, movie, onDownload = downloadPlayback, onClose = closePlayback)
+            InAppVideoPlayer(
+                activity,
+                movie,
+                onDownload = downloadPlayback,
+                onClose = closePlayback,
+                fallbackVideoUrls = movie.streamOptions.map { it.videoUrl }
+                    .filter { it != movie.videoUrl }
+            )
         }
     }
 }
