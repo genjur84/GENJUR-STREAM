@@ -6,7 +6,7 @@ plugins {
 
 android {
     namespace = "com.genjur.stream"
-    compileSdk = 37
+    compileSdk = 36
 
     val stableKeystorePath = System.getenv("ANDROID_KEYSTORE_PATH")
     val stableKeystorePassword = System.getenv("ANDROID_KEYSTORE_PASSWORD")
