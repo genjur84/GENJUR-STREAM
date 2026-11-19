@@ -3882,6 +3882,17 @@ private fun SourceFallbackPlayer(
     val isLandscape = LocalContext.current.resources.configuration.orientation ==
         android.content.res.Configuration.ORIENTATION_LANDSCAPE
 
+    // Begitu proses pencarian sumber dimulai, langsung kunci perangkat ke landscape
+    // dan sembunyikan system bar; jangan menunggu stream film ditemukan.
+    SideEffect {
+        activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+        WindowCompat.setDecorFitsSystemWindows(activity.window, false)
+        val bars = WindowInsetsControllerCompat(activity.window, activity.window.decorView)
+        bars.hide(WindowInsetsCompat.Type.systemBars())
+        bars.systemBarsBehavior =
+            WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+    }
+
     // Simpan URL media langsung yang benar-benar diminta player situs.
     // Halaman server/iframe biasa tidak diperlakukan sebagai URL video.
     fun addServerCandidate(candidate: String) {
@@ -3976,12 +3987,9 @@ private fun SourceFallbackPlayer(
             properties = DialogProperties(usePlatformDefaultWidth = false)
         ) {
             Surface(
-                // Portrait tetap memakai ukuran dan sudut dialog semula.
-                // Hanya landscape yang diperluas memenuhi layar.
-                modifier = if (isLandscape) Modifier.fillMaxSize()
-                    else Modifier.fillMaxWidth().fillMaxHeight(0.94f).padding(8.dp),
-                shape = if (isLandscape) RoundedCornerShape(0.dp)
-                    else RoundedCornerShape(18.dp),
+                // Layar pencarian sumber juga selalu memenuhi layar landscape.
+                modifier = Modifier.fillMaxSize(),
+                shape = RoundedCornerShape(0.dp),
                 color = Color.Black
             ) {
                 Column(Modifier.fillMaxSize().background(Color.Black)) {
@@ -4190,10 +4198,13 @@ private fun SourceFallbackPlayer(
                                         fullscreenView?.let { view -> decor?.removeView(view) }
                                         fullscreenView = null
                                         fullscreenCallback = null
-                                        activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
-                                        WindowCompat.setDecorFitsSystemWindows(activity.window, true)
-                                        WindowInsetsControllerCompat(activity.window, activity.window.decorView)
-                                            .show(WindowInsetsCompat.Type.systemBars())
+                                        activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+                                        WindowCompat.setDecorFitsSystemWindows(activity.window, false)
+                                        WindowInsetsControllerCompat(activity.window, activity.window.decorView).apply {
+                                            hide(WindowInsetsCompat.Type.systemBars())
+                                            systemBarsBehavior =
+                                                WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                                        }
                                     }
                                 }
                                 loadUrl(movie.termsUrl.ifBlank { movie.videoUrl })
