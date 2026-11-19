@@ -3960,7 +3960,7 @@ private fun SourceFallbackPlayer(
 
     // Simpan URL media langsung yang benar-benar diminta player situs.
     // Halaman server/iframe biasa tidak diperlakukan sebagai URL video.
-    fun addServerCandidate(candidate: String) {
+    fun addServerCandidate(candidate: String, durationSeconds: Double = 0.0) {
         val uri = Uri.parse(candidate)
         val path = uri.path.orEmpty().lowercase()
         val mediaUrlText = (path + "?" + uri.encodedQuery.orEmpty()).lowercase()
@@ -3971,7 +3971,7 @@ private fun SourceFallbackPlayer(
         val adPath = Regex("""(^|[/_.?&=-])(ads?|advert|advertisement|preroll|pre-roll|vast|vpaid|popunder|banner|sponsor|tracking)([/_.?&=-]|$)""")
             .containsMatchIn(mediaUrlText)
         if (uri.scheme !in listOf("https", "http") || uri.host.isNullOrBlank() ||
-            !isPlayableMedia || isGenjurAdHost(uri.host) || adPath) return
+            !isPlayableMedia || durationSeconds < 45.0 || isGenjurAdHost(uri.host) || adPath) return
         if (detectedServerUrls.none { it == candidate }) detectedServerUrls.add(candidate)
     }
 
@@ -4005,7 +4005,7 @@ private fun SourceFallbackPlayer(
             val candidates = detectedServerUrls.toList()
             // Utamakan kandidat terakhir karena player situs biasanya mengganti
             // sumber dari pre-roll ke film setelah tombol Skip Ads / start film.
-            val selected = candidates.lastOrNull()
+            val selected = candidates.firstOrNull()
             val sourceView = webViewRef.value
             if (!selected.isNullOrBlank() && sourceView != null && detectedDirectUrl.isBlank()) {
                 stopSourceAndUseInternalPlayer(sourceView, selected)
@@ -4110,9 +4110,9 @@ private fun SourceFallbackPlayer(
                                 }
                                 addJavascriptInterface(object {
                                     @JavascriptInterface
-                                    fun onPlayableMedia(url: String) {
-                                        // Bridge dipanggil dari thread JavaScript WebView.
-                                        this@apply.post { addServerCandidate(url) }
+                                    fun onPlayableMedia(url: String, durationSeconds: Double) {
+                                        // Hanya kandidat video berdurasi film yang diteruskan ke ExoPlayer.
+                                        this@apply.post { addServerCandidate(url, durationSeconds) }
                                     }
                                     @JavascriptInterface
                                     fun onStartFilmPrompt() {
@@ -4171,8 +4171,16 @@ private fun SourceFallbackPlayer(
                                         view: android.webkit.WebView,
                                         request: android.webkit.WebResourceRequest
                                     ): Boolean {
-                                        val scheme = request.url.scheme.orEmpty()
-                                        return scheme != "https" && scheme != "http"
+                                        val uri = request.url
+                                        val scheme = uri.scheme.orEmpty()
+                                        if (scheme != "https" && scheme != "http") return true
+                                        // Cegah redirect iklan yang mengganti halaman utama; iframe player tetap diizinkan.
+                                        if (request.isForMainFrame) {
+                                            val host = uri.host.orEmpty().lowercase()
+                                            val isLk21 = host == "lk21official.cc" || host.endsWith(".lk21official.cc")
+                                            if (!isLk21) return true
+                                        }
+                                        return false
                                     }
 
                                     override fun onPageFinished(view: android.webkit.WebView, url: String) {
@@ -4236,12 +4244,14 @@ private fun SourceFallbackPlayer(
                                                   var source = media.currentSrc || media.src ||
                                                     (media.querySelector('source') && media.querySelector('source').src) || '';
                                                   if (source && /^https?:/i.test(source) &&
-                                                      /\.(mp4|m4v|webm|m3u8)(?:$|[?#])/i.test(source)) {
-                                                    try { GenjurMediaBridge.onPlayableMedia(source); } catch(e) {}
+                                                      /\\.(mp4|m4v|webm|m3u8)(?:$|[?#])/i.test(source) &&
+                                                      Number.isFinite(media.duration) && media.duration >= 45) {
+                                                    try { GenjurMediaBridge.onPlayableMedia(source, media.duration); } catch(e) {}
                                                   }
                                                 }
-                                                media.addEventListener('play', report, { once: true });
-                                                media.addEventListener('playing', report, { once: true });
+                                                media.addEventListener('loadedmetadata', report);
+                                                media.addEventListener('durationchange', report);
+                                                media.addEventListener('playing', report);
                                                 report();
                                               }
                                               document.querySelectorAll('video,audio').forEach(attach);
