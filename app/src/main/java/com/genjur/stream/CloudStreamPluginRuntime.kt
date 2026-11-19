@@ -1,6 +1,8 @@
 package com.genjur.stream
 
 import android.content.Context
+import android.content.res.AssetManager
+import android.content.res.Resources
 import dalvik.system.PathClassLoader
 import com.lagradost.cloudstream3.APIHolder
 import com.lagradost.cloudstream3.plugins.BasePlugin
@@ -97,6 +99,16 @@ object CloudStreamPluginRuntime {
         }
         val instance = pluginClass.getDeclaredConstructor().newInstance() as BasePlugin
         instance.filename = pluginFile.absolutePath
+        if (manifest.optBoolean("requiresResources", false) && instance is Plugin) {
+            val assets = AssetManager::class.java.getDeclaredConstructor().newInstance()
+            AssetManager::class.java.getMethod("addAssetPath", String::class.java)
+                .invoke(assets, pluginFile.absolutePath)
+            instance.resources = Resources(
+                assets,
+                context.resources.displayMetrics,
+                context.resources.configuration
+            )
+        }
         when (instance) {
             is Plugin -> instance.load(context.applicationContext)
             else -> instance.load()
