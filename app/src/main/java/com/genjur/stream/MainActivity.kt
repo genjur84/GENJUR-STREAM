@@ -4160,10 +4160,13 @@ private fun SourceFallbackPlayer(
                                         val looksLikeAd = isGenjurAdHost(uri.host) ||
                                             Regex("""(?i)(/ads?/|advert|doubleclick|popunder|banner|tracking|analytics)""")
                                                 .containsMatchIn(fullUrl)
-                                        if (directMedia && !looksLikeAd &&
-                                            uri.scheme in listOf("https", "http") && !uri.host.isNullOrBlank()) {
-                                            // Tetap biarkan WebView mengumpulkan kandidat server lain.
-                                            view.post { addServerCandidate(fullUrl) }
+                                        // Jangan masukkan request media mentah ke daftar kandidat.
+                                        // Request pertama sering berupa iklan pre-roll dengan ekstensi MP4/HLS
+                                        // yang sama seperti film. Kandidat hanya boleh ditambahkan oleh
+                                        // GenjurMediaBridge setelah elemen video melaporkan durasi >= 45 detik.
+                                        // WebView tetap memuat request normal agar player situs dapat berjalan.
+                                        if (directMedia && looksLikeAd) {
+                                            // Tandai saja secara lokal; jangan pernah memilih URL iklan.
                                         }
                                         return super.shouldInterceptRequest(view, request)
                                     }
