@@ -1668,7 +1668,7 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                                     onClick = { searchSubmitted = true },
                                     modifier = Modifier.fillMaxWidth(),
                                     enabled = search.isNotBlank(),
-                                    colors = ButtonDefaults.buttonColors(containerColor = Green, contentColor = Color.Black)
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE53935), contentColor = Color.White)
                                 ) {
                                     Icon(Icons.Filled.Search, contentDescription = null)
                                     Spacer(Modifier.width(8.dp))
