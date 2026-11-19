@@ -3996,20 +3996,21 @@ private fun SourceFallbackPlayer(
         }
     }
 
-    // Jangan pindah ke ExoPlayer tepat setelah URL media pertama tertangkap:
-    // LK21 sering meminta stream iklan lebih dahulu. Beri waktu lebih panjang
-    // agar iklan selesai dan permintaan stream film utama ikut terdeteksi.
-    LaunchedEffect(detectedServerUrls.size) {
-        if (detectedServerUrls.isNotEmpty() && detectedDirectUrl.isBlank()) {
-            delay(18000)
-            val candidates = detectedServerUrls.toList()
-            // Utamakan kandidat terakhir karena player situs biasanya mengganti
-            // sumber dari pre-roll ke film setelah tombol Skip Ads / start film.
-            val selected = candidates.firstOrNull()
-            val sourceView = webViewRef.value
-            if (!selected.isNullOrBlank() && sourceView != null && detectedDirectUrl.isBlank()) {
-                stopSourceAndUseInternalPlayer(sourceView, selected)
+    // Begitu metadata video berdurasi film tersedia, beri jeda singkat agar
+    // player menyelesaikan pergantian dari iklan ke konten utama.
+    // Effect tidak diulang untuk setiap URL baru agar waktu tunggu tidak terus mundur.
+    LaunchedEffect(Unit) {
+        while (detectedDirectUrl.isBlank()) {
+            if (detectedServerUrls.isNotEmpty()) {
+                delay(1800)
+                val selected = detectedServerUrls.lastOrNull()
+                val sourceView = webViewRef.value
+                if (!selected.isNullOrBlank() && sourceView != null && detectedDirectUrl.isBlank()) {
+                    stopSourceAndUseInternalPlayer(sourceView, selected)
+                }
+                break
             }
+            delay(250)
         }
     }
 
