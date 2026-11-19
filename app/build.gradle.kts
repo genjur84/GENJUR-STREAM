@@ -79,7 +79,7 @@ dependencies {
     implementation("org.jsoup:jsoup:1.18.3")
 
     // CloudStream 4.9.1 extension API used by .cs3 providers.
-    implementation("com.github.recloudstream.cloudstream:library:v4.9.1")
+    implementation("com.github.recloudstream.cloudstream:library:v4.5.4")
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.13.1")
     implementation("com.github.Blatzar:NiceHttp:0.4.11")
     implementation("com.github.teamnewpipe:NewPipeExtractor:v0.25.2")
