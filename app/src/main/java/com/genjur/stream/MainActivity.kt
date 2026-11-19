@@ -2299,15 +2299,11 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                         it.videoUrl.startsWith("https://") || it.videoUrl.startsWith("http://")
                     }
                     val firstDirectStream = firstDirectOption?.videoUrl
-                    val directStreams = selectedVersion.streamOptions
-                        .map { it.videoUrl }
-                        .filter { it.startsWith("https://") || it.startsWith("http://") }
-                        .distinct()
                     val playbackMovie = if (firstDirectStream != null) {
                         selectedVersion.copy(
                             videoUrl = firstDirectStream,
                             downloadUrl = firstDirectStream,
-                            termsUrl = firstDirectOption.referer.ifBlank { selectedVersion.termsUrl },
+                            termsUrl = firstDirectOption?.referer?.ifBlank { selectedVersion.termsUrl } ?: selectedVersion.termsUrl,
                             licenseId = "Direct source media"
                         )
                     } else {
