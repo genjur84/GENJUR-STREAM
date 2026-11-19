@@ -1670,8 +1670,6 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
                                     enabled = search.isNotBlank(),
                                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE53935), contentColor = Color.White)
                                 ) {
-                                    Icon(Icons.Filled.Search, contentDescription = null)
-                                    Spacer(Modifier.width(8.dp))
                                     Text("Cari", fontWeight = FontWeight.Bold)
                                 }
                                 Text(
