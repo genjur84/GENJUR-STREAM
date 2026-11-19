@@ -4264,7 +4264,6 @@ private fun SourceFallbackPlayer(
         }
     }
     }
-}
 
 @Composable
 private fun InAppVideoPlayer(
