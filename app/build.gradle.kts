@@ -1,12 +1,11 @@
 plugins {
     id("com.android.application")
-    id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
 android {
     namespace = "com.genjur.stream"
-    compileSdk = 36
+    compileSdk = 37
 
     val stableKeystorePath = System.getenv("ANDROID_KEYSTORE_PATH")
     val stableKeystorePassword = System.getenv("ANDROID_KEYSTORE_PASSWORD")
