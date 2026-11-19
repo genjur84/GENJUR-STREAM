@@ -4243,9 +4243,8 @@ private fun InAppVideoPlayer(
     onClose: () -> Unit,
     fallbackVideoUrls: List<String> = emptyList()
 ) {
-    // Saat tombol Play ditekan, player dibuka dalam mode portrait terlebih dahulu.
-    // Pengguna dapat beralih ke landscape penuh melalui tombol fullscreen.
-    var isFullscreen by remember { mutableStateOf(false) }
+    // Player selalu dibuka langsung dalam mode landscape layar penuh.
+    var isFullscreen by remember { mutableStateOf(true) }
     var landscapeControlsVisible by remember { mutableStateOf(true) }
     var landscapePlayerView by remember { mutableStateOf<PlayerView?>(null) }
     SideEffect {
@@ -4442,8 +4441,8 @@ private fun InAppVideoPlayer(
     }
 
     // Tombol kembali Android keluar dari mode layar penuh terlebih dahulu.
-    BackHandler(enabled = isFullscreen) {
-        setFullscreen(false)
+    BackHandler(enabled = true) {
+        onClose()
     }
 
     Dialog(
@@ -4529,11 +4528,6 @@ private fun InAppVideoPlayer(
                             landscapePlayerView?.showController()
                         }) {
                             Icon(Icons.Filled.Download, contentDescription = "Unduh video", tint = Color.White)
-                        }
-                        IconButton(onClick = {
-                            setFullscreen(false)
-                        }) {
-                            Icon(Icons.Filled.FullscreenExit, contentDescription = "Keluar full screen", tint = Color.White)
                         }
                     }
                     }
