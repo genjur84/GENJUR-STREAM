@@ -3954,7 +3954,7 @@ private fun SourceFallbackPlayer(
     // Begitu proses pencarian sumber dimulai, langsung kunci perangkat ke landscape
     // dan sembunyikan system bar; jangan menunggu stream film ditemukan.
     SideEffect {
-        activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+        activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
         WindowCompat.setDecorFitsSystemWindows(activity.window, false)
         val bars = WindowInsetsControllerCompat(activity.window, activity.window.decorView)
         bars.hide(WindowInsetsCompat.Type.systemBars())
@@ -4253,7 +4253,7 @@ private fun SourceFallbackPlayer(
                                             android.view.ViewGroup.LayoutParams.MATCH_PARENT,
                                             android.view.ViewGroup.LayoutParams.MATCH_PARENT
                                         ))
-                                        activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+                                        activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
                                         WindowCompat.setDecorFitsSystemWindows(activity.window, false)
                                         WindowInsetsControllerCompat(activity.window, decor)
                                             .hide(WindowInsetsCompat.Type.systemBars())
@@ -4264,7 +4264,7 @@ private fun SourceFallbackPlayer(
                                         fullscreenView?.let { view -> decor?.removeView(view) }
                                         fullscreenView = null
                                         fullscreenCallback = null
-                                        activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+                                        activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
                                         WindowCompat.setDecorFitsSystemWindows(activity.window, false)
                                         WindowInsetsControllerCompat(activity.window, activity.window.decorView).apply {
                                             hide(WindowInsetsCompat.Type.systemBars())
@@ -4326,7 +4326,7 @@ private fun InAppVideoPlayer(
     var landscapePlayerView by remember { mutableStateOf<PlayerView?>(null) }
     SideEffect {
         activity.requestedOrientation = if (isFullscreen) {
-            ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+            ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
         } else {
             ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
         }
@@ -4501,7 +4501,7 @@ private fun InAppVideoPlayer(
     fun setFullscreen(enabled: Boolean) {
         isFullscreen = enabled
         activity.requestedOrientation = if (enabled) {
-            ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+            ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
         } else {
             ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
         }
