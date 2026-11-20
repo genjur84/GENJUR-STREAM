@@ -94,7 +94,6 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.ui.PlayerView
-import androidx.media3.ui.PlayerControlView
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerNotificationManager
 import com.arthenica.ffmpegkit.FFmpegKit
@@ -4592,13 +4591,15 @@ private fun InAppVideoPlayer(
                                 )
                                 // Samakan kontrol dengan player pada rekaman: timeline,
                                 // putar/jeda, serta lompat mundur/maju masing-masing 10 detik.
-                                findViewById<PlayerControlView>(androidx.media3.ui.R.id.exo_controller)?.apply {
-                                    setShowRewindButton(true)
-                                    setShowFastForwardButton(true)
-                                    setRewindIncrementMs(10_000)
-                                    setFastForwardIncrementMs(10_000)
-                                    setShowPreviousButton(false)
-                                    setShowNextButton(false)
+                                setShowRewindButton(true)
+                                setShowFastForwardButton(true)
+                                setShowPreviousButton(false)
+                                setShowNextButton(false)
+                                findViewById<android.view.View>(androidx.media3.ui.R.id.exo_rew)?.setOnClickListener {
+                                    player.seekTo((player.currentPosition - 10_000L).coerceAtLeast(0L))
+                                }
+                                findViewById<android.view.View>(androidx.media3.ui.R.id.exo_ffwd)?.setOnClickListener {
+                                    player.seekTo((player.currentPosition + 10_000L).coerceAtMost(player.duration.takeIf { it > 0L } ?: Long.MAX_VALUE))
                                 }
                                 landscapePlayerView = this
                                 resizeMode = effectiveResizeMode
@@ -4608,13 +4609,15 @@ private fun InAppVideoPlayer(
                         update = {
                             it.player = player
                             it.resizeMode = effectiveResizeMode
-                            it.findViewById<PlayerControlView>(androidx.media3.ui.R.id.exo_controller)?.apply {
-                                setShowRewindButton(true)
-                                setShowFastForwardButton(true)
-                                setRewindIncrementMs(10_000)
-                                setFastForwardIncrementMs(10_000)
-                                setShowPreviousButton(false)
-                                setShowNextButton(false)
+                            it.setShowRewindButton(true)
+                            it.setShowFastForwardButton(true)
+                            it.setShowPreviousButton(false)
+                            it.setShowNextButton(false)
+                            it.findViewById<android.view.View>(androidx.media3.ui.R.id.exo_rew)?.setOnClickListener {
+                                player.seekTo((player.currentPosition - 10_000L).coerceAtLeast(0L))
+                            }
+                            it.findViewById<android.view.View>(androidx.media3.ui.R.id.exo_ffwd)?.setOnClickListener {
+                                player.seekTo((player.currentPosition + 10_000L).coerceAtMost(player.duration.takeIf { duration -> duration > 0L } ?: Long.MAX_VALUE))
                             }
                             it.setControllerVisibilityListener(
                                 PlayerView.ControllerVisibilityListener { visibility: Int ->
