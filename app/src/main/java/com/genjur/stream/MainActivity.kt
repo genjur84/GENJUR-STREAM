@@ -4144,22 +4144,42 @@ private fun SourceFallbackPlayer(
                                         val uri = request.url
                                         val scheme = uri.scheme.orEmpty()
                                         if (scheme != "https" && scheme != "http") return true
-                                        // Cegah redirect iklan yang mengganti halaman utama; iframe player tetap diizinkan.
+                                        // Klikxxi memakai server eksternal. Izinkan perpindahan ke host pemutar,
+                                        // tetapi blokir domain/URL yang jelas merupakan iklan atau pelacak.
                                         if (request.isForMainFrame) {
                                             val host = uri.host.orEmpty().lowercase()
-                                            val isLk21 = host == "lk21official.cc" || host.endsWith(".lk21official.cc")
-                                            if (!isLk21) return true
+                                            val pathAndQuery = (uri.path.orEmpty() + "?" + uri.encodedQuery.orEmpty()).lowercase()
+                                            val isKnownAd = isGenjurAdHost(host) ||
+                                                Regex("""(^|[.-])(doubleclick|popads|popcash|exoclick|adsterra|onclick|trafficjunky)([.-]|$)""").containsMatchIn(host) ||
+                                                Regex("""(^|[/_.?&=-])(ads?|advert|popunder|popup|banner|tracking|clickunder)([/_.?&=-]|$)""").containsMatchIn(pathAndQuery)
+                                            if (isKnownAd) return true
                                         }
                                         return false
                                     }
 
                                     override fun onPageFinished(view: android.webkit.WebView, url: String) {
                                         super.onPageFinished(view, url)
-                                        // Halaman player sudah siap; jangan biarkan overlay pencarian
-                                        // menutupi player situs ketika stream tidak bisa diekstrak.
-                                        sourcePageLoaded = true
+                                        // Overlay pencarian tetap menutup halaman situs. Ia hanya hilang
+                                        // setelah URL media film terdeteksi dan dipindah ke player internal.
                                         val script = """
                                             (function() {
+                                              // Klikxxi: pilih Server 1 otomatis sebagai server pertama.
+                                              // Jika tidak menghasilkan stream, pengguna dapat menutup player dan mencoba ulang.
+                                              function genjurSelectKlikxxiServer() {
+                                                try {
+                                                  if (!/klikxxi\\.shop$/i.test(location.hostname) || window.__genjurKlikxxiServerChosen) return;
+                                                  var links = Array.prototype.slice.call(document.querySelectorAll('a,button,[role="button"]'));
+                                                  var server = links.find(function(el) {
+                                                    var label = (el.innerText || el.textContent || el.getAttribute('aria-label') || '').replace(/\\s+/g, ' ').trim();
+                                                    return /^server\\s*1$/i.test(label);
+                                                  });
+                                                  if (server) {
+                                                    window.__genjurKlikxxiServerChosen = true;
+                                                    window.setTimeout(function() { try { server.click(); } catch(e) {} }, 700);
+                                                  }
+                                                } catch(e) {}
+                                              }
+                                              genjurSelectKlikxxiServer();
                                               // Klik otomatis Skip Ads LK21 segera setelah tombol aktif (termasuk label hitung mundur).
                                               function genjurTrySkipAds(doc) {
                                                 try {
