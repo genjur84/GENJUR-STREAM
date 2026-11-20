@@ -3558,7 +3558,7 @@ private fun SourceBrowser(
                                 ))
                             }
                             siteFullscreenView = fullscreenContainer
-                            activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+                            activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
                             WindowCompat.setDecorFitsSystemWindows(activity.window, false)
                             WindowInsetsControllerCompat(activity.window, decor)
                                 .apply {
@@ -4037,28 +4037,10 @@ private fun SourceFallbackPlayer(
         }
     }
 
-    // Satu jendela induk dipertahankan sepanjang perpindahan dari pencarian sumber
-    // ke ExoPlayer. Dialog anak boleh berganti tanpa membuka katalog di belakangnya.
-    Dialog(
-        onDismissRequest = onClose,
-        properties = DialogProperties(usePlatformDefaultWidth = false)
-    ) {
-        val sourceDialogWindow = (LocalView.current.parent as? DialogWindowProvider)?.window
-        SideEffect {
-            sourceDialogWindow?.let { window ->
-                window.setLayout(
-                    android.view.WindowManager.LayoutParams.MATCH_PARENT,
-                    android.view.WindowManager.LayoutParams.MATCH_PARENT
-                )
-                window.setBackgroundDrawableResource(android.R.color.black)
-                WindowCompat.setDecorFitsSystemWindows(window, false)
-                WindowInsetsControllerCompat(window, window.decorView).apply {
-                    hide(WindowInsetsCompat.Type.systemBars())
-                    systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-                }
-            }
-        }
-        Surface(Modifier.fillMaxSize(), color = Color.Black) {
+    // Host hitam menjadi lapisan tunggal di atas katalog. Hindari Dialog induk
+    // yang membungkus Dialog pencarian/player karena dua window fullscreen
+    // menyebabkan rotasi dan ukuran konten saling bertabrakan pada sebagian HP.
+    Box(Modifier.fillMaxSize().background(Color.Black)) {
     // Jika halaman sumber menyediakan URL media HTML5 biasa yang dapat diakses,
     // pindahkan pemutaran ke ExoPlayer GENJUR. Jika tidak, tetap gunakan player situs.
     if (detectedDirectUrl.isNotBlank()) {
@@ -4328,7 +4310,6 @@ private fun SourceFallbackPlayer(
             }
         }
         }
-    }
     }
 
 @Composable
