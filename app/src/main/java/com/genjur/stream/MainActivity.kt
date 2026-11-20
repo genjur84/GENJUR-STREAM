@@ -2276,7 +2276,9 @@ fun GenjurStreamHome(activity: MainActivity, onOpenSources: () -> Unit = {}) {
         )
     }
 
-    selectedMovie?.let { movie ->
+    // Sembunyikan dialog detail selama pemutaran/pencarian sumber.
+    // Detail tetap tersimpan di state, sehingga muncul lagi saat player ditutup.
+    if (playingMovie == null) selectedMovie?.let { movie ->
         MovieDetailDialog(
             movie = movie,
             detailLoading = sourceDetailLoading,
