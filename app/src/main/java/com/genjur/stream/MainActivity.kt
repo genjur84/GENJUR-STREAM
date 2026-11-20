@@ -94,6 +94,7 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.ui.PlayerView
+import androidx.media3.ui.PlayerControlView
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerNotificationManager
 import com.arthenica.ffmpegkit.FFmpegKit
@@ -4589,9 +4590,17 @@ private fun InAppVideoPlayer(
                                         landscapeControlsVisible = visibility == android.view.View.VISIBLE
                                     }
                                 )
+                                // Samakan kontrol dengan player pada rekaman: timeline,
+                                // putar/jeda, serta lompat mundur/maju masing-masing 10 detik.
+                                findViewById<PlayerControlView>(androidx.media3.ui.R.id.exo_controller)?.apply {
+                                    setShowRewindButton(true)
+                                    setShowFastForwardButton(true)
+                                    setRewindIncrementMs(10_000)
+                                    setFastForwardIncrementMs(10_000)
+                                    setShowPreviousButton(false)
+                                    setShowNextButton(false)
+                                }
                                 landscapePlayerView = this
-                                // Perbesar video agar memenuhi layar landscape; sisi video
-                                // yang terpotong mengikuti rasio layar, tanpa meregangkan gambar.
                                 resizeMode = effectiveResizeMode
                                 setShowBuffering(PlayerView.SHOW_BUFFERING_WHEN_PLAYING)
                             }
@@ -4599,6 +4608,14 @@ private fun InAppVideoPlayer(
                         update = {
                             it.player = player
                             it.resizeMode = effectiveResizeMode
+                            it.findViewById<PlayerControlView>(androidx.media3.ui.R.id.exo_controller)?.apply {
+                                setShowRewindButton(true)
+                                setShowFastForwardButton(true)
+                                setRewindIncrementMs(10_000)
+                                setFastForwardIncrementMs(10_000)
+                                setShowPreviousButton(false)
+                                setShowNextButton(false)
+                            }
                             it.setControllerVisibilityListener(
                                 PlayerView.ControllerVisibilityListener { visibility: Int ->
                                     landscapeControlsVisible = visibility == android.view.View.VISIBLE
@@ -4611,31 +4628,39 @@ private fun InAppVideoPlayer(
                         }
                     )
                     if (landscapeControlsVisible) {
-                    Row(
-                        modifier = Modifier.align(Alignment.TopEnd).padding(8.dp),
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        TextButton(onClick = {
-                            videoResizeMode = when (videoResizeMode) {
-                                -1 -> AspectRatioFrameLayout.RESIZE_MODE_FIT
-                                AspectRatioFrameLayout.RESIZE_MODE_FIT -> AspectRatioFrameLayout.RESIZE_MODE_FILL
-                                AspectRatioFrameLayout.RESIZE_MODE_FILL -> AspectRatioFrameLayout.RESIZE_MODE_ZOOM
-                                else -> -1
+                        Row(
+                            modifier = Modifier.align(Alignment.TopCenter)
+                                .fillMaxWidth()
+                                .background(Color.Black.copy(alpha = 0.42f))
+                                .padding(horizontal = 10.dp, vertical = 4.dp),
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                movie.title,
+                                color = Color.White,
+                                fontWeight = FontWeight.SemiBold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f)
+                            )
+                            TextButton(onClick = {
+                                videoResizeMode = when (videoResizeMode) {
+                                    -1 -> AspectRatioFrameLayout.RESIZE_MODE_FIT
+                                    AspectRatioFrameLayout.RESIZE_MODE_FIT -> AspectRatioFrameLayout.RESIZE_MODE_FILL
+                                    AspectRatioFrameLayout.RESIZE_MODE_FILL -> AspectRatioFrameLayout.RESIZE_MODE_ZOOM
+                                    else -> -1
+                                }
+                            }) {
+                                Text(videoResizeLabel, color = Color.White)
                             }
-                        }) {
-                            Text(videoResizeLabel, color = Color.White)
+                            IconButton(onClick = { requestPlayerDownload() }) {
+                                Icon(Icons.Filled.Download, contentDescription = "Unduh video", tint = Color.White)
+                            }
+                            TextButton(onClick = onClose) {
+                                Text("Tutup", color = Color.White)
+                            }
                         }
-                        IconButton(onClick = { requestPlayerDownload() }) {
-                            Icon(Icons.Filled.Download, contentDescription = "Unduh video", tint = Color.White)
-                        }
-                        IconButton(onClick = {
-                            requestPlayerDownload()
-                            landscapePlayerView?.showController()
-                        }) {
-                            Icon(Icons.Filled.Download, contentDescription = "Unduh video", tint = Color.White)
-                        }
-                    }
                     }
                 }
             } else {
