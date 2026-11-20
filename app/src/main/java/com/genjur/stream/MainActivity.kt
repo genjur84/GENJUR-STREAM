@@ -4167,11 +4167,11 @@ private fun SourceFallbackPlayer(
                                               // Jika tidak menghasilkan stream, pengguna dapat menutup player dan mencoba ulang.
                                               function genjurSelectKlikxxiServer() {
                                                 try {
-                                                  if (!/klikxxi\\.shop$/i.test(location.hostname) || window.__genjurKlikxxiServerChosen) return;
+                                                  if (!/klikxxi\.shop$/i.test(location.hostname) || window.__genjurKlikxxiServerChosen) return;
                                                   var links = Array.prototype.slice.call(document.querySelectorAll('a,button,[role="button"]'));
                                                   var server = links.find(function(el) {
-                                                    var label = (el.innerText || el.textContent || el.getAttribute('aria-label') || '').replace(/\\s+/g, ' ').trim();
-                                                    return /^server\\s*1$/i.test(label);
+                                                    var label = (el.innerText || el.textContent || el.getAttribute('aria-label') || '').replace(/\s+/g, ' ').trim();
+                                                    return /^server\s*1$/i.test(label);
                                                   });
                                                   if (server) {
                                                     window.__genjurKlikxxiServerChosen = true;
