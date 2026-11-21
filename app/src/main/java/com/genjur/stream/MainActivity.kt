@@ -4175,18 +4175,84 @@ private fun SourceFallbackPlayer(
 
                                     override fun onPageCommitVisible(view: android.webkit.WebView, url: String) {
                                         super.onPageCommitVisible(view, url)
-                                        // Tampilkan halaman sumber begitu konten utama siap agar pengguna
-                                        // dapat menutup pop-up iklan dan memilih server secara manual.
-                                        sourcePageLoaded = true
+                                        // Halaman sumber tetap di belakang layar pencarian sampai URL film
+                                        // benar-benar terdeteksi dan dialihkan ke player internal.
                                     }
 
                                     override fun onPageFinished(view: android.webkit.WebView, url: String) {
                                         super.onPageFinished(view, url)
-                                        sourcePageLoaded = true
-                                        // Hanya amati media film; jangan klik iklan, tombol server,
-                                        // atau area player secara otomatis. Interaksi tetap di tangan pengguna.
+                                        // Otomatisasi hanya tombol Skip Ads/tutup iklan yang jelas,
+                                        // lalu pilih server KlikXXI. WebView tetap tertutup overlay
+                                        // "Mencari sumber video…" sampai media film ditemukan.
                                         val script = """
                                             (function() {
+                                              if (window.__genjurAutomationInstalled) return;
+                                              window.__genjurAutomationInstalled = true;
+                                              window.__genjurServerIndex = 0;
+                                              var serverLabels = ['server 1', 'server 3', 'server 4'];
+
+                                              function visible(el) {
+                                                if (!el || el.disabled || el.getAttribute('aria-disabled') === 'true') return false;
+                                                var r = el.getBoundingClientRect();
+                                                var s = window.getComputedStyle(el);
+                                                return r.width > 0 && r.height > 0 && s.display !== 'none' &&
+                                                  s.visibility !== 'hidden' && Number(s.opacity || 1) > 0;
+                                              }
+
+                                              function skipKnownAdButtons() {
+                                                try {
+                                                  var nodes = document.querySelectorAll(
+                                                    'button,a,[role="button"],input[type="button"],input[type="submit"],[class*="skip"],[id*="skip"]'
+                                                  );
+                                                  for (var i = 0; i < nodes.length; i++) {
+                                                    var el = nodes[i];
+                                                    if (!visible(el)) continue;
+                                                    var label = [el.innerText, el.textContent, el.getAttribute('aria-label'),
+                                                      el.getAttribute('title'), el.value, el.id, el.className]
+                                                      .filter(Boolean).join(' ').replace(/\\s+/g, ' ').trim().toLowerCase();
+                                                    if (label.length < 100 &&
+                                                      /\\bskip\\s*ads?\\b|\\bskip\\s+advertisement\\b|lewati\\s+iklan|tutup\\s+iklan|close\\s+ads?\\b|close\\s+advertisement/.test(label)) {
+                                                      el.dataset.genjurAdClicked = '1';
+                                                      window.__genjurAdDismissedAt = Date.now();
+                                                      try { el.click(); } catch(e) {}
+                                                    }
+                                                  }
+                                                } catch(e) {}
+                                              }
+
+                                              function selectKlikxxiServer() {
+                                                try {
+                                                  if (!/klikxxi\\.shop$/i.test(location.hostname) ||
+                                                      window.__genjurMediaFound || window.__genjurServerIndex >= serverLabels.length) return;
+                                                  if (window.__genjurAdDismissedAt && Date.now() - window.__genjurAdDismissedAt < 1200) return;
+                                                  if (window.__genjurLastServerAt && Date.now() - window.__genjurLastServerAt < 10000) return;
+                                                  var nodes = document.querySelectorAll('a,button,[role="button"],input[type="button"],input[type="submit"]');
+                                                  for (var i = 0; i < nodes.length; i++) {
+                                                    var el = nodes[i];
+                                                    if (!visible(el)) continue;
+                                                    var label = (el.innerText || el.textContent || el.getAttribute('aria-label') || el.value || '')
+                                                      .replace(/\\s+/g, ' ').trim().toLowerCase();
+                                                    if (label === serverLabels[window.__genjurServerIndex]) {
+                                                      window.__genjurServerIndex++;
+                                                      try { el.click(); } catch(e) {}
+                                                      window.__genjurLastServerAt = Date.now();
+                                                      return;
+                                                    }
+                                                  }
+                                                } catch(e) {}
+                                              }
+
+                                              function startFilmPrompt() {
+                                                try {
+                                                  var text = (document.body && (document.body.innerText || document.body.textContent) || '').toLowerCase();
+                                                  if (/klik\\s+di\\s+mana\\s+saja\\s+untuk\\s+memulai\\s+film|klik\\s+dimana\\s+saja\\s+untuk\\s+memulai\\s+film|click\\s+anywhere\\s+to\\s+start\\s+(the\\s+)?(movie|film|video)/i.test(text) &&
+                                                      !window.__genjurStartPromptSent && window.GenjurMediaBridge) {
+                                                    window.__genjurStartPromptSent = true;
+                                                    GenjurMediaBridge.onStartFilmPrompt();
+                                                  }
+                                                } catch(e) {}
+                                              }
+
                                               function attach(media) {
                                                 if (!media || media.dataset.genjurBridge === '1') return;
                                                 media.dataset.genjurBridge = '1';
@@ -4196,7 +4262,9 @@ private fun SourceFallbackPlayer(
                                                   if (source && /^https?:/i.test(source) &&
                                                       /\\.(mp4|m4v|webm|m3u8)(?:$|[?#])/i.test(source) &&
                                                       Number.isFinite(media.duration) && media.duration >= 45) {
+                                                    window.__genjurMediaFound = true;
                                                     try { GenjurMediaBridge.onPlayableMedia(source, media.duration); } catch(e) {}
+                                                    try { var p = media.play(); if (p && p.catch) p.catch(function() {}); } catch(e) {}
                                                   }
                                                 }
                                                 media.addEventListener('loadedmetadata', report);
@@ -4204,10 +4272,17 @@ private fun SourceFallbackPlayer(
                                                 media.addEventListener('playing', report);
                                                 report();
                                               }
-                                              document.querySelectorAll('video,audio').forEach(attach);
-                                              new MutationObserver(function() {
+
+                                              function scan() {
+                                                skipKnownAdButtons();
+                                                selectKlikxxiServer();
+                                                startFilmPrompt();
                                                 document.querySelectorAll('video,audio').forEach(attach);
-                                              }).observe(document.documentElement || document, {childList:true,subtree:true});
+                                              }
+                                              scan();
+                                              window.__genjurAutomationTimer = window.setInterval(scan, 700);
+                                              new MutationObserver(scan).observe(document.documentElement || document,
+                                                {childList:true,subtree:true,attributes:true});
                                             })();
                                         """.trimIndent()
                                         view.evaluateJavascript(script, null)
@@ -4260,7 +4335,7 @@ private fun SourceFallbackPlayer(
                         modifier = Modifier.fillMaxSize(),
                         update = { webViewRef.value = it }
                     )
-                    if (!sourcePageLoaded) {
+                    if (detectedDirectUrl.isBlank()) {
                         Box(
                             Modifier.fillMaxSize().background(Color.Black),
                             contentAlignment = Alignment.Center
