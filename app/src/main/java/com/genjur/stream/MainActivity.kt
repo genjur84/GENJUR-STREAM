@@ -3702,7 +3702,7 @@ private fun SourceBrowser(
                                                     var label = [
                                                         el.innerText, el.textContent, el.getAttribute('aria-label'),
                                                         el.getAttribute('title'), el.value
-                                                    ].filter(Boolean).join(' ').replace(/\\s+/g, ' ').trim().toLowerCase();
+                                                    ].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim().toLowerCase();
                                                     if (!label || label.length > 45) return;
                                                     if (/^(skip ad|skip ads|lewati iklan|lewati iklannya|close ad|tutup iklan|skip advertisement)$/.test(label)) {
                                                         el.click();
@@ -3778,40 +3778,55 @@ private fun SourceBrowser(
                                         } catch(e) {}
                                     }
                                     scanPage();
-                                    // LK21: coba server/player berikutnya otomatis bila player aktif
-                                    // belum memberikan URL media yang dapat diputar oleh GENJUR.
-                                    (function autoTryNextLk21Server() {
-                                        if ((location.hostname || '').toLowerCase().indexOf('lk21') === -1) return;
+                                    // KlikXXI: pilih server yang dikenal berurutan. Tunggu sebentar
+                                    // setelah tiap pilihan agar WebView sempat menangkap request media.
+                                    (function autoTryKlikxxiServers() {
+                                        var host = (location.hostname || '').toLowerCase();
+                                        if (host !== 'klikxxi.shop' && !host.endsWith('.klikxxi.shop')) return;
+                                        if (window.__genjurKlikxxiServerTimer) return;
                                         var selector = 'button,a,[role="button"],input[type="button"],input[type="submit"],[data-server],[data-player]';
-                                        function collect() {
-                                            var result = [];
-                                            document.querySelectorAll(selector).forEach(function(el) {
-                                                var label = [el.innerText, el.textContent, el.getAttribute('aria-label'),
-                                                    el.getAttribute('title'), el.value, el.getAttribute('data-server'),
-                                                    el.getAttribute('data-player')].filter(Boolean).join(' ')
-                                                    .replace(/\\s+/g, ' ').trim();
-                                                if (!label || !/(player\\s*[1-9]|p2p|cast|hydrax|server\\s*[1-9])/i.test(label)) return;
-                                                if (el.disabled || el.getAttribute('aria-hidden') === 'true') return;
-                                                var state = ((el.className || '') + ' ' + (el.getAttribute('aria-pressed') || '') +
-                                                    ' ' + (el.getAttribute('aria-selected') || '')).toLowerCase();
-                                                if (/active|selected|current|true/.test(state)) return;
-                                                if (result.every(function(x) { return x.el !== el; })) result.push({el:el,label:label});
-                                            });
-                                            return result;
-                                        }
-                                        var options = collect();
+                                        var preferred = ['server 1', 'server 3', 'server 4'];
+                                        var attempted = {};
                                         var index = 0;
-                                        function tryNext() {
-                                            if (index >= options.length) return;
-                                            var option = options[index++];
-                                            try { option.el.click(); } catch(e) {}
-                                            setTimeout(function() {
-                                                tryNext();
-                                            }, 6500);
+                                        function normalized(el) {
+                                            return [el.innerText, el.textContent, el.getAttribute('aria-label'),
+                                                el.getAttribute('title'), el.value, el.getAttribute('data-server'),
+                                                el.getAttribute('data-player')].filter(Boolean).join(' ')
+                                                .replace(/\s+/g, ' ').trim().toLowerCase();
                                         }
-                                        if (options.length > 1) setTimeout(tryNext, 6500);
+                                        function findServer(name) {
+                                            var found = null;
+                                            document.querySelectorAll(selector).forEach(function(el) {
+                                                if (found || !el || el.disabled || el.getAttribute('aria-hidden') === 'true') return;
+                                                var label = normalized(el);
+                                                if (label === name || new RegExp('(^|\\b)' + name.replace(' ', '\\s*') + '(\\b|$)', 'i').test(label)) {
+                                                    found = el;
+                                                }
+                                            });
+                                            return found;
+                                        }
+                                        function tryNext() {
+                                            if (window.__genjurMediaFound || index >= preferred.length) {
+                                                window.clearInterval(window.__genjurKlikxxiServerTimer);
+                                                window.__genjurKlikxxiServerTimer = null;
+                                                return;
+                                            }
+                                            var name = preferred[index++];
+                                            if (attempted[name]) return;
+                                            attempted[name] = true;
+                                            var el = findServer(name);
+                                            if (el) {
+                                                try { el.click(); } catch(e) {}
+                                            }
+                                        }
+                                        tryNext();
+                                        window.__genjurKlikxxiServerTimer = window.setInterval(tryNext, 10000);
                                         new MutationObserver(function() {
-                                            options = collect();
+                                            if (!window.__genjurMediaFound && index < preferred.length) {
+                                                // Tombol server kadang baru muncul setelah popup ditutup.
+                                                var nextName = preferred[index];
+                                                if (findServer(nextName)) tryNext();
+                                            }
                                         }).observe(document.documentElement, {childList:true,subtree:true});
                                     })();
                                     var scanTimer = null;
