@@ -4007,7 +4007,8 @@ private fun SourceFallbackPlayer(
         val path = uri.path.orEmpty().lowercase()
         val mediaUrlText = (path + "?" + uri.encodedQuery.orEmpty()).lowercase()
         val isPlayableMedia = path.endsWith(".m3u8") || path.endsWith(".mpd") ||
-            path.endsWith(".mp4") || path.endsWith(".m4v") || path.endsWith(".webm")
+            path.endsWith(".mp4") || path.endsWith(".m4v") || path.endsWith(".webm") ||
+            path.endsWith(".mov") || path.endsWith(".mkv")
         // Tolak URL media yang jelas berasal dari jaringan iklan atau endpoint
         // pre-roll/VAST. Beberapa situs memakai host CDN berbeda untuk iklannya.
         val adPath = Regex("""(^|[/_.?&=-])(ads?|advert|advertisement|preroll|pre-roll|vast|vpaid|popunder|banner|sponsor|tracking)([/_.?&=-]|$)""")
@@ -4180,9 +4181,38 @@ private fun SourceFallbackPlayer(
                                         view: android.webkit.WebView,
                                         request: android.webkit.WebResourceRequest
                                     ): android.webkit.WebResourceResponse? {
-                                        // Jangan pilih request MP4/HLS mentah sebagai film.
-                                        // Iklan pre-roll dapat memakai format yang sama; kandidat film
-                                        // hanya berasal dari GenjurMediaBridge setelah durasi >= 45 detik.
+                                        val uri = request.url
+                                        if (uri.scheme !in listOf("http", "https") || uri.host.isNullOrBlank()) {
+                                            return super.shouldInterceptRequest(view, request)
+                                        }
+
+                                        // Terapkan filter iklan pada seluruh resource, termasuk iframe.
+                                        // Domain iklan yang jelas dan endpoint tracking/popunder diblokir
+                                        // sebelum WebView memuat script, frame, gambar, atau redirect-nya.
+                                        if (isGenjurAdRequest(uri)) {
+                                            return blockedAdResponse()
+                                        }
+
+                                        // shouldInterceptRequest dipanggil untuk request dari iframe juga.
+                                        // Karena itu kita dapat menemukan manifest HLS/DASH walaupun
+                                        // JavaScript player berada di iframe lintas-domain.
+                                        val path = uri.path.orEmpty().lowercase()
+                                        val mediaUrl = uri.toString()
+                                        val hasMediaExtension = listOf(
+                                            ".m3u8", ".mpd", ".mp4", ".m4v", ".webm", ".mov", ".mkv"
+                                        ).any { ext ->
+                                            path.endsWith(ext) || Regex(
+                                                Regex.escape(ext) + "(?:$|[?#])",
+                                                RegexOption.IGNORE_CASE
+                                            ).containsMatchIn(mediaUrl)
+                                        }
+                                        if (hasMediaExtension) {
+                                            view.post {
+                                                // Manifest HLS/DASH lebih diprioritaskan daripada file
+                                                // media biasa karena lebih sering menjadi sumber utama.
+                                                addServerCandidate(mediaUrl, 0.0)
+                                            }
+                                        }
                                         return super.shouldInterceptRequest(view, request)
                                     }
 
