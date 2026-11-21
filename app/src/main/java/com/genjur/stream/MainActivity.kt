@@ -3702,7 +3702,7 @@ private fun SourceBrowser(
                                                     var label = [
                                                         el.innerText, el.textContent, el.getAttribute('aria-label'),
                                                         el.getAttribute('title'), el.value
-                                                    ].filter(Boolean).join(' ').replace(/\\s+/g, ' ').trim().toLowerCase();
+                                                    ].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim().toLowerCase();
                                                     if (!label || label.length > 45) return;
                                                     if (/^(skip ad|skip ads|lewati iklan|lewati iklannya|close ad|tutup iklan|skip advertisement)$/.test(label)) {
                                                         el.click();
@@ -3799,7 +3799,7 @@ private fun SourceBrowser(
                                             document.querySelectorAll(selector).forEach(function(el) {
                                                 if (found || !el || el.disabled || el.getAttribute('aria-hidden') === 'true') return;
                                                 var label = normalized(el);
-                                                if (label === name || new RegExp('(^|\\\\b)' + name.replace(' ', '\\\\s*') + '(\\\\b|$)', 'i').test(label)) {
+                                                if (label === name || new RegExp('(^|\\b)' + name.replace(' ', '\\s*') + '(\\b|$)', 'i').test(label)) {
                                                     found = el;
                                                 }
                                             });
