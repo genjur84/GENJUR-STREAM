@@ -4173,79 +4173,20 @@ private fun SourceFallbackPlayer(
                                         return false
                                     }
 
+                                    override fun onPageCommitVisible(view: android.webkit.WebView, url: String) {
+                                        super.onPageCommitVisible(view, url)
+                                        // Tampilkan halaman sumber begitu konten utama siap agar pengguna
+                                        // dapat menutup pop-up iklan dan memilih server secara manual.
+                                        sourcePageLoaded = true
+                                    }
+
                                     override fun onPageFinished(view: android.webkit.WebView, url: String) {
                                         super.onPageFinished(view, url)
-                                        // Overlay pencarian tetap menutup halaman situs. Ia hanya hilang
-                                        // setelah URL media film terdeteksi dan dipindah ke player internal.
+                                        sourcePageLoaded = true
+                                        // Hanya amati media film; jangan klik iklan, tombol server,
+                                        // atau area player secara otomatis. Interaksi tetap di tangan pengguna.
                                         val script = """
                                             (function() {
-                                              // Klikxxi: pilih Server 1 otomatis sebagai server pertama.
-                                              // Jika tidak menghasilkan stream, pengguna dapat menutup player dan mencoba ulang.
-                                              function genjurSelectKlikxxiServer() {
-                                                try {
-                                                  if (!/klikxxi\.shop$/i.test(location.hostname) || window.__genjurKlikxxiServerChosen) return;
-                                                  var links = Array.prototype.slice.call(document.querySelectorAll('a,button,[role="button"]'));
-                                                  var server = links.find(function(el) {
-                                                    var label = (el.innerText || el.textContent || el.getAttribute('aria-label') || '').replace(/\s+/g, ' ').trim();
-                                                    return /^server\s*1$/i.test(label);
-                                                  });
-                                                  if (server) {
-                                                    window.__genjurKlikxxiServerChosen = true;
-                                                    window.setTimeout(function() { try { server.click(); } catch(e) {} }, 700);
-                                                  }
-                                                } catch(e) {}
-                                              }
-                                              genjurSelectKlikxxiServer();
-                                              // Klik otomatis Skip Ads LK21 segera setelah tombol aktif (termasuk label hitung mundur).
-                                              function genjurTrySkipAds(doc) {
-                                                try {
-                                                  var nodes = doc.querySelectorAll('button, a, [role="button"], input[type="button"], input[type="submit"], [class*="skip"], [id*="skip"]');
-                                                  nodes.forEach(function(el) {
-                                                    if (!el || el.disabled || el.getAttribute('aria-disabled') === 'true' ||
-                                                        el.getAttribute('aria-hidden') === 'true') return;
-                                                    var label = [el.innerText, el.textContent, el.getAttribute('aria-label'),
-                                                      el.getAttribute('title'), el.value, el.id, el.className]
-                                                      .filter(Boolean).join(' ').replace(/\\s+/g, ' ').trim().toLowerCase();
-                                                    if (!label || label.length > 100) return;
-                                                    if (/\\bskip\\s*ads?\\b|\\bskip\\s+advertisement\\b|lewati\\s+iklan/.test(label)) {
-                                                      try { el.click(); } catch(e) {}
-                                                    }
-                                                  });
-                                                  Array.prototype.forEach.call(doc.querySelectorAll('iframe'), function(frame) {
-                                                    try { if (frame.contentDocument) genjurTrySkipAds(frame.contentDocument); } catch(e) {}
-                                                  });
-                                                } catch(e) {}
-                                              }
-                                              if (!window.__genjurSkipAdsTimer) {
-                                                genjurScanFrames(document);
-                                                window.__genjurSkipAdsTimer = window.setInterval(function() {
-                                                  genjurScanFrames(document);
-                                                }, 350);
-                                              }
-                                              // Setelah Skip Ads, LK21 meminta satu ketukan pada area player.
-                                              // Kirim satu klik di tengah player hanya setelah pesan mulai film terlihat.
-                                              function genjurTryStartFilm(doc) {
-                                                try {
-                                                  if (doc.__genjurFilmStartRequested) return;
-                                                  var bodyText = (doc.body && (doc.body.innerText || doc.body.textContent) || '').toLowerCase();
-                                                  var asksToStart = /klik\\s+di\\s+mana\\s+saja\\s+untuk\\s+memulai\\s+film|klik\\s+dimana\\s+saja\\s+untuk\\s+memulai\\s+film|click\\s+anywhere\\s+to\\s+start\\s+(the\\s+)?(movie|film|video)/i.test(bodyText);
-                                                  if (!asksToStart) return;
-                                                  // Minta Android mengirim satu sentuhan native ke tengah WebView.
-                                                  if (window.GenjurMediaBridge && GenjurMediaBridge.onStartFilmPrompt) {
-                                                    GenjurMediaBridge.onStartFilmPrompt();
-                                                    doc.__genjurFilmStartRequested = true;
-                                                  }
-                                                } catch(e) {}
-                                              }
-                                              function genjurScanFrames(doc) {
-                                                try {
-                                                  genjurTrySkipAds(doc);
-                                                  genjurTryStartFilm(doc);
-                                                  Array.prototype.forEach.call(doc.querySelectorAll('iframe'), function(frame) {
-                                                    try { if (frame.contentDocument) genjurScanFrames(frame.contentDocument); } catch(e) {}
-                                                  });
-                                                } catch(e) {}
-                                              }
                                               function attach(media) {
                                                 if (!media || media.dataset.genjurBridge === '1') return;
                                                 media.dataset.genjurBridge = '1';
