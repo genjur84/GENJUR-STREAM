@@ -3792,7 +3792,7 @@ private fun SourceBrowser(
                                             return [el.innerText, el.textContent, el.getAttribute('aria-label'),
                                                 el.getAttribute('title'), el.value, el.getAttribute('data-server'),
                                                 el.getAttribute('data-player')].filter(Boolean).join(' ')
-                                                .replace(/\\s+/g, ' ').trim().toLowerCase();
+                                                .replace(/\s+/g, ' ').trim().toLowerCase();
                                         }
                                         function findServer(name) {
                                             var found = null;
