@@ -3954,12 +3954,16 @@ private fun SourceFallbackPlayer(
     // Begitu proses pencarian sumber dimulai, langsung kunci perangkat ke landscape
     // dan sembunyikan system bar; jangan menunggu stream film ditemukan.
     SideEffect {
-        activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
-        WindowCompat.setDecorFitsSystemWindows(activity.window, false)
-        val bars = WindowInsetsControllerCompat(activity.window, activity.window.decorView)
-        bars.hide(WindowInsetsCompat.Type.systemBars())
-        bars.systemBarsBehavior =
-            WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        // Setelah URL media ditemukan, biarkan InAppVideoPlayer mengatur orientasi.
+        // Jangan biarkan layar pencarian sumber mengunci landscape kembali.
+        if (detectedDirectUrl.isBlank()) {
+            activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+            WindowCompat.setDecorFitsSystemWindows(activity.window, false)
+            val bars = WindowInsetsControllerCompat(activity.window, activity.window.decorView)
+            bars.hide(WindowInsetsCompat.Type.systemBars())
+            bars.systemBarsBehavior =
+                WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        }
     }
 
     // Simpan URL media langsung yang benar-benar diminta player situs.
@@ -4088,6 +4092,8 @@ private fun SourceFallbackPlayer(
                                 settings.mediaPlaybackRequiresUserGesture = true
                                 settings.javaScriptCanOpenWindowsAutomatically = false
                                 settings.setSupportMultipleWindows(false)
+                                // Selalu ambil halaman sumber terbaru, bukan halaman lama dari cache WebView.
+                                settings.cacheMode = android.webkit.WebSettings.LOAD_NO_CACHE
                                 settings.userAgentString = settings.userAgentString
                                     .replace("; wv)", ")")
                                     .replace(" Version/4.0", "")
@@ -4293,6 +4299,7 @@ private fun SourceFallbackPlayer(
                                         }
                                     }
                                 }
+                                clearHistory()
                                 loadUrl(movie.termsUrl.ifBlank { movie.videoUrl })
                             }
                         },
@@ -4537,13 +4544,20 @@ private fun InAppVideoPlayer(
         }
     }
 
-    // Tombol kembali Android keluar dari mode layar penuh terlebih dahulu.
-    BackHandler(enabled = true) {
+    // Tutup player dan kembalikan Activity ke portrait sebelum kembali ke detail film.
+    fun closePlayerToDetail() {
+        activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+        WindowCompat.setDecorFitsSystemWindows(activity.window, true)
+        WindowInsetsControllerCompat(activity.window, activity.window.decorView)
+            .show(WindowInsetsCompat.Type.systemBars())
         onClose()
+    }
+    BackHandler(enabled = true) {
+        closePlayerToDetail()
     }
 
     Dialog(
-        onDismissRequest = onClose,
+        onDismissRequest = { closePlayerToDetail() },
         properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
         // Ambil window dialog yang benar: pada Android, menyembunyikan system bar
@@ -4661,7 +4675,7 @@ private fun InAppVideoPlayer(
                             IconButton(onClick = { requestPlayerDownload() }) {
                                 Icon(Icons.Filled.Download, contentDescription = "Unduh video", tint = Color.White)
                             }
-                            TextButton(onClick = onClose) {
+                            TextButton(onClick = { closePlayerToDetail() }) {
                                 Text("Tutup", color = Color.White)
                             }
                         }
