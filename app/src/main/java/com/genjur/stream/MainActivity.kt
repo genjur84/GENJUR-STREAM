@@ -4212,6 +4212,8 @@ private fun SourceFallbackPlayer(
                                                       .filter(Boolean).join(' ').replace(/\\s+/g, ' ').trim().toLowerCase();
                                                     if (label.length < 100 &&
                                                       /\\bskip\\s*ads?\\b|\\bskip\\s+advertisement\\b|lewati\\s+iklan|tutup\\s+iklan|close\\s+ads?\\b|close\\s+advertisement/.test(label)) {
+                                                      el.dataset.genjurAdClicked = '1';
+                                                      window.__genjurAdDismissedAt = Date.now();
                                                       try { el.click(); } catch(e) {}
                                                     }
                                                   }
@@ -4222,6 +4224,8 @@ private fun SourceFallbackPlayer(
                                                 try {
                                                   if (!/klikxxi\\.shop$/i.test(location.hostname) ||
                                                       window.__genjurMediaFound || window.__genjurServerIndex >= serverLabels.length) return;
+                                                  if (window.__genjurAdDismissedAt && Date.now() - window.__genjurAdDismissedAt < 1200) return;
+                                                  if (window.__genjurLastServerAt && Date.now() - window.__genjurLastServerAt < 10000) return;
                                                   var nodes = document.querySelectorAll('a,button,[role="button"],input[type="button"],input[type="submit"]');
                                                   for (var i = 0; i < nodes.length; i++) {
                                                     var el = nodes[i];
