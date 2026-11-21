@@ -3943,6 +3943,7 @@ private fun SourceFallbackPlayer(
     onClose: () -> Unit
 ) {
     var fullscreenView by remember { mutableStateOf<android.view.View?>(null) }
+    var fullscreenContainer by remember { mutableStateOf<android.view.ViewGroup?>(null) }
     var fullscreenCallback by remember { mutableStateOf<android.webkit.WebChromeClient.CustomViewCallback?>(null) }
     var detectedDirectUrl by remember(movie) { mutableStateOf("") }
     var sourcePageLoaded by remember(movie) { mutableStateOf(false) }
@@ -4022,13 +4023,21 @@ private fun SourceFallbackPlayer(
         }
     }
 
-    BackHandler(enabled = fullscreenView != null) {
-        fullscreenCallback?.onCustomViewHidden()
+    // Tutup seluruh player saat Back ditekan. Custom view milik situs ditempel
+    // langsung ke decor Activity, jadi harus dilepas eksplisit saat composable hilang.
+    BackHandler(enabled = true) {
+        onClose()
     }
 
     DisposableEffect(Unit) {
         onDispose {
-            fullscreenCallback?.onCustomViewHidden()
+            val overlay = fullscreenView
+            val container = fullscreenContainer ?: (overlay?.parent as? android.view.ViewGroup)
+            runCatching { container?.removeView(overlay) }
+            fullscreenView = null
+            fullscreenContainer = null
+            runCatching { fullscreenCallback?.onCustomViewHidden() }
+            fullscreenCallback = null
             webViewRef.value?.apply {
                 stopLoading()
                 loadUrl("about:blank")
@@ -4036,6 +4045,7 @@ private fun SourceFallbackPlayer(
                 destroy()
             }
             activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+            WindowCompat.setDecorFitsSystemWindows(activity.window, true)
             WindowInsetsControllerCompat(activity.window, activity.window.decorView)
                 .show(WindowInsetsCompat.Type.systemBars())
         }
@@ -4274,6 +4284,7 @@ private fun SourceFallbackPlayer(
                                         }
                                         (view.parent as? android.view.ViewGroup)?.removeView(view)
                                         fullscreenView = view
+                                        fullscreenContainer = decor
                                         fullscreenCallback = callback
                                         decor.addView(view, android.view.ViewGroup.LayoutParams(
                                             android.view.ViewGroup.LayoutParams.MATCH_PARENT,
@@ -4286,9 +4297,11 @@ private fun SourceFallbackPlayer(
                                     }
 
                                     override fun onHideCustomView() {
-                                        val decor = fullscreenView?.rootView as? android.view.ViewGroup
-                                        fullscreenView?.let { view -> decor?.removeView(view) }
+                                        val overlay = fullscreenView
+                                        val container = fullscreenContainer ?: (overlay?.parent as? android.view.ViewGroup)
+                                        runCatching { container?.removeView(overlay) }
                                         fullscreenView = null
+                                        fullscreenContainer = null
                                         fullscreenCallback = null
                                         activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
                                         WindowCompat.setDecorFitsSystemWindows(activity.window, false)
