@@ -178,6 +178,23 @@ private fun isGenjurAdHost(host: String?): Boolean {
     val normalized = host?.lowercase()?.trim('.') ?: return false
     return GENJUR_AD_HOSTS.any { normalized == it || normalized.endsWith(".$it") }
 }
+
+/**
+ * Filter only clear ad/tracker endpoints. Keep ordinary film pages and media
+ * manifests untouched so the resolver can still discover the real stream.
+ */
+private fun isGenjurAdRequest(uri: Uri): Boolean {
+    if (isGenjurAdHost(uri.host)) return true
+    val endpoint = (uri.encodedPath.orEmpty() + "?" + uri.encodedQuery.orEmpty()).lowercase()
+    return Regex(
+        """(?i)(?:^|[/._-])(adserver|adservice|ads?|advert|popunder|popads|banner|tracking|analytics|pixel|beacon)(?:[/._?&=-]|$)|doubleclick|googlesyndication|googleadservices|popcash|propellerads|exoclick|trafficjunky|juicyads|taboola|outbrain|mgid"""
+    ).containsMatchIn(endpoint)
+}
+
+private fun blockedAdResponse(): android.webkit.WebResourceResponse =
+    android.webkit.WebResourceResponse(
+        "text/plain", "utf-8", ByteArrayInputStream(ByteArray(0))
+    )
 private val Bg = Color(0xFF09090D)
 private val Panel = Color(0xFF191821)
 private val Green = Color(0xFF8B5CF6)
@@ -3635,6 +3652,12 @@ private fun SourceBrowser(
                     webViewClient = object : WebViewClient() {
                         override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): android.webkit.WebResourceResponse? {
                             val requestedUri = request.url
+                            // Block ad/tracker network requests before they load. This applies
+                            // to scripts, frames, images, popunders and ad redirects, while
+                            // requests for the film host and media URLs continue normally.
+                            if (requestedUri.scheme in listOf("http", "https") && isGenjurAdRequest(requestedUri)) {
+                                return blockedAdResponse()
+                            }
                             val mediaPath = requestedUri.path.orEmpty().lowercase()
                             val mediaUrlLower = requestedUri.toString().lowercase()
                             val mediaMatch = Regex("""\.(m3u8|mpd|mp4|m4v|webm|mov|mkv)(?:$|[?#&])""").containsMatchIn(mediaUrlLower)
@@ -3660,11 +3683,6 @@ private fun SourceBrowser(
                                         } + StreamOption(label, mediaUrl))
                                     }
                                 }
-                            }
-                            if (!request.isForMainFrame && isGenjurAdHost(requestedUri.host)) {
-                                return android.webkit.WebResourceResponse(
-                                    "text/plain", "utf-8", ByteArrayInputStream(ByteArray(0))
-                                )
                             }
                             return super.shouldInterceptRequest(view, request)
                         }
